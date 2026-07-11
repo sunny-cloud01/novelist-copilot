@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/worker-result.schema.json",
+  "title": "WorkerResult",
+  "type": "object",
+  "required": ["schema_version", "task_id", "status", "output_refs", "metrics", "errors", "trace_id"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "./task-status.schema.json" },
+    "output_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "metrics": { "type": "object" },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "./api-error.schema.json"
+      }
+    },
+    "trace_id": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

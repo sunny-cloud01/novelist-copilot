@@ -3,9 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "contracts:lint": "python3 scripts/build_docs.py --check",
-    "contracts:test": "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
-    "lint": "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
-    "test": "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
+    "contracts:lint": "pnpm --filter @novel-factory/contracts lint",
+    "contracts:test": "pnpm --filter @novel-factory/contracts test",
+    "lint": "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:lint",
+    "test": "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:test"
   }
 }

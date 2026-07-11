@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/task-event.schema.json",
+  "title": "TaskEvent",
+  "type": "object",
+  "required": ["schema_version", "task_event_id", "task_id", "event_type", "message", "created_at"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "task_event_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "event_type": {
+      "type": "string",
+      "enum": ["created", "started", "progress", "retry_scheduled", "review_required", "blocked", "failed", "succeeded"]
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "payload_ref": { "type": ["string", "null"] },
+    "payload_json": { "type": ["object", "null"] },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

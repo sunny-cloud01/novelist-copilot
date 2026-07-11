@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/api-success-envelope.schema.json",
+  "title": "ApiSuccessEnvelope",
+  "type": "object",
+  "required": ["data", "meta", "errors"],
+  "properties": {
+    "data": {},
+    "meta": {
+      "$ref": "./request-meta.schema.json"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "./api-error.schema.json"
+      }
+    }
+  },
+  "additionalProperties": false
+}

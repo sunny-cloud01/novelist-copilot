@@ -1,0 +1,103 @@
+openapi: 3.1.0
+info:
+  title: Novel Factory API
+  version: 1.0.0
+servers:
+  - url: /v1
+paths:
+  /health:
+    get:
+      operationId: getGatewayHealth
+      responses:
+        '200':
+          description: Gateway health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /agent-tasks:
+    post:
+      operationId: createAgentTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskCommand'
+      responses:
+        '202':
+          description: Task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /agent-tasks/{taskId}:
+    get:
+      operationId: getAgentTask
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+components:
+  schemas:
+    RequestMeta:
+      type: object
+      required:
+        - request_id
+        - trace_id
+      properties:
+        request_id:
+          type: string
+          minLength: 1
+        trace_id:
+          type: string
+          minLength: 1
+      additionalProperties: false
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          minLength: 1
+        message:
+          type: string
+          minLength: 1
+        target:
+          type: string
+        recovery_hint:
+          type: string
+      additionalProperties: false
+    ApiSuccessEnvelope:
+      $ref: ../schemas/api-success-envelope.schema.json
+    ApiErrorEnvelope:
+      $ref: ../schemas/api-error-envelope.schema.json
+    TaskStatus:
+      $ref: ../schemas/task-status.schema.json
+    Task:
+      $ref: ../schemas/task.schema.json
+    TaskEvent:
+      $ref: ../schemas/task-event.schema.json
+    CreateTaskCommand:
+      $ref: ../schemas/create-task-command.schema.json
+    WorkerCommand:
+      $ref: ../schemas/worker-command.schema.json
+    WorkerResult:
+      $ref: ../schemas/worker-result.schema.json

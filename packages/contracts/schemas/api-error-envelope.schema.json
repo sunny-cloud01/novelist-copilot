@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/api-error-envelope.schema.json",
+  "title": "ApiErrorEnvelope",
+  "type": "object",
+  "required": ["data", "meta", "errors"],
+  "properties": {
+    "data": {
+      "type": ["null", "object", "array", "string", "number", "boolean"]
+    },
+    "meta": {
+      "$ref": "./request-meta.schema.json"
+    },
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "./api-error.schema.json"
+      }
+    }
+  },
+  "additionalProperties": false
+}

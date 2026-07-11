@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/create-task-command.schema.json",
+  "title": "CreateTaskCommand",
+  "type": "object",
+  "required": ["schema_version", "task_type", "workspace_id", "owner_module", "input_refs", "idempotency_key", "trace_id", "requested_by"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "task_type": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "owner_module": { "type": "string", "minLength": 1 },
+    "input_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "idempotency_key": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "requested_by": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

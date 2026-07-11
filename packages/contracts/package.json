@@ -1,0 +1,15 @@
+{
+  "name": "@novel-factory/contracts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node ./scripts/lint-contracts.mjs",
+    "test": "node ./scripts/test-contracts.mjs"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "glob": "^11.0.0"
+  }
+}

@@ -5,10 +5,10 @@ import json
 def test_root_workspace_files_exist_and_expose_required_scripts() -> None:
     package = json.loads(Path("package.json").read_text())
     assert package["private"] is True
-    assert package["scripts"]["contracts:lint"] == "python3 scripts/build_docs.py --check"
-    assert package["scripts"]["contracts:test"] == "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
-    assert package["scripts"]["lint"] == "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
-    assert package["scripts"]["test"] == "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
+    assert package["scripts"]["contracts:lint"] == "pnpm --filter @novel-factory/contracts lint"
+    assert package["scripts"]["contracts:test"] == "pnpm --filter @novel-factory/contracts test"
+    assert package["scripts"]["lint"] == "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:lint"
+    assert package["scripts"]["test"] == "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:test"
 
 
 def test_workspace_membership_and_bootstrap_docs_are_present() -> None:

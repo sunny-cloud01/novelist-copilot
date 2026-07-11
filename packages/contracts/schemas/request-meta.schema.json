@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/request-meta.schema.json",
+  "title": "RequestMeta",
+  "type": "object",
+  "required": ["request_id", "trace_id"],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

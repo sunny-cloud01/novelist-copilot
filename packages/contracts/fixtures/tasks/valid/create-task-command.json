@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "task_type": "extract_knowledge",
+  "workspace_id": "01JZ0000000000000000000000",
+  "owner_module": "ai-worker",
+  "input_refs": ["object://source-books/01JZBOOK"],
+  "idempotency_key": "extract-01JZBOOK-001",
+  "trace_id": "01JZTRC000000000000000000",
+  "requested_by": "system_agent"
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/task-status.schema.json",
+  "title": "TaskStatus",
+  "type": "string",
+  "enum": [
+    "queued",
+    "running",
+    "retrying",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "requires_review",
+    "blocked"
+  ]
+}
