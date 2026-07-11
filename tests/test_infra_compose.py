@@ -1,7 +1,11 @@
 from pathlib import Path
+import shutil
 import subprocess
 
+import pytest
 
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="docker CLI is unavailable")
 def test_docker_compose_file_is_valid() -> None:
     compose_path = Path("infra/docker-compose.yml")
     assert compose_path.exists()
