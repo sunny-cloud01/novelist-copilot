@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "assignment_id": "01JZASSIGN000000000000001",
+  "agent_role": "writer",
+  "task_type": "chapter_generation",
+  "output_mode": "text",
+  "model_profile_id": "model_profile_default",
+  "fallback_profile_ids": ["model_profile_structured_fallback"],
+  "max_retry": 2,
+  "max_cost": 1.5,
+  "enabled": true
+}

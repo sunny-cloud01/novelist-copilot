@@ -1,0 +1,7 @@
+{
+  "default_model_profile_id": "model_profile_default",
+  "model_profiles": [],
+  "agent_model_assignments": [],
+  "quality_gate_profiles": [],
+  "prompt_versions": []
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/workspace-home.schema.json",
+  "title": "WorkspaceHome",
+  "type": "object",
+  "required": [
+    "workspace",
+    "recent_tasks",
+    "pending_reviews",
+    "quick_links"
+  ],
+  "properties": {
+    "workspace": { "$ref": "https://novelfactory.dev/schemas/workspace.schema.json" },
+    "recent_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["task_id", "task_type", "status", "summary", "updated_at"],
+        "properties": {
+          "task_id": { "type": "string", "minLength": 1 },
+          "task_type": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "target_ref": { "type": ["string", "null"], "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "pending_reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["review_id", "review_type", "status", "title", "target_ref"],
+        "properties": {
+          "review_id": { "type": "string", "minLength": 1 },
+          "review_type": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "target_ref": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "quick_links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "route", "resource_ref"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "route": { "type": "string", "minLength": 1 },
+          "resource_ref": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

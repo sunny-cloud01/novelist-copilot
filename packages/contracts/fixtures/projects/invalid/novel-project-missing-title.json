@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "project_id": "01JZPROJECT000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "genre_scope": "玄幻升级流",
+  "status": "planning",
+  "story_bible_id": "01JZBIBLE0000000000000001",
+  "quality_gate_profile_id": "01JZQUALITY00000000000001",
+  "allowed_knowledge_source_refs": [
+    "object://source-books/01JZBOOK000000000000000001"
+  ],
+  "created_at": "2026-07-11T02:00:00Z"
+}

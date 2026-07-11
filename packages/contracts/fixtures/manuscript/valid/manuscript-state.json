@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "manuscript_state_id": "manuscript-state:01JZPROJECT000000000000001",
+  "project_id": "01JZPROJECT000000000000001",
+  "writing_run_id": "01JZWRITING00000000000001",
+  "current_story_state": {
+    "summary": "第 1 章《乌坦城风起》已进入 manuscript，三年之约正式进入主线。",
+    "accepted_chapter_ref": "object://manuscripts/01JZWRITING00000000000001/chapters/1",
+    "quality_gate_status": "passed"
+  },
+  "character_dynamic_state": [
+    {
+      "character_name": "萧炎",
+      "state_summary": "从公开羞辱中立下三年之约，主线动机被明确激活。"
+    }
+  ],
+  "relationship_state": [
+    {
+      "subject": "萧炎",
+      "object": "三年之约",
+      "state_summary": "人物目标从承压转为正面回应，冲突升级为长期承诺。"
+    }
+  ],
+  "hook_state": [
+    {
+      "hook_key": "core_conflict",
+      "status": "active",
+      "summary": "天赋跌落后的家族压力与三年之约仍是当前核心挂钩。"
+    }
+  ],
+  "prior_summary_pack": [
+    {
+      "summary_index": 1,
+      "summary": "议事堂压抑氛围与家族压力被建立。"
+    },
+    {
+      "summary_index": 2,
+      "summary": "纳兰家退婚消息引爆公开冲突。"
+    },
+    {
+      "summary_index": 3,
+      "summary": "主角在羞辱中立下三年之约。"
+    }
+  ],
+  "updated_at": "2026-07-11T03:12:00Z"
+}

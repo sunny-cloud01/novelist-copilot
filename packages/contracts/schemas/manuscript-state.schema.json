@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/manuscript-state.schema.json",
+  "title": "ManuscriptState",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "manuscript_state_id",
+    "project_id",
+    "writing_run_id",
+    "current_story_state",
+    "character_dynamic_state",
+    "relationship_state",
+    "hook_state",
+    "prior_summary_pack",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "manuscript_state_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "current_story_state": {
+      "type": "object",
+      "required": ["summary", "accepted_chapter_ref", "quality_gate_status"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "accepted_chapter_ref": { "type": "string", "minLength": 1 },
+        "quality_gate_status": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "character_dynamic_state": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["character_name", "state_summary"],
+        "properties": {
+          "character_name": { "type": "string", "minLength": 1 },
+          "state_summary": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relationship_state": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["subject", "object", "state_summary"],
+        "properties": {
+          "subject": { "type": "string", "minLength": 1 },
+          "object": { "type": "string", "minLength": 1 },
+          "state_summary": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "hook_state": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["hook_key", "status", "summary"],
+        "properties": {
+          "hook_key": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "prior_summary_pack": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["summary_index", "summary"],
+        "properties": {
+          "summary_index": { "type": "integer", "minimum": 1 },
+          "summary": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

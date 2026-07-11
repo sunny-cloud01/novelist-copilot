@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "feedback_record_id": "01JZFDBK0000000000000002",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "target_type": "writing_run",
+  "target_id": "01JZWRITING00000000000001",
+  "feedback_type": "cost",
+  "score": 1.7,
+  "source": "system",
+  "comment_ref": null,
+  "payload": {},
+  "created_at": "2026-07-11T03:10:00Z"
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/extraction-run.schema.json",
+  "title": "ExtractionRun",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "book_id",
+    "workspace_id",
+    "task_id",
+    "status",
+    "current_stage",
+    "chapter_count",
+    "scene_count",
+    "object_count",
+    "evidence_count",
+    "low_confidence_count",
+    "errors",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "running", "retrying", "succeeded", "failed", "requires_review", "blocked"]
+    },
+    "current_stage": {
+      "type": "string",
+      "enum": [
+        "source_submission",
+        "book_registration",
+        "file_intake",
+        "text_normalization",
+        "chapter_segmentation",
+        "scene_segmentation",
+        "knowledge_extraction",
+        "evidence_binding",
+        "object_normalization",
+        "quality_review",
+        "knowledge_package_export",
+        "knowledge_base_commit"
+      ]
+    },
+    "chapter_count": { "type": "integer", "minimum": 0 },
+    "scene_count": { "type": "integer", "minimum": 0 },
+    "object_count": { "type": "integer", "minimum": 0 },
+    "evidence_count": { "type": "integer", "minimum": 0 },
+    "low_confidence_count": { "type": "integer", "minimum": 0 },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "finished_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "provider_call_id": "01JZPCALL0000000000000001",
+  "agent_role": "critic",
+  "model_profile_id": "model_profile_structured_fallback",
+  "provider_name": "anthropic",
+  "prompt_tokens": 1400,
+  "completion_tokens": 540,
+  "latency_ms": 980,
+  "retry_count": 1,
+  "cost_estimate": 0.22,
+  "status": "retrying",
+  "error_code": "structured_output_validation_failed"
+}

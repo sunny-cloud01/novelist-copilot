@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "chapter_plan_id": "01JZCHPLAN000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "project_id": "01JZPROJECT000000000000001",
+  "chapter_index": 1,
+  "status": "requires_review",
+  "target_word_count": 3200,
+  "payload": {
+    "title": "乌坦城风起",
+    "summary": "主角在第一章完成进入主线前的势能铺垫。"
+  },
+  "created_at": "2026-07-11T02:10:00Z",
+  "updated_at": "2026-07-11T02:12:00Z"
+}

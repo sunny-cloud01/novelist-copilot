@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "model_profile_id": "model_profile_default",
+  "provider_name": "anthropic",
+  "provider_model_name": "claude-sonnet-5",
+  "label": "默认中文长文本模型",
+  "description": "用于大多数 MVP agent role 的默认 profile。",
+  "enabled": true,
+  "supports_structured_output": true,
+  "fallback_profile_ids": ["model_profile_structured_fallback"]
+}

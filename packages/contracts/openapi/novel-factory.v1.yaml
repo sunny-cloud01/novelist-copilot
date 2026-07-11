@@ -15,6 +15,450 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /books:
+    post:
+      operationId: createBook
+      responses:
+        '201':
+          description: Book created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /books/{bookId}:
+    get:
+      operationId: getBook
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /books/{bookId}/chapters:
+    get:
+      operationId: listBookChapters
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book chapters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /extraction-runs:
+    post:
+      operationId: createExtractionRun
+      responses:
+        '202':
+          description: Extraction run accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /extraction-runs/{runId}:
+    get:
+      operationId: getExtractionRun
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Extraction run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Extraction run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /extraction-runs/{runId}/report:
+    get:
+      operationId: getExtractionRunReport
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Extraction run report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /knowledge-objects:
+    get:
+      operationId: listKnowledgeObjects
+      responses:
+        '200':
+          description: Knowledge objects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /knowledge-objects/{objectId}/review-actions:
+    post:
+      operationId: reviewKnowledgeObject
+      parameters:
+        - in: path
+          name: objectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewActionCommand'
+      responses:
+        '200':
+          description: Review action applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /graph/summary:
+    get:
+      operationId: getGraphSummary
+      responses:
+        '200':
+          description: Graph summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /novel-projects:
+    post:
+      operationId: createNovelProject
+      responses:
+        '202':
+          description: Novel project accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /novel-projects/{projectId}:
+    get:
+      operationId: getNovelProject
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Novel project detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Novel project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /workspaces:
+    post:
+      operationId: createWorkspace
+      responses:
+        '201':
+          description: Workspace created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /workspaces/{workspaceId}:
+    get:
+      operationId: getWorkspace
+      parameters:
+        - in: path
+          name: workspaceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workspace detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Workspace not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /workspaces/{workspaceId}/home:
+    get:
+      operationId: getWorkspaceHome
+      parameters:
+        - in: path
+          name: workspaceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workspace home aggregate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Workspace not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /chapter-plans:
+    post:
+      operationId: createChapterPlan
+      responses:
+        '202':
+          description: Chapter plan accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /chapter-plans/{chapterPlanId}:
+    get:
+      operationId: getChapterPlan
+      parameters:
+        - in: path
+          name: chapterPlanId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chapter plan detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Chapter plan not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /chapter-plans/{chapterPlanId}/section-plans:
+    get:
+      operationId: listSectionPlans
+      parameters:
+        - in: path
+          name: chapterPlanId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Section plans
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+    post:
+      operationId: createSectionPlans
+      parameters:
+        - in: path
+          name: chapterPlanId
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Section plans accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /writing-runs:
+    post:
+      operationId: createWritingRun
+      responses:
+        '202':
+          description: Writing run accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /writing-runs/{writingRunId}:
+    get:
+      operationId: getWritingRun
+      parameters:
+        - in: path
+          name: writingRunId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Writing run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Writing run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /writing-runs/{writingRunId}/accept-chapter:
+    post:
+      operationId: acceptWritingChapter
+      parameters:
+        - in: path
+          name: writingRunId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Writing chapter accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Writing run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '409':
+          description: Writing run acceptance dependencies incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /quality-reports/{qualityReportId}:
+    get:
+      operationId: getQualityReport
+      parameters:
+        - in: path
+          name: qualityReportId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quality report detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Quality report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /feedback-records:
+    get:
+      operationId: listFeedbackRecords
+      parameters:
+        - in: query
+          name: targetType
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: targetId
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Feedback records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /configuration:
+    get:
+      operationId: getConfigurationSnapshot
+      responses:
+        '200':
+          description: Configuration snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /model-profiles/{modelProfileId}/enable:
+    post:
+      operationId: enableModelProfile
+      parameters:
+        - in: path
+          name: modelProfileId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model profile enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Model profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /model-profiles/{modelProfileId}/disable:
+    post:
+      operationId: disableModelProfile
+      parameters:
+        - in: path
+          name: modelProfileId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model profile disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Model profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /agent-tasks:
     post:
       operationId: createAgentTask
@@ -101,3 +545,47 @@ components:
       $ref: ../schemas/worker-command.schema.json
     WorkerResult:
       $ref: ../schemas/worker-result.schema.json
+    SourceBook:
+      $ref: ../schemas/source-book.schema.json
+    SourceChapter:
+      $ref: ../schemas/source-chapter.schema.json
+    ExtractionRun:
+      $ref: ../schemas/extraction-run.schema.json
+    KnowledgeObject:
+      $ref: ../schemas/knowledge-object.schema.json
+    ReviewActionCommand:
+      $ref: ../schemas/review-action-command.schema.json
+    GraphSummary:
+      $ref: ../schemas/graph-summary.schema.json
+    NovelProject:
+      $ref: ../schemas/novel-project.schema.json
+    Workspace:
+      $ref: ../schemas/workspace.schema.json
+    WorkspaceMember:
+      $ref: ../schemas/workspace-member.schema.json
+    WorkspaceHome:
+      $ref: ../schemas/workspace-home.schema.json
+    StoryBible:
+      $ref: ../schemas/story-bible.schema.json
+    ChapterPlan:
+      $ref: ../schemas/chapter-plan.schema.json
+    SectionPlan:
+      $ref: ../schemas/section-plan.schema.json
+    WritingRun:
+      $ref: ../schemas/writing-run.schema.json
+    ChapterSnapshot:
+      $ref: ../schemas/chapter-snapshot.schema.json
+    ManuscriptState:
+      $ref: ../schemas/manuscript-state.schema.json
+    ModelProfile:
+      $ref: ../schemas/model-profile.schema.json
+    AgentModelAssignment:
+      $ref: ../schemas/agent-model-assignment.schema.json
+    ProviderCall:
+      $ref: ../schemas/provider-call.schema.json
+    ConfigurationSnapshot:
+      $ref: ../schemas/configuration-snapshot.schema.json
+    QualityReport:
+      $ref: ../schemas/quality-report.schema.json
+    FeedbackRecord:
+      $ref: ../schemas/feedback-record.schema.json

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "quality_report_id": "01JZQLTREP000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "writing_run_id": "01JZWRITING00000000000001",
+  "status": "reviewing",
+  "ai_flavor_score": 0.34,
+  "mobile_readability_score": 0.82,
+  "originality_safety_score": 0.91,
+  "human_review_required": true,
+  "blocking_issues": [],
+  "created_at": "2026-07-11T03:08:00Z"
+}

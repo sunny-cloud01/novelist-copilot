@@ -18,27 +18,262 @@ const ajv = new Ajv2020({ allErrors: true, strict: false, schemas: [
   JSON.parse(fs.readFileSync(path.join(root, "schemas/create-task-command.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/worker-command.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/worker-result.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/source-book.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/source-chapter.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/extraction-run.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/knowledge-object.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/review-action-command.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/graph-summary.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/novel-project.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/workspace.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/workspace-member.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/workspace-home.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-bible.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/chapter-plan.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/section-plan.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/model-profile.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/agent-model-assignment.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/provider-call.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/configuration-snapshot.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/chapter-snapshot.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/manuscript-state.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/writing-run.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/quality-report.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/feedback-record.schema.json"), "utf8")),
 ] });
 addFormats(ajv);
 
-const validateCreateTaskCommand = ajv.getSchema("https://novelfactory.dev/schemas/create-task-command.schema.json");
-if (!validateCreateTaskCommand) {
-  throw new Error("create-task-command validator missing");
+function readFixture(relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }
 
-const validPayload = JSON.parse(
-  fs.readFileSync(path.join(root, "fixtures/tasks/valid/create-task-command.json"), "utf8"),
+function assertValid(schemaId, payload, label) {
+  const validate = ajv.getSchema(schemaId);
+  if (!validate) {
+    throw new Error(`${label} validator missing`);
+  }
+  if (!validate(payload)) {
+    throw new Error(`${label} valid fixture failed: ${JSON.stringify(validate.errors)}`);
+  }
+}
+
+function assertInvalid(schemaId, payload, label) {
+  const validate = ajv.getSchema(schemaId);
+  if (!validate) {
+    throw new Error(`${label} validator missing`);
+  }
+  if (validate(payload)) {
+    throw new Error(`${label} invalid fixture unexpectedly passed`);
+  }
+}
+
+assertValid(
+  "https://novelfactory.dev/schemas/create-task-command.schema.json",
+  readFixture("fixtures/tasks/valid/create-task-command.json"),
+  "create-task-command",
 );
-const invalidPayload = JSON.parse(
-  fs.readFileSync(path.join(root, "fixtures/tasks/invalid/create-task-command-missing-idempotency-key.json"), "utf8"),
+assertInvalid(
+  "https://novelfactory.dev/schemas/create-task-command.schema.json",
+  readFixture("fixtures/tasks/invalid/create-task-command-missing-idempotency-key.json"),
+  "create-task-command",
 );
 
-if (!validateCreateTaskCommand(validPayload)) {
-  throw new Error(`valid fixture failed: ${JSON.stringify(validateCreateTaskCommand.errors)}`);
-}
+assertValid(
+  "https://novelfactory.dev/schemas/source-book.schema.json",
+  readFixture("fixtures/books/valid/source-book.json"),
+  "source-book",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/source-book.schema.json",
+  readFixture("fixtures/books/invalid/source-book-missing-title.json"),
+  "source-book",
+);
 
-if (validateCreateTaskCommand(invalidPayload)) {
-  throw new Error("invalid fixture unexpectedly passed");
-}
+assertValid(
+  "https://novelfactory.dev/schemas/extraction-run.schema.json",
+  readFixture("fixtures/extraction-runs/valid/extraction-run.json"),
+  "extraction-run",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/extraction-run.schema.json",
+  readFixture("fixtures/extraction-runs/invalid/extraction-run-invalid-stage.json"),
+  "extraction-run",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/review-action-command.schema.json",
+  readFixture("fixtures/knowledge-review/valid/review-action-merge-alias.json"),
+  "review-action",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/review-action-command.schema.json",
+  readFixture("fixtures/knowledge-review/invalid/review-action-merge-alias-missing-target.json"),
+  "review-action",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/novel-project.schema.json",
+  readFixture("fixtures/projects/valid/novel-project.json"),
+  "novel-project",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/novel-project.schema.json",
+  readFixture("fixtures/projects/invalid/novel-project-missing-title.json"),
+  "novel-project",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/workspace.schema.json",
+  readFixture("fixtures/workspace/valid/workspace.json"),
+  "workspace",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/workspace.schema.json",
+  readFixture("fixtures/workspace/invalid/workspace-missing-owner-user.json"),
+  "workspace",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/workspace-member.schema.json",
+  readFixture("fixtures/workspace/valid/workspace-member.json"),
+  "workspace-member",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/workspace-member.schema.json",
+  readFixture("fixtures/workspace/invalid/workspace-member-invalid-role.json"),
+  "workspace-member",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/workspace-home.schema.json",
+  readFixture("fixtures/workspace/valid/workspace-home.json"),
+  "workspace-home",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/workspace-home.schema.json",
+  readFixture("fixtures/workspace/invalid/workspace-home-empty-links.json"),
+  "workspace-home",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/chapter-plan.schema.json",
+  readFixture("fixtures/planning/valid/chapter-plan.json"),
+  "chapter-plan",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/chapter-plan.schema.json",
+  readFixture("fixtures/planning/invalid/chapter-plan-invalid-status.json"),
+  "chapter-plan",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/section-plan.schema.json",
+  readFixture("fixtures/planning/valid/section-plan.json"),
+  "section-plan",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/section-plan.schema.json",
+  readFixture("fixtures/planning/invalid/section-plan-invalid-role.json"),
+  "section-plan",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/model-profile.schema.json",
+  readFixture("fixtures/configuration/valid/model-profile.json"),
+  "model-profile",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/model-profile.schema.json",
+  readFixture("fixtures/configuration/invalid/model-profile-missing-id.json"),
+  "model-profile",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/agent-model-assignment.schema.json",
+  readFixture("fixtures/configuration/valid/agent-model-assignment.json"),
+  "agent-model-assignment",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/agent-model-assignment.schema.json",
+  readFixture("fixtures/configuration/invalid/agent-model-assignment-invalid-retry.json"),
+  "agent-model-assignment",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/provider-call.schema.json",
+  readFixture("fixtures/configuration/valid/provider-call.json"),
+  "provider-call",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/provider-call.schema.json",
+  readFixture("fixtures/configuration/invalid/provider-call-invalid-latency.json"),
+  "provider-call",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/configuration-snapshot.schema.json",
+  readFixture("fixtures/configuration/valid/configuration-snapshot.json"),
+  "configuration-snapshot",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/configuration-snapshot.schema.json",
+  readFixture("fixtures/configuration/invalid/configuration-snapshot-empty.json"),
+  "configuration-snapshot",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/chapter-snapshot.schema.json",
+  readFixture("fixtures/manuscript/valid/chapter-snapshot.json"),
+  "chapter-snapshot",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/chapter-snapshot.schema.json",
+  readFixture("fixtures/manuscript/invalid/chapter-snapshot-missing-text.json"),
+  "chapter-snapshot",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/manuscript-state.schema.json",
+  readFixture("fixtures/manuscript/valid/manuscript-state.json"),
+  "manuscript-state",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/manuscript-state.schema.json",
+  readFixture("fixtures/manuscript/invalid/manuscript-state-missing-prior-summary-pack.json"),
+  "manuscript-state",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/writing-run.schema.json",
+  readFixture("fixtures/writing/valid/writing-run.json"),
+  "writing-run",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/writing-run.schema.json",
+  readFixture("fixtures/writing/invalid/writing-run-invalid-status.json"),
+  "writing-run",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/quality-report.schema.json",
+  readFixture("fixtures/writing/valid/quality-report.json"),
+  "quality-report",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/quality-report.schema.json",
+  readFixture("fixtures/writing/invalid/quality-report-invalid-status.json"),
+  "quality-report",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/feedback-record.schema.json",
+  readFixture("fixtures/writing/valid/feedback-record.json"),
+  "feedback-record",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/feedback-record.schema.json",
+  readFixture("fixtures/writing/invalid/feedback-record-invalid-score.json"),
+  "feedback-record",
+);
 
 console.log("contracts test ok");

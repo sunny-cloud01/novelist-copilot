@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/review-action-command.schema.json",
+  "title": "ReviewActionCommand",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "object_id",
+    "action",
+    "requested_by",
+    "trace_id"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "object_id": { "type": "string", "minLength": 1 },
+    "action": {
+      "type": "string",
+      "enum": ["approve", "reject", "merge_alias", "request_reextract"]
+    },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "target_object_id": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": { "const": "merge_alias" }
+        }
+      },
+      "then": {
+        "required": ["target_object_id"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/quality-report.schema.json",
+  "title": "QualityReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "quality_report_id",
+    "workspace_id",
+    "writing_run_id",
+    "status",
+    "ai_flavor_score",
+    "mobile_readability_score",
+    "originality_safety_score",
+    "human_review_required",
+    "blocking_issues",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "quality_report_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["queued", "passed", "blocked"] },
+    "ai_flavor_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "mobile_readability_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "originality_safety_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "human_review_required": { "type": "boolean" },
+    "blocking_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "category", "summary", "affected_text_ref"],
+        "properties": {
+          "issue_id": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "affected_text_ref": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

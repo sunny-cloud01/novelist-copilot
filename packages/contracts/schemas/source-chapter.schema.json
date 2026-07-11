@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/source-chapter.schema.json",
+  "title": "SourceChapter",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "chapter_id",
+    "book_id",
+    "chapter_index",
+    "title",
+    "segmentation_status"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_index": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "segmentation_status": {
+      "type": "string",
+      "enum": ["pending", "segmented", "review_required", "failed"]
+    },
+    "text_object_ref": { "type": ["string", "null"], "minLength": 1 }
+  },
+  "additionalProperties": false
+}

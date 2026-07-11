@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/configuration-snapshot.schema.json",
+  "title": "ConfigurationSnapshot",
+  "type": "object",
+  "required": [
+    "default_model_profile_id",
+    "model_profiles",
+    "agent_model_assignments",
+    "quality_gate_profiles",
+    "prompt_versions"
+  ],
+  "properties": {
+    "default_model_profile_id": { "type": "string", "minLength": 1 },
+    "model_profiles": {
+      "type": "array",
+      "items": { "$ref": "https://novelfactory.dev/schemas/model-profile.schema.json" },
+      "minItems": 1
+    },
+    "agent_model_assignments": {
+      "type": "array",
+      "items": { "$ref": "https://novelfactory.dev/schemas/agent-model-assignment.schema.json" },
+      "minItems": 1
+    },
+    "quality_gate_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "quality_gate_profile_id",
+          "label",
+          "ai_flavor_threshold",
+          "originality_safety_threshold"
+        ],
+        "properties": {
+          "quality_gate_profile_id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "ai_flavor_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "originality_safety_threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "prompt_versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agent_role", "template_ref"],
+        "properties": {
+          "agent_role": { "type": "string", "minLength": 1 },
+          "template_ref": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

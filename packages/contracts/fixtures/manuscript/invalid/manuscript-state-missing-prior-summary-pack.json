@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "manuscript_state_id": "manuscript-state:01JZPROJECT000000000000001",
+  "project_id": "01JZPROJECT000000000000001",
+  "writing_run_id": "01JZWRITING00000000000001",
+  "current_story_state": {
+    "summary": "第 1 章《乌坦城风起》已进入 manuscript。",
+    "accepted_chapter_ref": "object://manuscripts/01JZWRITING00000000000001/chapters/1",
+    "quality_gate_status": "passed"
+  },
+  "character_dynamic_state": [
+    {
+      "character_name": "萧炎",
+      "state_summary": "主线动机被激活。"
+    }
+  ],
+  "relationship_state": [
+    {
+      "subject": "萧炎",
+      "object": "三年之约",
+      "state_summary": "冲突升级。"
+    }
+  ],
+  "hook_state": [
+    {
+      "hook_key": "core_conflict",
+      "status": "active",
+      "summary": "三年之约仍持续。"
+    }
+  ],
+  "updated_at": "2026-07-11T03:12:00Z"
+}

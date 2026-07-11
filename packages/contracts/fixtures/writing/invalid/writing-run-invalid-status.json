@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "writing_run_id": "01JZWRITING00000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "project_id": "01JZPROJECT000000000000001",
+  "chapter_plan_id": "01JZCHPLAN000000000000001",
+  "status": "drafting",
+  "task_id": "01JZWRITETASK0000000000001",
+  "memory_package_id": "01JZMEMPKG000000000000001",
+  "prompt_package_id": "01JZPROMPTPKG000000000001",
+  "chapter_draft_id": "01JZDRAFT0000000000000001",
+  "quality_report_id": "01JZQLTREP000000000000001",
+  "trace_id": "01JZTRC000000000000000003",
+  "current_stage": "humanizer_pass",
+  "writer_model_profile_id": "writer_default",
+  "critic_model_profile_id": "critic_default",
+  "humanizer_model_profile_id": "humanizer_default",
+  "assembled_chapter": "text",
+  "model_cost": {
+    "input_tokens": 4980,
+    "output_tokens": 2310,
+    "estimated_total_cost": 0.86
+  },
+  "accepted_into_manuscript_at": null,
+  "accepted_chapter_ref": null,
+  "chapter_snapshot_id": null,
+  "manuscript_state_id": null,
+  "chapter_snapshot": null,
+  "manuscript_state": null,
+  "created_at": "2026-07-11T03:02:00Z"
+}

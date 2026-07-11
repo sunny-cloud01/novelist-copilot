@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/writing-run.schema.json",
+  "title": "WritingRun",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "writing_run_id",
+    "workspace_id",
+    "project_id",
+    "chapter_plan_id",
+    "status",
+    "task_id",
+    "memory_package_id",
+    "prompt_package_id",
+    "chapter_draft_id",
+    "quality_report_id",
+    "trace_id",
+    "current_stage",
+    "writer_model_profile_id",
+    "critic_model_profile_id",
+    "humanizer_model_profile_id",
+    "assembled_chapter",
+    "model_cost",
+    "provider_calls",
+    "accepted_into_manuscript_at",
+    "accepted_chapter_ref",
+    "chapter_snapshot_id",
+    "manuscript_state_id",
+    "chapter_snapshot",
+    "manuscript_state",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "chapter_plan_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "running", "succeeded", "failed", "requires_review", "blocked"]
+    },
+    "task_id": { "type": "string", "minLength": 1 },
+    "memory_package_id": { "type": "string", "minLength": 1 },
+    "prompt_package_id": { "type": "string", "minLength": 1 },
+    "chapter_draft_id": { "type": "string", "minLength": 1 },
+    "quality_report_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "current_stage": {
+      "type": "string",
+      "enum": ["queued", "memory_package", "prompt_package", "writer_draft", "critic_review", "humanizer_pass", "quality_gate"]
+    },
+    "writer_model_profile_id": { "type": "string", "minLength": 1 },
+    "critic_model_profile_id": { "type": "string", "minLength": 1 },
+    "humanizer_model_profile_id": { "type": "string", "minLength": 1 },
+    "assembled_chapter": { "type": "string" },
+    "model_cost": {
+      "type": "object",
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "estimated_total_cost",
+        "retry_count",
+        "writer_input_tokens",
+        "writer_output_tokens",
+        "critic_input_tokens",
+        "critic_output_tokens",
+        "humanizer_input_tokens",
+        "humanizer_output_tokens"
+      ],
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "estimated_total_cost": { "type": "number", "minimum": 0 },
+        "retry_count": { "type": "integer", "minimum": 0 },
+        "writer_input_tokens": { "type": "integer", "minimum": 0 },
+        "writer_output_tokens": { "type": "integer", "minimum": 0 },
+        "critic_input_tokens": { "type": "integer", "minimum": 0 },
+        "critic_output_tokens": { "type": "integer", "minimum": 0 },
+        "humanizer_input_tokens": { "type": "integer", "minimum": 0 },
+        "humanizer_output_tokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "provider_calls": {
+      "type": "array",
+      "items": { "$ref": "https://novelfactory.dev/schemas/provider-call.schema.json" }
+    },
+    "accepted_into_manuscript_at": { "type": ["string", "null"], "format": "date-time" },
+    "accepted_chapter_ref": { "type": ["string", "null"], "minLength": 1 },
+    "chapter_snapshot_id": { "type": ["string", "null"], "minLength": 1 },
+    "manuscript_state_id": { "type": ["string", "null"], "minLength": 1 },
+    "chapter_snapshot": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "https://novelfactory.dev/schemas/chapter-snapshot.schema.json" }
+      ]
+    },
+    "manuscript_state": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "https://novelfactory.dev/schemas/manuscript-state.schema.json" }
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

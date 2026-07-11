@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/section-plan.schema.json",
+  "title": "SectionPlan",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "section_plan_id",
+    "workspace_id",
+    "chapter_plan_id",
+    "section_index",
+    "planning_role",
+    "payload",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "section_plan_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "chapter_plan_id": { "type": "string", "minLength": 1 },
+    "section_index": { "type": "integer", "minimum": 1 },
+    "planning_role": { "type": "string", "enum": ["setup", "conflict", "turn", "payoff"] },
+    "payload": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

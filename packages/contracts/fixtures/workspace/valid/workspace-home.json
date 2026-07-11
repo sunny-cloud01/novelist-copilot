@@ -1,0 +1,59 @@
+{
+  "workspace": {
+    "schema_version": 1,
+    "workspace_id": "demo-workspace",
+    "owner_user_id": "demo-user",
+    "name": "默认中文工作区",
+    "slug": "demo-workspace",
+    "default_language": "zh-CN",
+    "status": "active",
+    "created_at": "2026-07-11T00:00:00Z",
+    "updated_at": "2026-07-11T00:10:00Z"
+  },
+  "recent_tasks": [
+    {
+      "task_id": "01JZWRITETASK0000000000001",
+      "task_type": "create_writing_run",
+      "status": "requires_review",
+      "summary": "写作任务进入人工复核。",
+      "updated_at": "2026-07-11T03:05:00Z",
+      "target_ref": "object://writing-runs/01JZWRITING00000000000001"
+    },
+    {
+      "task_id": "01JZPLANTASK0000000000001",
+      "task_type": "create_chapter_plan",
+      "status": "requires_review",
+      "summary": "章节规划已生成，等待确认。",
+      "updated_at": "2026-07-11T02:12:00Z",
+      "target_ref": "object://chapter-plans/01JZCHPLAN000000000000001"
+    }
+  ],
+  "pending_reviews": [
+    {
+      "review_id": "01JZOBJ0000000000000000002",
+      "review_type": "knowledge_object",
+      "status": "pending",
+      "title": "Yao Lao 仍待知识审核",
+      "target_ref": "object://knowledge-objects/01JZOBJ0000000000000000002"
+    },
+    {
+      "review_id": "01JZSECRUN00000000000002",
+      "review_type": "section_run",
+      "status": "rewrite_required",
+      "title": "第二节仍需补足压迫递进",
+      "target_ref": "object://section-runs/01JZSECRUN00000000000002"
+    }
+  ],
+  "quick_links": [
+    {
+      "label": "进入写作工作台",
+      "route": "/projects/demo-project/writing/demo-run",
+      "resource_ref": "object://writing-runs/01JZWRITING00000000000001"
+    },
+    {
+      "label": "进入配置中心",
+      "route": "/configuration",
+      "resource_ref": "object://configuration/default"
+    }
+  ]
+}

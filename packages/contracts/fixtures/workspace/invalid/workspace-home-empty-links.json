@@ -1,0 +1,15 @@
+{
+  "workspace": {
+    "schema_version": 1,
+    "workspace_id": "demo-workspace",
+    "owner_user_id": "demo-user",
+    "name": "默认中文工作区",
+    "slug": "demo-workspace",
+    "default_language": "zh-CN",
+    "status": "active",
+    "created_at": "2026-07-11T00:00:00Z"
+  },
+  "recent_tasks": [],
+  "pending_reviews": [],
+  "quick_links": []
+}

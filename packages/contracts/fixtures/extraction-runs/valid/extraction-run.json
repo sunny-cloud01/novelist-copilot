@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "run_id": "01JZRUN0000000000000000001",
+  "book_id": "01JZBOOK000000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "task_id": "01JZTASK000000000000000001",
+  "status": "requires_review",
+  "current_stage": "quality_review",
+  "chapter_count": 12,
+  "scene_count": 48,
+  "object_count": 34,
+  "evidence_count": 89,
+  "low_confidence_count": 3,
+  "errors": [],
+  "created_at": "2026-07-11T00:00:00Z",
+  "started_at": "2026-07-11T00:00:05Z",
+  "finished_at": null
+}

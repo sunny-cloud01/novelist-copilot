@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/provider-call.schema.json",
+  "title": "ProviderCall",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provider_call_id",
+    "agent_role",
+    "model_profile_id",
+    "provider_name",
+    "prompt_tokens",
+    "completion_tokens",
+    "latency_ms",
+    "retry_count",
+    "cost_estimate",
+    "status",
+    "error_code"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "provider_call_id": { "type": "string", "minLength": 1 },
+    "agent_role": { "type": "string", "minLength": 1 },
+    "model_profile_id": { "type": "string", "minLength": 1 },
+    "provider_name": { "type": "string", "minLength": 1 },
+    "prompt_tokens": { "type": "integer", "minimum": 0 },
+    "completion_tokens": { "type": "integer", "minimum": 0 },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "retry_count": { "type": "integer", "minimum": 0 },
+    "cost_estimate": { "type": "number", "minimum": 0 },
+    "status": { "type": "string", "enum": ["succeeded", "failed", "retrying"] },
+    "error_code": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}
