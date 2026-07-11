@@ -4,8 +4,8 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "contracts:lint": "python3 scripts/build_docs.py --check",
-    "contracts:test": "pytest tests/test_build_docs.py tests/test_repo_layout.py -q",
-    "lint": "python3 scripts/build_docs.py --check && pytest tests/test_build_docs.py tests/test_repo_layout.py -q",
-    "test": "pytest tests/test_build_docs.py tests/test_repo_layout.py -q"
+    "contracts:test": "python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py -q",
+    "lint": "python3 scripts/build_docs.py --check && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py -q",
+    "test": "python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py -q"
   }
 }
