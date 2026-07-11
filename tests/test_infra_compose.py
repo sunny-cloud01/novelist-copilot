@@ -28,7 +28,7 @@ def test_pgvector_init_and_env_example_exist() -> None:
     assert "CREATE EXTENSION IF NOT EXISTS vector;" in sql
 
     env = Path(".env.example").read_text()
-    assert "NOVEL_FACTORY_POSTGRES_URL=" in env
+    assert "NOVEL_FACTORY_POSTGRES_URL=postgresql://novel:novel@localhost:5436/novel_factory" in env
     assert "NOVEL_FACTORY_REDIS_URL=" in env
     assert "NOVEL_FACTORY_MINIO_SECRET_KEY=replace-me" in env
 
