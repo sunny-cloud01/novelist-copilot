@@ -6,6 +6,11 @@
   "required": [
     "schema_version",
     "provider_call_id",
+    "workspace_id",
+    "task_id",
+    "writing_run_id",
+    "request_id",
+    "trace_id",
     "agent_role",
     "model_profile_id",
     "provider_name",
@@ -20,6 +25,11 @@
   "properties": {
     "schema_version": { "type": "integer", "minimum": 1 },
     "provider_call_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
     "agent_role": { "type": "string", "minLength": 1 },
     "model_profile_id": { "type": "string", "minLength": 1 },
     "provider_name": { "type": "string", "minLength": 1 },

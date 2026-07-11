@@ -22,6 +22,9 @@ def post_workspace(command: CreateWorkspaceCommand, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -34,6 +37,9 @@ def get_workspace_detail(workspace_id: str, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -46,4 +52,7 @@ def get_workspace_home_detail(workspace_id: str, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )

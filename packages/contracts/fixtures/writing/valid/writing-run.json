@@ -32,6 +32,11 @@
     {
       "schema_version": 1,
       "provider_call_id": "01JZPCALL0000000000000001",
+      "workspace_id": "01JZWORKSPACE0000000000001",
+      "task_id": "01JZWRITETASK0000000000001",
+      "writing_run_id": "01JZWRITING00000000000001",
+      "request_id": "req-writing-run",
+      "trace_id": "01JZTRC000000000000000003",
       "agent_role": "writer",
       "model_profile_id": "model_profile_default",
       "provider_name": "anthropic",
@@ -46,6 +51,11 @@
     {
       "schema_version": 1,
       "provider_call_id": "01JZPCALL0000000000000002",
+      "workspace_id": "01JZWORKSPACE0000000000001",
+      "task_id": "01JZWRITETASK0000000000001",
+      "writing_run_id": "01JZWRITING00000000000001",
+      "request_id": "req-writing-run",
+      "trace_id": "01JZTRC000000000000000003",
       "agent_role": "critic",
       "model_profile_id": "model_profile_structured_fallback",
       "provider_name": "anthropic",

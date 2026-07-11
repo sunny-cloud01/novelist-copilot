@@ -7,7 +7,11 @@ import {
   createInitialPhaseTwoState,
   createUploadedBook,
   deriveLowConfidenceItems,
+  promoteStrategySuggestionInState,
   toggleModelProfileInState,
+  updateAgentAssignmentInState,
+  updatePromptVersionInState,
+  updateQualityGateProfileInState,
 } from "../components/phase-two-state";
 
 describe("phase two state", () => {
@@ -72,15 +76,37 @@ describe("phase two state", () => {
     expect(next.sectionRunsByWriting["01JZWRITING00000000000001"].every((item) => item.status === "beat_approved")).toBe(true);
   });
 
-  it("disables default profile and reroutes writing telemetry to fallback", () => {
-    const next = toggleModelProfileInState(createInitialPhaseTwoState(), "model_profile_default", false);
+  it("records unique ids for repeated model toggles", () => {
+    const initial = createInitialPhaseTwoState();
+    const once = toggleModelProfileInState(initial, "model_profile_default", true);
+    const twice = toggleModelProfileInState(once, "model_profile_default", true);
 
-    expect(next.configurationSnapshot.modelProfiles.find((item) => item.modelProfileId === "model_profile_default")?.enabled).toBe(false);
-    expect(next.writingRuns[0].writerModelProfileId).toBe("model_profile_structured_fallback");
-    expect(next.writingRuns[0].criticModelProfileId).toBe("model_profile_structured_fallback");
-    expect(next.writingRuns[0].humanizerModelProfileId).toBe("model_profile_structured_fallback");
-    expect(next.providerCallsByWriting["01JZWRITING00000000000001"][0].modelProfileId).toBe("model_profile_structured_fallback");
-    expect(next.providerCallsByWriting["01JZWRITING00000000000001"][2].modelProfileId).toBe("model_profile_structured_fallback");
-    expect(next.activityLog.at(-1)).toContain("已禁用模型 profile：model_profile_default");
+    expect(twice.configurationMutations.at(-2)?.mutationId).not.toBe(twice.configurationMutations.at(-1)?.mutationId);
+    expect(twice.auditEvents.at(-2)?.auditEventId).not.toBe(twice.auditEvents.at(-1)?.auditEventId);
+    expect(twice.auditEvents.at(-1)?.requestId).toContain("-2");
+  });
+
+  it("records audit and mutation entries for governance actions", () => {
+    const initial = createInitialPhaseTwoState();
+    const afterQuality = updateQualityGateProfileInState(initial, "01JZQUALITY00000000000001", 0.4, 0.9);
+    const afterAssignment = updateAgentAssignmentInState(
+      afterQuality,
+      "01JZASSIGN000000000000006",
+      "model_profile_structured_fallback",
+    );
+    const afterPrompt = updatePromptVersionInState(afterAssignment, "writer", "prompt://writer/chapter-compact");
+    const afterPromotion = promoteStrategySuggestionInState(afterPrompt, "01JZSTRAT000000000000001");
+
+    expect(afterPromotion.configurationSnapshot.qualityGateProfiles[0].aiFlavorThreshold).toBe(0.4);
+    expect(
+      afterPromotion.configurationSnapshot.agentModelAssignments.find((item) => item.assignmentId === "01JZASSIGN000000000000006")
+        ?.modelProfileId,
+    ).toBe("model_profile_structured_fallback");
+    expect(
+      afterPromotion.configurationSnapshot.promptVersions.find((item) => item.agentRole === "writer")?.templateRef,
+    ).toBe("prompt://writer/chapter-compact");
+    expect(afterPromotion.strategySuggestions[0].status).toBe("approved");
+    expect(afterPromotion.configurationMutations.at(-1)?.mutationType).toBe("feedback_record_promoted");
+    expect(afterPromotion.auditEvents.at(-1)?.action).toBe("feedback.record_promoted");
   });
 });

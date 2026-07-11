@@ -42,11 +42,27 @@ def test_gateway_create_and_fetch_novel_project() -> None:
     assert payload["meta"] == {
         "request_id": "req-gateway-project",
         "trace_id": "trace-gateway-project",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
     }
 
     detail_response = client.get(f"/v1/novel-projects/{project_id}")
     assert detail_response.status_code == 200
     assert detail_response.json()["data"]["project"]["title"] == "遮天衍生稿"
+
+
+def test_gateway_novel_project_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/novel-projects",
+        json={"title": "遮天衍生稿", "genre_scope": "东方玄幻"},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_gateway_seed_project_and_planning_flow() -> None:
@@ -81,6 +97,7 @@ def test_gateway_create_chapter_plan_and_sections() -> None:
     payload = create_plan.json()["data"]
     chapter_plan_id = payload["chapter_plan"]["chapter_plan_id"]
     assert payload["task"]["status"] == "queued"
+    assert payload["chapter_plan"]["trace_id"] == "trace-gateway-plan"
 
     create_sections = client.post(
         f"/v1/chapter-plans/{chapter_plan_id}/section-plans",
@@ -92,6 +109,20 @@ def test_gateway_create_chapter_plan_and_sections() -> None:
     section_payload = create_sections.json()["data"]
     assert len(section_payload["items"]) == 2
     assert section_payload["items"][1]["planning_role"] == "conflict"
+    assert section_payload["items"][0]["trace_id"] == "trace-gateway-sections"
+
+
+def test_gateway_chapter_plan_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/chapter-plans",
+        json={"project_id": "01JZPROJECT000000000000001", "chapter_index": 3, "target_word_count": 4200},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_gateway_workspace_create_detail_and_home() -> None:

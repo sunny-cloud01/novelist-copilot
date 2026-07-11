@@ -1,5 +1,7 @@
 {
   "default_model_profile_id": "model_profile_default",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "trace_id": "trace-config-snapshot",
   "model_profiles": [
     {
       "schema_version": 1,
@@ -53,9 +55,13 @@
   "quality_gate_profiles": [
     {
       "quality_gate_profile_id": "01JZQUALITY00000000000001",
+      "workspace_id": "01JZWORKSPACE0000000000001",
+      "trace_id": "trace-config-snapshot",
       "label": "默认质量阈值",
       "ai_flavor_threshold": 0.45,
-      "originality_safety_threshold": 0.85
+      "originality_safety_threshold": 0.85,
+      "input_refs": ["object://config/default-quality-thresholds"],
+      "output_refs": ["object://quality-gate-profiles/01JZQUALITY00000000000001"]
     }
   ],
   "prompt_versions": [

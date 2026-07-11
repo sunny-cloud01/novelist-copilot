@@ -82,7 +82,9 @@ class CoreStore:
     chapter_snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
     manuscript_states_by_project: dict[str, dict[str, Any]] = field(default_factory=dict)
     feedback_records: dict[str, dict[str, Any]] = field(default_factory=dict)
+    agent_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     task_events_by_task: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    audit_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 STORE = CoreStore()
@@ -118,7 +120,9 @@ def reset_store() -> None:
     STORE.chapter_snapshots.clear()
     STORE.manuscript_states_by_project.clear()
     STORE.feedback_records.clear()
+    STORE.agent_tasks.clear()
     STORE.task_events_by_task.clear()
+    STORE.audit_events.clear()
 
 
 def seed_phase_two_demo_data() -> None:
@@ -890,6 +894,197 @@ def _workspace_or_default(workspace_id: Optional[str] = None) -> str:
     return default_workspace_id()
 
 
+def _member_for_actor(workspace_id: str, actor_id: str) -> Optional[dict[str, Any]]:
+    for member in STORE.workspace_members.values():
+        if member["workspace_id"] == workspace_id and member["user_id"] == actor_id and member["status"] == "active":
+            return member
+    return None
+
+
+def _actor_context(
+    workspace_id: Optional[str] = None,
+    actor_id: Optional[str] = None,
+    actor_role: Optional[str] = None,
+) -> dict[str, str]:
+    resolved_workspace_id = _workspace_or_default(workspace_id)
+    resolved_actor_id = actor_id or USER_ID
+    member = _member_for_actor(resolved_workspace_id, resolved_actor_id)
+    resolved_actor_role = actor_role or (member["role"] if member else "viewer")
+    return {
+        "workspace_id": resolved_workspace_id,
+        "actor_id": resolved_actor_id,
+        "actor_role": resolved_actor_role,
+    }
+
+
+def _append_task_event(
+    task: Optional[dict[str, Any]],
+    event_type: str,
+    message: str,
+    status: str,
+    request_id: str,
+    trace_id: str,
+    actor_id: str,
+    agent_role: str = "system",
+    payload_json: Optional[dict[str, Any]] = None,
+    error_code: Optional[str] = None,
+    created_at: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    if not task:
+        return None
+    event = {
+        "schema_version": 1,
+        "task_event_id": str(ulid.new()),
+        "task_id": task["task_id"],
+        "workspace_id": task["workspace_id"],
+        "event_type": event_type,
+        "status": status,
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "actor_id": actor_id,
+        "agent_role": agent_role,
+        "message": message,
+        "payload_ref": None,
+        "payload_json": payload_json,
+        "error_code": error_code,
+        "created_at": created_at or utc_now(),
+    }
+    STORE.task_events_by_task.setdefault(task["task_id"], []).append(event)
+    return event
+
+
+def _append_audit_event(
+    action: str,
+    target_type: str,
+    target_id: str,
+    request_id: str,
+    trace_id: str,
+    actor_id: str,
+    actor_role: str,
+    workspace_id: str,
+    target_ref: Optional[str] = None,
+    before_ref: Optional[str] = None,
+    after_ref: Optional[str] = None,
+    reason: Optional[str] = None,
+    payload: Optional[dict[str, Any]] = None,
+    created_at: Optional[str] = None,
+) -> dict[str, Any]:
+    event = {
+        "schema_version": 1,
+        "audit_event_id": str(ulid.new()),
+        "workspace_id": workspace_id,
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "actor_id": actor_id,
+        "actor_role": actor_role,
+        "action": action,
+        "target_type": target_type,
+        "target_id": target_id,
+        "target_ref": target_ref,
+        "before_ref": before_ref,
+        "after_ref": after_ref,
+        "reason": reason,
+        "payload": payload,
+        "created_at": created_at or utc_now(),
+    }
+    STORE.audit_events.append(event)
+    return event
+
+
+def _require_role(actor_role: str, allowed_roles: set[str]) -> None:
+    if actor_role not in allowed_roles:
+        raise PermissionError("forbidden")
+
+
+def _build_task(
+    task_id: str,
+    task_type: str,
+    workspace_id: str,
+    input_refs: list[str],
+    output_refs: list[str],
+    status: str,
+    progress: int,
+    idempotency_key: str,
+    request_id: str,
+    trace_id: str,
+    actor_id: str,
+    retry_count: int = 0,
+    error_code: Optional[str] = None,
+    created_at: Optional[str] = None,
+    started_at: Optional[str] = None,
+    finished_at: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "task_id": task_id,
+        "task_type": task_type,
+        "workspace_id": workspace_id,
+        "owner_module": "ai-worker",
+        "input_refs": input_refs,
+        "output_refs": output_refs,
+        "status": status,
+        "progress": progress,
+        "idempotency_key": idempotency_key,
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "actor_id": actor_id,
+        "retry_count": retry_count,
+        "latency_ms": latency_ms,
+        "error_code": error_code,
+        "created_at": created_at,
+        "started_at": started_at,
+        "finished_at": finished_at,
+    }
+
+
+def _build_feedback_record(
+    feedback_record_id: str,
+    workspace_id: str,
+    target_type: str,
+    target_id: str,
+    feedback_type: str,
+    score: float,
+    source: str,
+    request_id: str,
+    trace_id: str,
+    actor_id: str,
+    created_at: str,
+    comment_ref: Optional[str] = None,
+    payload: Optional[dict[str, Any]] = None,
+    promotion_status: str = "pending",
+    input_refs: Optional[list[str]] = None,
+    output_refs: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "feedback_record_id": feedback_record_id,
+        "workspace_id": workspace_id,
+        "target_type": target_type,
+        "target_id": target_id,
+        "feedback_type": feedback_type,
+        "score": score,
+        "source": source,
+        "request_id": request_id,
+        "trace_id": trace_id,
+        "actor_id": actor_id,
+        "promotion_status": promotion_status,
+        "input_refs": input_refs or [],
+        "output_refs": output_refs or [],
+        "comment_ref": comment_ref,
+        "payload": payload,
+        "created_at": created_at,
+        "updated_at": created_at,
+    }
+
+
+def list_audit_events(workspace_id: Optional[str] = None) -> list[dict[str, Any]]:
+    items = STORE.audit_events
+    if workspace_id:
+        items = [item for item in items if item["workspace_id"] == workspace_id]
+    return sorted(items, key=lambda item: item["created_at"])
+
+
 def create_workspace(payload: dict[str, Any]) -> dict[str, Any]:
     workspace_id = payload.get("slug") or str(ulid.new())
     now = utc_now()
@@ -1013,7 +1208,76 @@ def get_workspace_home(workspace_id: str) -> Optional[dict[str, Any]]:
     }
 
 
+def _normalize_seed_records() -> None:
+    for object_id, obj in STORE.knowledge_objects.items():
+        obj.setdefault("trace_id", STORE.extraction_runs.get(RUN_ID, {}).get("task", {}).get("trace_id", "01JZTRC000000000000000001"))
+        obj.setdefault("input_refs", [f"object://extraction-runs/{RUN_ID}"])
+        obj.setdefault("output_refs", [f"object://knowledge-objects/{object_id}"])
+
+    for chapter_plan in STORE.chapter_plans.values():
+        chapter_plan.setdefault("trace_id", "01JZTRC000000000000000002")
+        chapter_plan.setdefault("input_refs", [f"object://novel-projects/{chapter_plan['project_id']}"])
+        chapter_plan.setdefault("output_refs", [f"object://chapter-plans/{chapter_plan['chapter_plan_id']}"])
+
+    for section_items in STORE.section_plans_by_chapter.values():
+        for section in section_items:
+            section.setdefault("trace_id", "01JZTRC000000000000000002")
+            section.setdefault("input_refs", [f"object://chapter-plans/{section['chapter_plan_id']}"])
+            section.setdefault("output_refs", [f"object://section-plans/{section['section_plan_id']}"])
+
+    for task in [*STORE.chapter_plan_tasks.values(), *STORE.section_plan_tasks.values(), *STORE.writing_run_tasks.values()]:
+        task.setdefault("request_id", "seed-request")
+        task.setdefault("trace_id", "seed-trace")
+        task.setdefault("actor_id", USER_ID)
+        task.setdefault("latency_ms", 1000 if task.get("finished_at") else 0)
+
+    extraction_task = STORE.extraction_runs.get(RUN_ID, {}).get("task")
+    if extraction_task:
+        extraction_task.setdefault("request_id", "seed-request")
+        extraction_task.setdefault("trace_id", "01JZTRC000000000000000001")
+        extraction_task.setdefault("actor_id", USER_ID)
+        extraction_task.setdefault("latency_ms", 0)
+
+    for writing_run_id, provider_calls in STORE.provider_calls_by_writing.items():
+        task = STORE.writing_run_tasks.get(writing_run_id)
+        for call in provider_calls:
+            call.setdefault("workspace_id", default_workspace_id())
+            call.setdefault("task_id", task["task_id"] if task else WRITING_TASK_ID)
+            call.setdefault("writing_run_id", writing_run_id)
+            call.setdefault("request_id", "seed-request")
+            call.setdefault("trace_id", STORE.writing_runs.get(writing_run_id, {}).get("trace_id", "seed-trace"))
+
+    for record_id, record in STORE.feedback_records.items():
+        target_ref = f"object://{record['target_type'].replace('_', '-')}/{record['target_id']}"
+        record.setdefault("request_id", "seed-request")
+        record.setdefault("trace_id", STORE.writing_runs.get(WRITING_RUN_ID, {}).get("trace_id", "seed-trace"))
+        record.setdefault("actor_id", USER_ID)
+        record.setdefault("promotion_status", "pending")
+        record.setdefault("input_refs", [target_ref])
+        record.setdefault("output_refs", [])
+
+    for task_id, events in STORE.task_events_by_task.items():
+        task = None
+        for candidate in [STORE.extraction_runs.get(RUN_ID, {}).get("task"), *STORE.chapter_plan_tasks.values(), *STORE.section_plan_tasks.values(), *STORE.writing_run_tasks.values()]:
+            if candidate and candidate["task_id"] == task_id:
+                task = candidate
+                break
+        for event in events:
+            event.setdefault("workspace_id", task["workspace_id"] if task else default_workspace_id())
+            event.setdefault("status", task["status"] if task else "queued")
+            event.setdefault("request_id", task.get("request_id") if task else "seed-request")
+            event.setdefault("trace_id", task.get("trace_id") if task else "seed-trace")
+            event.setdefault("actor_id", task.get("actor_id") if task else USER_ID)
+            event.setdefault("agent_role", "system")
+            event.setdefault("error_code", None)
+            if event.get("event_type") == "writing_run_created":
+                event["event_type"] = "created"
+            if event.get("event_type") == "progress" and event.get("payload_json", {}).get("status") == "requires_review":
+                event["event_type"] = "review_required"
+
+
 seed_phase_two_demo_data()
+_normalize_seed_records()
 
 
 def create_book(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
@@ -1044,18 +1308,46 @@ def list_book_chapters(book_id: str) -> list[dict[str, Any]]:
     return STORE.chapters_by_book.get(book_id, [])
 
 
-def create_extraction_run(book_id: str, trace_id: str) -> dict[str, Any]:
+def create_extraction_run(
+    book_id: str,
+    trace_id: str,
+    request_id: str = "system-extraction",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     if book_id == BOOK_ID:
         return STORE.extraction_runs[RUN_ID]
 
     run_id = str(ulid.new())
     task_id = str(ulid.new())
     now = utc_now()
+    task = _build_task(
+        task_id=task_id,
+        task_type="extract_knowledge",
+        workspace_id=context["workspace_id"],
+        input_refs=[f"object://source-books/{book_id}"],
+        output_refs=[f"object://extraction-runs/{run_id}"],
+        status="queued",
+        progress=0,
+        idempotency_key=f"extract-{book_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        retry_count=0,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+        latency_ms=None,
+    )
     run = {
         "schema_version": 1,
         "run_id": run_id,
         "book_id": book_id,
-        "workspace_id": _workspace_or_default(),
+        "workspace_id": context["workspace_id"],
         "task_id": task_id,
         "status": "queued",
         "current_stage": "source_submission",
@@ -1068,38 +1360,22 @@ def create_extraction_run(book_id: str, trace_id: str) -> dict[str, Any]:
         "created_at": now,
         "started_at": None,
         "finished_at": None,
-        "task": {
-            "schema_version": 1,
-            "task_id": task_id,
-            "task_type": "extract_knowledge",
-            "workspace_id": _workspace_or_default(),
-            "owner_module": "ai-worker",
-            "input_refs": [f"object://source-books/{book_id}"],
-            "output_refs": [f"object://extraction-runs/{run_id}"],
-            "status": "queued",
-            "progress": 0,
-            "idempotency_key": f"extract-{book_id}",
-            "retry_count": 0,
-            "error_code": None,
-            "created_at": now,
-            "started_at": None,
-            "finished_at": None,
-        },
+        "task": task,
     }
     STORE.extraction_runs[run_id] = run
     STORE.knowledge_by_run[run_id] = []
-    STORE.task_events_by_task[task_id] = [
-        {
-            "schema_version": 1,
-            "task_event_id": str(ulid.new()),
-            "task_id": task_id,
-            "event_type": "created",
-            "message": "Extraction run queued.",
-            "payload_ref": None,
-            "payload_json": {"trace_id": trace_id},
-            "created_at": now,
-        }
-    ]
+    STORE.task_events_by_task[task_id] = []
+    _append_task_event(
+        task,
+        "created",
+        "Extraction run queued.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"book_id": book_id, "run_id": run_id},
+        created_at=now,
+    )
     return run
 
 
@@ -1131,7 +1407,15 @@ def apply_review_action(
     object_id: str,
     action: str,
     target_object_id: Optional[str] = None,
+    request_id: str = "system-review",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     obj = STORE.knowledge_objects.get(object_id)
     if not obj:
         return None
@@ -1168,7 +1452,42 @@ def apply_review_action(
                 run["task"]["progress"] = 100
                 run["finished_at"] = utc_now()
                 run["task"]["finished_at"] = run["finished_at"]
+                run["task"]["latency_ms"] = 1000
+                _append_task_event(
+                    run["task"],
+                    "succeeded",
+                    "Knowledge review completed.",
+                    run["task"]["status"],
+                    request_id,
+                    trace_id,
+                    context["actor_id"],
+                    payload_json={"run_id": run["run_id"], "low_confidence_count": 0},
+                )
+            else:
+                _append_task_event(
+                    run["task"],
+                    "review_required",
+                    "Knowledge review updated.",
+                    run["task"]["status"],
+                    request_id,
+                    trace_id,
+                    context["actor_id"],
+                    payload_json={"run_id": run["run_id"], "low_confidence_count": len(pending)},
+                )
             break
+
+    _append_audit_event(
+        action=f"knowledge.{action}",
+        target_type="knowledge_object",
+        target_id=object_id,
+        target_ref=f"object://knowledge-objects/{object_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={"target_object_id": target_object_id, "review_status": obj["review_status"]},
+    )
     return obj
 
 
@@ -1221,13 +1540,159 @@ def get_configuration_snapshot() -> dict[str, Any]:
     }
 
 
-def set_model_profile_enabled(model_profile_id: str, enabled: bool) -> Optional[dict[str, Any]]:
+def set_model_profile_enabled(
+    model_profile_id: str,
+    enabled: bool,
+    request_id: str = "system-config",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner"})
+
     profile = STORE.model_profiles.get(model_profile_id)
     if not profile:
         return None
     profile["enabled"] = enabled
+    _append_audit_event(
+        action="configuration.model_profile_toggled",
+        target_type="model_profile",
+        target_id=model_profile_id,
+        target_ref=f"object://model-profiles/{model_profile_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={"enabled": enabled},
+    )
     return {
         "model_profile": profile,
+        "configuration_snapshot": get_configuration_snapshot(),
+    }
+
+
+def update_quality_gate_profile(
+    quality_gate_profile_id: str,
+    ai_flavor_threshold: float,
+    originality_safety_threshold: float,
+    request_id: str = "system-config",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner"})
+
+    profile = STORE.quality_gate_profiles.get(quality_gate_profile_id)
+    if not profile:
+        return None
+    profile["ai_flavor_threshold"] = ai_flavor_threshold
+    profile["originality_safety_threshold"] = originality_safety_threshold
+    _append_audit_event(
+        action="configuration.quality_gate_profile_updated",
+        target_type="quality_gate_profile",
+        target_id=quality_gate_profile_id,
+        target_ref=f"object://quality-gate-profiles/{quality_gate_profile_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={
+            "ai_flavor_threshold": ai_flavor_threshold,
+            "originality_safety_threshold": originality_safety_threshold,
+        },
+    )
+    return {
+        "quality_gate_profile": profile,
+        "configuration_snapshot": get_configuration_snapshot(),
+    }
+
+
+def update_agent_model_assignment(
+    assignment_id: str,
+    model_profile_id: str,
+    max_retry: int,
+    max_cost: float,
+    enabled: bool,
+    request_id: str = "system-config",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner"})
+
+    assignment = STORE.agent_model_assignments.get(assignment_id)
+    if not assignment:
+        return None
+    if model_profile_id not in STORE.model_profiles:
+        return False
+    assignment["model_profile_id"] = model_profile_id
+    assignment["max_retry"] = max_retry
+    assignment["max_cost"] = max_cost
+    assignment["enabled"] = enabled
+    _append_audit_event(
+        action="configuration.agent_model_assignment_updated",
+        target_type="agent_model_assignment",
+        target_id=assignment_id,
+        target_ref=f"object://agent-model-assignments/{assignment_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={
+            "model_profile_id": model_profile_id,
+            "max_retry": max_retry,
+            "max_cost": max_cost,
+            "enabled": enabled,
+        },
+    )
+    return {
+        "agent_model_assignment": assignment,
+        "configuration_snapshot": get_configuration_snapshot(),
+    }
+
+
+def update_prompt_version(
+    agent_role: str,
+    template_ref: str,
+    request_id: str = "system-config",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner"})
+
+    existing = next((item for item in STORE.prompt_versions if item["agent_role"] == agent_role), None)
+    if existing:
+        existing["template_ref"] = template_ref
+        prompt_version = existing
+    else:
+        prompt_version = {"agent_role": agent_role, "template_ref": template_ref}
+        STORE.prompt_versions.append(prompt_version)
+    _append_audit_event(
+        action="configuration.prompt_version_updated",
+        target_type="prompt_version",
+        target_id=agent_role,
+        target_ref=f"object://prompt-versions/{agent_role}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={"template_ref": template_ref},
+    )
+    return {
+        "prompt_version": prompt_version,
         "configuration_snapshot": get_configuration_snapshot(),
     }
 
@@ -1246,6 +1711,11 @@ def _build_provider_call(
     status: str,
     retry_count: int,
     error_code: Optional[str] = None,
+    workspace_id: Optional[str] = None,
+    task_id: Optional[str] = None,
+    writing_run_id: Optional[str] = None,
+    request_id: str = "system-request",
+    trace_id: str = "system-trace",
 ) -> dict[str, Any]:
     metrics = ROLE_CALL_METRICS.get(agent_role, {"prompt_tokens": 1000, "completion_tokens": 300, "latency_ms": 800, "cost_estimate": 0.1})
     completion_tokens = metrics["completion_tokens"] if status == "succeeded" else 0
@@ -1254,6 +1724,11 @@ def _build_provider_call(
     return {
         "schema_version": 1,
         "provider_call_id": str(ulid.new()),
+        "workspace_id": workspace_id or default_workspace_id(),
+        "task_id": task_id,
+        "writing_run_id": writing_run_id,
+        "request_id": request_id,
+        "trace_id": trace_id,
         "agent_role": agent_role,
         "model_profile_id": model_profile_id,
         "provider_name": provider_name,
@@ -1335,14 +1810,24 @@ def _build_model_cost(provider_calls: list[dict[str, Any]], retry_count: int) ->
     }
 
 
-def create_novel_project(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
+def create_novel_project(
+    payload: dict[str, Any],
+    trace_id: str,
+    request_id: str = "system-project",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     project_id = str(ulid.new())
     story_bible_id = str(ulid.new())
     now = utc_now()
     project = {
         "schema_version": 1,
         "project_id": project_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "title": payload["title"],
         "genre_scope": payload["genre_scope"],
         "status": "planning",
@@ -1395,7 +1880,17 @@ def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
     }
 
 
-def create_chapter_plan(payload: dict[str, Any], trace_id: str) -> Optional[dict[str, Any]]:
+def create_chapter_plan(
+    payload: dict[str, Any],
+    trace_id: str,
+    request_id: str = "system-plan",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     project_id = payload["project_id"]
     if project_id not in STORE.novel_projects:
         return None
@@ -1406,8 +1901,11 @@ def create_chapter_plan(payload: dict[str, Any], trace_id: str) -> Optional[dict
     chapter_plan = {
         "schema_version": 1,
         "chapter_plan_id": chapter_plan_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "project_id": project_id,
+        "trace_id": trace_id,
+        "input_refs": [f"object://novel-projects/{project_id}"],
+        "output_refs": [f"object://chapter-plans/{chapter_plan_id}"],
         "chapter_index": payload["chapter_index"],
         "status": "queued",
         "target_word_count": payload["target_word_count"],
@@ -1415,38 +1913,39 @@ def create_chapter_plan(payload: dict[str, Any], trace_id: str) -> Optional[dict
         "created_at": now,
         "updated_at": now,
     }
-    task = {
-        "schema_version": 1,
-        "task_id": task_id,
-        "task_type": "create_chapter_plan",
-        "workspace_id": chapter_plan["workspace_id"],
-        "owner_module": "ai-worker",
-        "input_refs": [f"object://novel-projects/{project_id}"],
-        "output_refs": [f"object://chapter-plans/{chapter_plan_id}"],
-        "status": "queued",
-        "progress": 0,
-        "idempotency_key": f"plan-{project_id}-{payload['chapter_index']}",
-        "retry_count": 0,
-        "error_code": None,
-        "created_at": now,
-        "started_at": None,
-        "finished_at": None,
-    }
+    task = _build_task(
+        task_id=task_id,
+        task_type="create_chapter_plan",
+        workspace_id=chapter_plan["workspace_id"],
+        input_refs=chapter_plan["input_refs"],
+        output_refs=chapter_plan["output_refs"],
+        status="queued",
+        progress=0,
+        idempotency_key=f"plan-{project_id}-{payload['chapter_index']}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        retry_count=0,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+        latency_ms=None,
+    )
     STORE.chapter_plans[chapter_plan_id] = chapter_plan
     STORE.chapter_plan_tasks[chapter_plan_id] = task
     STORE.section_plans_by_chapter[chapter_plan_id] = []
-    STORE.task_events_by_task[task_id] = [
-        {
-            "schema_version": 1,
-            "task_event_id": str(ulid.new()),
-            "task_id": task_id,
-            "event_type": "created",
-            "message": "Chapter plan queued.",
-            "payload_ref": None,
-            "payload_json": {"trace_id": trace_id, "chapter_index": payload["chapter_index"]},
-            "created_at": now,
-        }
-    ]
+    STORE.task_events_by_task[task_id] = []
+    _append_task_event(
+        task,
+        "created",
+        "Chapter plan queued.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"chapter_index": payload["chapter_index"], "chapter_plan_id": chapter_plan_id},
+        created_at=now,
+    )
     return {
         "chapter_plan": chapter_plan,
         "task": task,
@@ -1481,7 +1980,18 @@ def list_section_plans(chapter_plan_id: str) -> Optional[dict[str, Any]]:
     }
 
 
-def create_section_plans(chapter_plan_id: str, section_count: int, trace_id: str) -> Optional[dict[str, Any]]:
+def create_section_plans(
+    chapter_plan_id: str,
+    section_count: int,
+    trace_id: str,
+    request_id: str = "system-plan",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     chapter_plan = STORE.chapter_plans.get(chapter_plan_id)
     if not chapter_plan:
         return None
@@ -1508,6 +2018,9 @@ def create_section_plans(chapter_plan_id: str, section_count: int, trace_id: str
                 "section_plan_id": str(ulid.new()),
                 "workspace_id": chapter_plan["workspace_id"],
                 "chapter_plan_id": chapter_plan_id,
+                "trace_id": trace_id,
+                "input_refs": [f"object://chapter-plans/{chapter_plan_id}"],
+                "output_refs": [f"object://section-plans/{chapter_plan_id}:{section_index}"],
                 "section_index": section_index,
                 "planning_role": role,
                 "payload": {
@@ -1522,47 +2035,49 @@ def create_section_plans(chapter_plan_id: str, section_count: int, trace_id: str
             }
         )
 
-    task = {
-        "schema_version": 1,
-        "task_id": task_id,
-        "task_type": "create_section_plans",
-        "workspace_id": chapter_plan["workspace_id"],
-        "owner_module": "ai-worker",
-        "input_refs": [f"object://chapter-plans/{chapter_plan_id}"],
-        "output_refs": [f"object://section-plans/{item['section_plan_id']}" for item in items],
-        "status": "succeeded",
-        "progress": 100,
-        "idempotency_key": f"section-{chapter_plan_id}",
-        "retry_count": 0,
-        "error_code": None,
-        "created_at": now,
-        "started_at": now,
-        "finished_at": now,
-    }
+    task = _build_task(
+        task_id=task_id,
+        task_type="create_section_plans",
+        workspace_id=chapter_plan["workspace_id"],
+        input_refs=[f"object://chapter-plans/{chapter_plan_id}"],
+        output_refs=[f"object://section-plans/{item['section_plan_id']}" for item in items],
+        status="succeeded",
+        progress=100,
+        idempotency_key=f"section-{chapter_plan_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        retry_count=0,
+        created_at=now,
+        started_at=now,
+        finished_at=now,
+        latency_ms=1000,
+    )
     STORE.section_plans_by_chapter[chapter_plan_id] = items
     STORE.section_plan_tasks[chapter_plan_id] = task
-    STORE.task_events_by_task[task_id] = [
-        {
-            "schema_version": 1,
-            "task_event_id": str(ulid.new()),
-            "task_id": task_id,
-            "event_type": "created",
-            "message": "Section plan generation started.",
-            "payload_ref": None,
-            "payload_json": {"trace_id": trace_id, "section_count": len(items)},
-            "created_at": now,
-        },
-        {
-            "schema_version": 1,
-            "task_event_id": str(ulid.new()),
-            "task_id": task_id,
-            "event_type": "progress",
-            "message": "Section plans generated.",
-            "payload_ref": None,
-            "payload_json": {"section_count": len(items)},
-            "created_at": now,
-        },
-    ]
+    STORE.task_events_by_task[task_id] = []
+    _append_task_event(
+        task,
+        "created",
+        "Section plan generation started.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"section_count": len(items)},
+        created_at=now,
+    )
+    _append_task_event(
+        task,
+        "succeeded",
+        "Section plans generated.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"section_count": len(items)},
+        created_at=now,
+    )
     chapter_plan["status"] = "requires_review"
     chapter_plan["updated_at"] = now
     return {
@@ -1573,7 +2088,17 @@ def create_section_plans(chapter_plan_id: str, section_count: int, trace_id: str
     }
 
 
-def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[str, Any]]:
+def create_writing_run(
+    payload: dict[str, Any],
+    trace_id: str,
+    request_id: str = "system-writing",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     project_id = payload["project_id"]
     chapter_plan_id = payload["chapter_plan_id"]
     if project_id not in STORE.novel_projects or chapter_plan_id not in STORE.chapter_plans:
@@ -1612,6 +2137,11 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
             writer_resolution["selected_profile"]["provider_name"],
             "succeeded",
             writer_resolution["retry_count"],
+            workspace_id=context["workspace_id"],
+            task_id=task_id,
+            writing_run_id=writing_run_id,
+            request_id=request_id,
+            trace_id=trace_id,
         ),
         *critic_resolution["provider_calls"],
         _build_provider_call(
@@ -1620,6 +2150,11 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
             critic_resolution["selected_profile"]["provider_name"],
             "succeeded",
             critic_resolution["retry_count"],
+            workspace_id=context["workspace_id"],
+            task_id=task_id,
+            writing_run_id=writing_run_id,
+            request_id=request_id,
+            trace_id=trace_id,
         ),
         *humanizer_resolution["provider_calls"],
         _build_provider_call(
@@ -1628,6 +2163,11 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
             humanizer_resolution["selected_profile"]["provider_name"],
             "succeeded",
             humanizer_resolution["retry_count"],
+            workspace_id=context["workspace_id"],
+            task_id=task_id,
+            writing_run_id=writing_run_id,
+            request_id=request_id,
+            trace_id=trace_id,
         ),
     ]
     retry_count = max(
@@ -1635,11 +2175,22 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
         critic_resolution["retry_count"],
         humanizer_resolution["retry_count"],
     )
+    provider_calls = [
+        {
+            **call,
+            "workspace_id": context["workspace_id"],
+            "task_id": task_id,
+            "writing_run_id": writing_run_id,
+            "request_id": request_id,
+            "trace_id": trace_id,
+        }
+        for call in provider_calls
+    ]
 
     STORE.memory_packages[memory_package_id] = {
         "schema_version": 1,
         "memory_package_id": memory_package_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "project_id": project_id,
         "writing_run_id": writing_run_id,
         "summary": "已组装章节规划、故事设定与知识证据。",
@@ -1653,7 +2204,7 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
     STORE.prompt_packages[prompt_package_id] = {
         "schema_version": 1,
         "prompt_package_id": prompt_package_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "project_id": project_id,
         "writing_run_id": writing_run_id,
         "summary": "写手与润色阶段共用提示包。",
@@ -1672,7 +2223,7 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
             {
                 "schema_version": 1,
                 "section_run_id": str(ulid.new()),
-                "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+                "workspace_id": context["workspace_id"],
                 "writing_run_id": writing_run_id,
                 "section_plan_id": section["section_plan_id"],
                 "status": "planned",
@@ -1692,31 +2243,32 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
             }
         )
 
-    task = {
-        "schema_version": 1,
-        "task_id": task_id,
-        "task_type": "create_writing_run",
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
-        "owner_module": "ai-worker",
-        "input_refs": [
+    task = _build_task(
+        task_id=task_id,
+        task_type="create_writing_run",
+        workspace_id=context["workspace_id"],
+        input_refs=[
             f"object://chapter-plans/{chapter_plan_id}",
             f"object://memory-packages/{memory_package_id}",
             f"object://prompt-packages/{prompt_package_id}",
         ],
-        "output_refs": [f"object://writing-runs/{writing_run_id}"],
-        "status": "queued",
-        "progress": 0,
-        "idempotency_key": f"writing-{chapter_plan_id}",
-        "retry_count": retry_count,
-        "error_code": None,
-        "created_at": now,
-        "started_at": None,
-        "finished_at": None,
-    }
+        output_refs=[f"object://writing-runs/{writing_run_id}"],
+        status="queued",
+        progress=0,
+        idempotency_key=f"writing-{chapter_plan_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        retry_count=retry_count,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+        latency_ms=None,
+    )
     writing_run = {
         "schema_version": 1,
         "writing_run_id": writing_run_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "project_id": project_id,
         "chapter_plan_id": chapter_plan_id,
         "status": "queued",
@@ -1742,7 +2294,7 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
     quality_report = {
         "schema_version": 1,
         "quality_report_id": quality_report_id,
-        "workspace_id": _workspace_or_default(payload.get("workspace_id")),
+        "workspace_id": context["workspace_id"],
         "writing_run_id": writing_run_id,
         "status": "queued",
         "ai_flavor_score": 0,
@@ -1759,18 +2311,18 @@ def create_writing_run(payload: dict[str, Any], trace_id: str) -> Optional[dict[
     STORE.provider_calls_by_writing[writing_run_id] = provider_calls
     STORE.section_runs_by_writing[writing_run_id] = section_runs
     STORE.quality_reports[quality_report_id] = quality_report
-    STORE.task_events_by_task[task_id] = [
-        {
-            "schema_version": 1,
-            "task_event_id": str(ulid.new()),
-            "task_id": task_id,
-            "event_type": "writing_run_created",
-            "message": "Writing run queued.",
-            "payload_ref": None,
-            "payload_json": {"trace_id": trace_id, "writing_run_id": writing_run_id},
-            "created_at": now,
-        }
-    ]
+    STORE.task_events_by_task[task_id] = []
+    _append_task_event(
+        task,
+        "created",
+        "Writing run queued.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"writing_run_id": writing_run_id},
+        created_at=now,
+    )
     return get_writing_run(writing_run_id)
 
 
@@ -1781,6 +2333,110 @@ def list_feedback_records(target_type: Optional[str] = None, target_id: Optional
     if target_id:
         records = [item for item in records if item["target_id"] == target_id]
     return sorted(records, key=lambda item: item["created_at"])
+
+
+def promote_feedback_record(
+    feedback_record_id: str,
+    promotion_status: str,
+    output_ref: Optional[str],
+    request_id: str = "system-feedback",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
+    record = STORE.feedback_records.get(feedback_record_id)
+    if not record:
+        return None
+    record["promotion_status"] = promotion_status
+    record["updated_at"] = utc_now()
+    if output_ref:
+        record["output_refs"] = [output_ref]
+    _append_audit_event(
+        action="feedback.record_promoted",
+        target_type="feedback_record",
+        target_id=feedback_record_id,
+        target_ref=f"object://feedback-records/{feedback_record_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        after_ref=output_ref,
+        payload={"promotion_status": promotion_status},
+    )
+    return record
+
+
+def create_agent_task(
+    payload: dict[str, Any],
+    request_id: str = "system-task",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
+    existing = next((item for item in STORE.agent_tasks.values() if item["idempotency_key"] == payload["idempotency_key"]), None)
+    if existing:
+        return {
+            "task": existing,
+            "events": STORE.task_events_by_task.get(existing["task_id"], []),
+        }
+
+    task_id = str(ulid.new())
+    now = utc_now()
+    task = _build_task(
+        task_id=task_id,
+        task_type=payload["task_type"],
+        workspace_id=context["workspace_id"],
+        input_refs=payload["input_refs"],
+        output_refs=[],
+        status="queued",
+        progress=0,
+        idempotency_key=payload["idempotency_key"],
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=payload["requested_by"],
+        retry_count=0,
+        created_at=now,
+        started_at=None,
+        finished_at=None,
+        latency_ms=0,
+    )
+    task["owner_module"] = payload["owner_module"]
+    STORE.agent_tasks[task_id] = task
+    STORE.task_events_by_task[task_id] = []
+    _append_task_event(
+        task,
+        "created",
+        f"{payload['task_type']} queued.",
+        task["status"],
+        request_id,
+        trace_id,
+        context["actor_id"],
+        payload_json={"owner_module": payload["owner_module"]},
+        created_at=now,
+    )
+    return {
+        "task": task,
+        "events": STORE.task_events_by_task[task_id],
+    }
+
+
+def get_agent_task(task_id: str) -> Optional[dict[str, Any]]:
+    task = STORE.agent_tasks.get(task_id)
+    if not task:
+        return None
+    return {
+        "task": task,
+        "events": STORE.task_events_by_task.get(task_id, []),
+    }
 
 
 def _build_chapter_snapshot(writing_run: dict[str, Any], section_runs: list[dict[str, Any]], chapter_plan: Optional[dict[str, Any]], accepted_chapter_ref: str, created_at: str) -> dict[str, Any]:
@@ -1854,7 +2510,17 @@ def _acceptance_ready(writing_run: dict[str, Any], quality_report: Optional[dict
     return has_feedback and has_section_outputs
 
 
-def accept_chapter(writing_run_id: str, trace_id: str) -> Optional[dict[str, Any]]:
+def accept_chapter(
+    writing_run_id: str,
+    trace_id: str,
+    request_id: str = "system-accept",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
     writing_run = STORE.writing_runs.get(writing_run_id)
     if not writing_run:
         return None
@@ -1863,6 +2529,20 @@ def accept_chapter(writing_run_id: str, trace_id: str) -> Optional[dict[str, Any
     quality_report = STORE.quality_reports.get(writing_run["quality_report_id"])
     section_runs = STORE.section_runs_by_writing.get(writing_run_id, [])
     if not _acceptance_ready(writing_run, quality_report, section_runs):
+        if task:
+            task["status"] = "blocked"
+            task["error_code"] = "acceptance_dependencies_incomplete"
+            _append_task_event(
+                task,
+                "blocked",
+                "Writing run acceptance dependencies incomplete.",
+                task["status"],
+                request_id,
+                trace_id,
+                context["actor_id"],
+                error_code="acceptance_dependencies_incomplete",
+                payload_json={"writing_run_id": writing_run_id},
+            )
         return False
 
     chapter_plan = STORE.chapter_plans.get(writing_run["chapter_plan_id"])
@@ -1895,6 +2575,8 @@ def accept_chapter(writing_run_id: str, trace_id: str) -> Optional[dict[str, Any
         task["status"] = "succeeded"
         task["progress"] = 100
         task["finished_at"] = task["finished_at"] or now
+        task["latency_ms"] = 1000
+        task["error_code"] = None
 
     if quality_report:
         quality_report["status"] = "passed"
@@ -1906,65 +2588,85 @@ def accept_chapter(writing_run_id: str, trace_id: str) -> Optional[dict[str, Any
     run_feedback_types = {item["feedback_type"] for item in run_records}
     if "acceptance" not in run_feedback_types:
         acceptance_id = str(ulid.new())
-        STORE.feedback_records[acceptance_id] = {
-            "schema_version": 1,
-            "feedback_record_id": acceptance_id,
-            "workspace_id": writing_run["workspace_id"],
-            "target_type": "writing_run",
-            "target_id": writing_run_id,
-            "feedback_type": "acceptance",
-            "score": 1.0,
-            "source": "human_review",
-            "comment_ref": f"object://feedback-comments/{acceptance_id}",
-            "payload": {
+        STORE.feedback_records[acceptance_id] = _build_feedback_record(
+            feedback_record_id=acceptance_id,
+            workspace_id=writing_run["workspace_id"],
+            target_type="writing_run",
+            target_id=writing_run_id,
+            feedback_type="acceptance",
+            score=1.0,
+            source="human_review",
+            request_id=request_id,
+            trace_id=trace_id,
+            actor_id=context["actor_id"],
+            comment_ref=f"object://feedback-comments/{acceptance_id}",
+            payload={
                 "accepted_chapter_ref": writing_run["accepted_chapter_ref"],
                 "chapter_snapshot_id": chapter_snapshot["chapter_snapshot_id"],
                 "manuscript_state_id": manuscript_state["manuscript_state_id"],
                 "summary": "人工复核已接受本章进入 manuscript。",
             },
-            "created_at": now,
-            "updated_at": now,
-        }
+            promotion_status="promoted",
+            input_refs=[f"object://writing-runs/{writing_run_id}"],
+            output_refs=[accepted_chapter_ref],
+            created_at=now,
+        )
     if "cost" not in run_feedback_types:
         cost_id = str(ulid.new())
-        STORE.feedback_records[cost_id] = {
-            "schema_version": 1,
-            "feedback_record_id": cost_id,
-            "workspace_id": writing_run["workspace_id"],
-            "target_type": "writing_run",
-            "target_id": writing_run_id,
-            "feedback_type": "cost",
-            "score": 0.78,
-            "source": "system",
-            "comment_ref": None,
-            "payload": {
+        STORE.feedback_records[cost_id] = _build_feedback_record(
+            feedback_record_id=cost_id,
+            workspace_id=writing_run["workspace_id"],
+            target_type="writing_run",
+            target_id=writing_run_id,
+            feedback_type="cost",
+            score=0.78,
+            source="system",
+            request_id=request_id,
+            trace_id=trace_id,
+            actor_id=context["actor_id"],
+            payload={
                 "estimated_total_cost": writing_run["model_cost"]["estimated_total_cost"],
                 "retry_count": writing_run["model_cost"]["retry_count"],
             },
-            "created_at": now,
-            "updated_at": now,
-        }
+            input_refs=[f"object://writing-runs/{writing_run_id}"],
+            output_refs=[],
+            created_at=now,
+        )
 
     if task:
-        events = STORE.task_events_by_task.setdefault(task["task_id"], [])
-        if not any(event["event_type"] == "chapter_accepted" for event in events):
-            events.append(
-                {
-                    "schema_version": 1,
-                    "task_event_id": str(ulid.new()),
-                    "task_id": task["task_id"],
-                    "event_type": "chapter_accepted",
-                    "message": "Chapter accepted into manuscript.",
-                    "payload_ref": None,
-                    "payload_json": {
-                        "trace_id": trace_id,
-                        "accepted_chapter_ref": writing_run["accepted_chapter_ref"],
-                        "chapter_snapshot_id": chapter_snapshot["chapter_snapshot_id"],
-                        "manuscript_state_id": manuscript_state["manuscript_state_id"],
-                    },
-                    "created_at": now,
-                }
-            )
+        _append_task_event(
+            task,
+            "succeeded",
+            "Chapter accepted into manuscript.",
+            task["status"],
+            request_id,
+            trace_id,
+            context["actor_id"],
+            payload_json={
+                "accepted_chapter_ref": writing_run["accepted_chapter_ref"],
+                "chapter_snapshot_id": chapter_snapshot["chapter_snapshot_id"],
+                "manuscript_state_id": manuscript_state["manuscript_state_id"],
+            },
+            created_at=now,
+        )
+
+    _append_audit_event(
+        action="writing.accept_chapter",
+        target_type="writing_run",
+        target_id=writing_run_id,
+        target_ref=f"object://writing-runs/{writing_run_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        after_ref=accepted_chapter_ref,
+        payload={
+            "chapter_snapshot_id": chapter_snapshot["chapter_snapshot_id"],
+            "manuscript_state_id": manuscript_state["manuscript_state_id"],
+        },
+        created_at=now,
+    )
 
     return get_writing_run(writing_run_id)
 

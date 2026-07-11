@@ -48,6 +48,23 @@ def test_gateway_get_configuration_snapshot_and_toggle_model_profile() -> None:
     snapshot_response = client.get("/v1/configuration")
     disable_response = client.post("/v1/model-profiles/model_profile_default/disable")
     enable_response = client.post("/v1/model-profiles/model_profile_default/enable")
+    quality_response = client.post(
+        "/v1/quality-gate-profiles/01JZQUALITY00000000000001",
+        json={"ai_flavor_threshold": 0.4, "originality_safety_threshold": 0.9},
+    )
+    assignment_response = client.post(
+        "/v1/agent-model-assignments/01JZASSIGN000000000000001",
+        json={
+            "model_profile_id": "model_profile_structured_fallback",
+            "max_retry": 3,
+            "max_cost": 1.2,
+            "enabled": True,
+        },
+    )
+    prompt_response = client.post(
+        "/v1/prompt-versions/writer",
+        json={"template_ref": "prompt://writer/chapter-v2"},
+    )
 
     assert snapshot_response.status_code == 200
     snapshot = snapshot_response.json()["data"]
@@ -58,6 +75,31 @@ def test_gateway_get_configuration_snapshot_and_toggle_model_profile() -> None:
     assert disable_response.json()["data"]["model_profile"]["enabled"] is False
     assert enable_response.status_code == 200
     assert enable_response.json()["data"]["model_profile"]["enabled"] is True
+    assert quality_response.status_code == 200
+    assert quality_response.json()["data"]["quality_gate_profile"]["ai_flavor_threshold"] == 0.4
+    assert assignment_response.status_code == 200
+    assert assignment_response.json()["data"]["agent_model_assignment"]["model_profile_id"] == "model_profile_structured_fallback"
+    assert prompt_response.status_code == 200
+    assert prompt_response.json()["data"]["prompt_version"]["template_ref"] == "prompt://writer/chapter-v2"
+
+    audit_response = client.get("/v1/audit-events")
+    actions = {item["action"] for item in audit_response.json()["data"]["items"]}
+    assert "configuration.model_profile_toggled" in actions
+    assert "configuration.quality_gate_profile_updated" in actions
+    assert "configuration.agent_model_assignment_updated" in actions
+    assert "configuration.prompt_version_updated" in actions
+
+
+def test_gateway_model_profile_toggle_requires_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/model-profiles/model_profile_default/disable",
+        headers={"x-actor-role": "editor", "x-actor-id": "editor-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_gateway_create_writing_run_returns_seeded_quality_and_provider_calls() -> None:
@@ -93,6 +135,9 @@ def test_gateway_create_writing_run_returns_seeded_quality_and_provider_calls() 
     assert payload["meta"] == {
         "request_id": "req-gateway-writing",
         "trace_id": "trace-gateway-writing",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
     }
     assert payload["data"]["writing_run"]["status"] == "queued"
     assert payload["data"]["writing_run"]["critic_model_profile_id"] == "model_profile_structured_fallback"
@@ -117,6 +162,9 @@ def test_gateway_accept_chapter_marks_writing_run_and_returns_feedback_records()
     assert payload["meta"] == {
         "request_id": "req-gateway-accept",
         "trace_id": "trace-gateway-accept",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
     }
     assert payload["data"]["writing_run"]["status"] == "succeeded"
     assert payload["data"]["writing_run"]["accepted_chapter_ref"]
@@ -124,6 +172,9 @@ def test_gateway_accept_chapter_marks_writing_run_and_returns_feedback_records()
     assert payload["data"]["writing_run"]["manuscript_state"]["current_story_state"]["quality_gate_status"] == "passed"
     assert payload["data"]["chapter_snapshot"]["chapter_snapshot_id"].startswith("chapter-snapshot:")
     assert payload["data"]["manuscript_state"]["manuscript_state_id"].startswith("manuscript-state:")
+
+    audit_response = client.get("/v1/audit-events")
+    assert any(item["action"] == "writing.accept_chapter" and item["trace_id"] == "trace-gateway-accept" for item in audit_response.json()["data"]["items"])
 
 
 def test_gateway_accept_chapter_returns_conflict_when_dependencies_incomplete() -> None:
@@ -162,6 +213,48 @@ def test_gateway_accept_chapter_returns_conflict_when_dependencies_incomplete() 
 
     assert response.status_code == 409
     assert response.json()["detail"] == "writing run acceptance dependencies incomplete"
+
+
+def test_gateway_feedback_promotion_and_agent_task_routes() -> None:
+    client = make_client()
+
+    promote_response = client.post(
+        "/v1/feedback-records/01JZFDBK0000000000000001/promote",
+        json={"promotion_status": "promoted", "output_ref": "object://playbooks/feedback-1"},
+        headers={"x-request-id": "req-gateway-promote", "x-trace-id": "trace-gateway-promote"},
+    )
+    task_response = client.post(
+        "/v1/agent-tasks",
+        json={
+            "schema_version": 1,
+            "task_type": "feedback_followup",
+            "workspace_id": "demo-workspace",
+            "owner_module": "api-gateway",
+            "input_refs": ["object://feedback-records/01JZFDBK0000000000000001"],
+            "idempotency_key": "feedback-followup-1",
+            "trace_id": "trace-gateway-agent-task",
+            "requested_by": "demo-user",
+        },
+        headers={"x-request-id": "req-gateway-agent-task", "x-trace-id": "trace-gateway-agent-task"},
+    )
+
+    assert promote_response.status_code == 200
+    promoted = promote_response.json()["data"]
+    assert promoted["promotion_status"] == "promoted"
+    assert promoted["output_refs"] == ["object://playbooks/feedback-1"]
+
+    assert task_response.status_code == 202
+    task_payload = task_response.json()["data"]
+    task_id = task_payload["task"]["task_id"]
+    assert task_payload["task"]["task_type"] == "feedback_followup"
+    assert task_payload["events"][0]["event_type"] == "created"
+
+    detail_response = client.get(f"/v1/agent-tasks/{task_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["data"]["task"]["task_id"] == task_id
+
+    audit_response = client.get("/v1/audit-events")
+    assert any(item["action"] == "feedback.record_promoted" for item in audit_response.json()["data"]["items"])
 
 
 def test_gateway_writing_resources_missing_return_not_found() -> None:

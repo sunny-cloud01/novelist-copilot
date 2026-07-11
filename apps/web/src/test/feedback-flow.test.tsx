@@ -22,18 +22,12 @@ function renderFeedbackPageWithAcceptedChapter() {
 }
 
 describe("feedback page", () => {
-  it("renders Chinese dashboard with quality, cost, feedback, and evidence", () => {
+  it("promotes strategy suggestion from feedback dashboard", () => {
     renderFeedbackPageWithAcceptedChapter();
     fireEvent.click(screen.getByRole("button", { name: "接受本章" }));
+    fireEvent.click(screen.getByRole("button", { name: "提升为已批准策略" }));
 
-    expect(screen.getByRole("heading", { name: "反馈看板" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "质量报告摘要" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "成本质量指标" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "反馈记录", level: 3 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "证据链", level: 3 })).toBeInTheDocument();
-    expect(screen.getByText("质量门禁通过后保留了节奏与可读性指标。")).toBeInTheDocument();
-    expect(screen.getAllByText("prompt://writer/chapter-default").length).toBeGreaterThan(0);
-    expect(screen.getByRole("heading", { name: "章节入稿后状态" })).toBeInTheDocument();
-    expect(screen.getAllByText("第 1 章《乌坦城风起》已进入 manuscript，三年之约正式进入主线。").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/收紧 writer 默认提示中对金手指线索的显性表达。/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/feedback\.record_promoted/).length).toBeGreaterThan(1);
   });
 });

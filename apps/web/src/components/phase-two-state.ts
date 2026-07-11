@@ -14,6 +14,7 @@ export type KnowledgeObject = {
 
 export type ExtractionRunState = {
   runId: string;
+  taskId: string;
   status: string;
   currentStage: string;
   chapterCount: number;
@@ -277,6 +278,69 @@ export type PromptVersionState = {
   templateRef: string;
 };
 
+export type AuditEventState = {
+  auditEventId: string;
+  workspaceId: string;
+  action: string;
+  actorId: string;
+  actorRole: string;
+  targetType: string;
+  targetId: string;
+  traceId: string;
+  requestId: string;
+  createdAt: string;
+  summary: string;
+  inputRefs: string[];
+  outputRefs: string[];
+};
+
+export type AgentTaskEventState = {
+  eventId: string;
+  taskId: string;
+  eventType: string;
+  status: string;
+  summary: string;
+  createdAt: string;
+};
+
+export type AgentTaskState = {
+  taskId: string;
+  workspaceId: string;
+  taskType: string;
+  status: string;
+  actorId: string;
+  actorRole: string;
+  targetRef: string;
+  traceId: string;
+  requestId: string;
+  createdAt: string;
+  updatedAt: string;
+  summary: string;
+  events: AgentTaskEventState[];
+};
+
+export type StrategySuggestionState = {
+  suggestionId: string;
+  basedOnFeedbackRecordId: string;
+  status: string;
+  targetScope: string;
+  summary: string;
+  promotedAt: string | null;
+};
+
+export type ConfigurationMutationState = {
+  mutationId: string;
+  mutationType: string;
+  targetId: string;
+  actorId: string;
+  actorRole: string;
+  status: string;
+  requestId: string;
+  traceId: string;
+  createdAt: string;
+  summary: string;
+};
+
 export type ConfigurationSnapshotState = {
   defaultModelProfileId: string;
   modelProfiles: ModelProfileState[];
@@ -376,7 +440,11 @@ export type PhaseTwoState = {
   promptPackages: PromptPackageState[];
   qualityReports: QualityReportState[];
   feedbackRecords: FeedbackRecordState[];
+  strategySuggestions: StrategySuggestionState[];
   configurationSnapshot: ConfigurationSnapshotState;
+  configurationMutations: ConfigurationMutationState[];
+  agentTasks: AgentTaskState[];
+  auditEvents: AuditEventState[];
   providerCallsByWriting: Record<string, ProviderCallState[]>;
   activityLog: string[];
 };
@@ -499,6 +567,7 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
     ],
     run: {
       runId: DEMO_RUN_ID,
+      taskId: "01JZTASK000000000000000001",
       status: "requires_review",
       currentStage: "quality_review",
       chapterCount: 2,
@@ -800,6 +869,16 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         },
       },
     ],
+    strategySuggestions: [
+      {
+        suggestionId: "01JZSTRAT000000000000001",
+        basedOnFeedbackRecordId: "01JZFDBK0000000000000002",
+        status: "review_required",
+        targetScope: "prompt",
+        summary: "收紧 writer 默认提示中对金手指线索的显性表达。",
+        promotedAt: null,
+      },
+    ],
     configurationSnapshot: {
       defaultModelProfileId: DEFAULT_MODEL_PROFILE_ID,
       modelProfiles: [
@@ -851,6 +930,177 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         { agentRole: "feedback", templateRef: "prompt://feedback/chapter-default" },
       ],
     },
+    configurationMutations: [
+      {
+        mutationId: "01JZCFG0000000000000001",
+        mutationType: "quality_gate_profile_updated",
+        targetId: "01JZQUALITY00000000000001",
+        actorId: "demo-user",
+        actorRole: "owner",
+        status: "succeeded",
+        requestId: "req-config-quality-1",
+        traceId: "trace-config-quality-1",
+        createdAt: "2026-07-11T02:30:00Z",
+        summary: "将 AI 味阈值调到 0.45，原创安全阈值调到 0.85。",
+      },
+      {
+        mutationId: "01JZCFG0000000000000002",
+        mutationType: "prompt_version_updated",
+        targetId: "writer",
+        actorId: "demo-user",
+        actorRole: "owner",
+        status: "succeeded",
+        requestId: "req-config-prompt-1",
+        traceId: "trace-config-prompt-1",
+        createdAt: "2026-07-11T02:34:00Z",
+        summary: "writer 已切到 prompt://writer/chapter-default。",
+      },
+    ],
+    agentTasks: [
+      {
+        taskId: "01JZTASK000000000000000001",
+        workspaceId: DEMO_WORKSPACE_ID,
+        taskType: "extract_knowledge",
+        status: "requires_review",
+        actorId: "demo-user",
+        actorRole: "editor",
+        targetRef: `object://extraction-runs/${DEMO_RUN_ID}`,
+        traceId: "01JZTRC000000000000000010",
+        requestId: "req-extraction-1",
+        createdAt: "2026-07-11T00:00:00Z",
+        updatedAt: "2026-07-11T00:01:00Z",
+        summary: "确定性抽取结果仍有低置信对象待处理。",
+        events: [
+          {
+            eventId: "01JZTEVT0000000000000001",
+            taskId: "01JZTASK000000000000000001",
+            eventType: "created",
+            status: "queued",
+            summary: "抽取任务已入队。",
+            createdAt: "2026-07-11T00:00:00Z",
+          },
+          {
+            eventId: "01JZTEVT0000000000000002",
+            taskId: "01JZTASK000000000000000001",
+            eventType: "review_required",
+            status: "requires_review",
+            summary: "发现低置信对象，转入人工审核。",
+            createdAt: "2026-07-11T00:01:00Z",
+          },
+        ],
+      },
+      {
+        taskId: "01JZPLANTASK0000000000001",
+        workspaceId: DEMO_WORKSPACE_ID,
+        taskType: "create_chapter_plan",
+        status: "requires_review",
+        actorId: "demo-user",
+        actorRole: "editor",
+        targetRef: `object://chapter-plans/${DEMO_CHAPTER_PLAN_ID}`,
+        traceId: "01JZTRC000000000000000011",
+        requestId: "req-plan-1",
+        createdAt: "2026-07-11T02:05:00Z",
+        updatedAt: "2026-07-11T02:12:00Z",
+        summary: "章节规划已生成，等待确认。",
+        events: [
+          {
+            eventId: "01JZTEVT0000000000000003",
+            taskId: "01JZPLANTASK0000000000001",
+            eventType: "created",
+            status: "running",
+            summary: "章节规划生成中。",
+            createdAt: "2026-07-11T02:05:00Z",
+          },
+          {
+            eventId: "01JZTEVT0000000000000004",
+            taskId: "01JZPLANTASK0000000000001",
+            eventType: "review_required",
+            status: "requires_review",
+            summary: "章节规划已生成，等待人工确认。",
+            createdAt: "2026-07-11T02:12:00Z",
+          },
+        ],
+      },
+      {
+        taskId: "01JZWRITETASK0000000000001",
+        workspaceId: DEMO_WORKSPACE_ID,
+        taskType: "create_writing_run",
+        status: "requires_review",
+        actorId: "demo-user",
+        actorRole: "editor",
+        targetRef: `object://writing-runs/${DEMO_WRITING_RUN_ID}`,
+        traceId: "01JZTRC000000000000000012",
+        requestId: "req-writing-1",
+        createdAt: "2026-07-11T02:40:00Z",
+        updatedAt: "2026-07-11T03:05:00Z",
+        summary: "写作任务进入人工复核。",
+        events: [
+          {
+            eventId: "01JZTEVT0000000000000005",
+            taskId: "01JZWRITETASK0000000000001",
+            eventType: "retry_scheduled",
+            status: "retrying",
+            summary: "critic 结构化输出失败，已切到 fallback。",
+            createdAt: "2026-07-11T02:52:00Z",
+          },
+          {
+            eventId: "01JZTEVT0000000000000006",
+            taskId: "01JZWRITETASK0000000000001",
+            eventType: "review_required",
+            status: "requires_review",
+            summary: "润色通过，等待人工接受章节。",
+            createdAt: "2026-07-11T03:05:00Z",
+          },
+        ],
+      },
+    ],
+    auditEvents: [
+      {
+        auditEventId: "01JZAUDIT000000000000001",
+        workspaceId: DEMO_WORKSPACE_ID,
+        action: "knowledge.approve",
+        actorId: "demo-user",
+        actorRole: "editor",
+        targetType: "knowledge_object",
+        targetId: "01JZOBJ0000000000000000003",
+        traceId: "01JZTRC000000000000000020",
+        requestId: "req-knowledge-1",
+        createdAt: "2026-07-11T00:10:00Z",
+        summary: "已确认 Xiao Clan 为有效知识对象。",
+        inputRefs: ["object://knowledge-objects/01JZOBJ0000000000000000003"],
+        outputRefs: ["object://graph-nodes/01JZNODE000000000000000003"],
+      },
+      {
+        auditEventId: "01JZAUDIT000000000000002",
+        workspaceId: DEMO_WORKSPACE_ID,
+        action: "configuration.quality_gate_profile_updated",
+        actorId: "demo-user",
+        actorRole: "owner",
+        targetType: "quality_gate_profile",
+        targetId: "01JZQUALITY00000000000001",
+        traceId: "trace-config-quality-1",
+        requestId: "req-config-quality-1",
+        createdAt: "2026-07-11T02:30:00Z",
+        summary: "更新默认质量阈值。",
+        inputRefs: ["object://quality-gate-profiles/01JZQUALITY00000000000001"],
+        outputRefs: ["object://configuration/default"],
+      },
+      {
+        auditEventId: "01JZAUDIT000000000000003",
+        workspaceId: DEMO_WORKSPACE_ID,
+        action: "feedback.record_promoted",
+        actorId: "demo-user",
+        actorRole: "owner",
+        targetType: "strategy_suggestion",
+        targetId: "01JZSTRAT000000000000001",
+        traceId: "trace-feedback-promotion-1",
+        requestId: "req-feedback-promotion-1",
+        createdAt: "2026-07-11T03:08:00Z",
+        summary: "风格反馈已转为 prompt 调整建议，待批准。",
+        inputRefs: ["object://feedback-records/01JZFDBK0000000000000002"],
+        outputRefs: ["object://strategy-suggestions/01JZSTRAT000000000000001"],
+      },
+    ],
     providerCallsByWriting: {
       [DEMO_WRITING_RUN_ID]: [
         { providerCallId: "01JZPCALL0000000000000001", agentRole: "writer", modelProfileId: DEFAULT_MODEL_PROFILE_ID, providerName: "anthropic", promptTokens: 1800, completionTokens: 920, latencyMs: 1430, retryCount: 0, costEstimate: 0.31, status: "succeeded", errorCode: null },
@@ -1171,6 +1421,7 @@ export function toggleModelProfileInState(
   modelProfileId: string,
   enabled: boolean,
 ): PhaseTwoState {
+  const occurrence = state.configurationMutations.filter((item) => item.mutationType === "model_profile_toggled").length + 1;
   const modelProfiles = state.configurationSnapshot.modelProfiles.map((item) =>
     item.modelProfileId === modelProfileId ? { ...item, enabled } : item,
   );
@@ -1223,19 +1474,238 @@ export function toggleModelProfileInState(
     humanizerModelProfileId: writerResolvedProfileId,
   }));
 
+  const mutation = {
+    mutationId: `cfg-model-${modelProfileId}-${enabled ? "enable" : "disable"}-${occurrence}`,
+    mutationType: "model_profile_toggled",
+    targetId: modelProfileId,
+    actorId: "demo-user",
+    actorRole: "owner",
+    status: "succeeded",
+    requestId: `req-model-${modelProfileId}-${enabled ? "enable" : "disable"}-${occurrence}`,
+    traceId: `trace-model-${modelProfileId}-${enabled ? "enable" : "disable"}-${occurrence}`,
+    createdAt: "2026-07-11T03:09:00Z",
+    summary: enabled ? `已启用模型 profile：${modelProfileId}。` : `已禁用模型 profile：${modelProfileId}，路由已切换到 fallback。`,
+  };
+  const auditEvent = {
+    auditEventId: `audit-model-${modelProfileId}-${enabled ? "enable" : "disable"}-${occurrence}`,
+    workspaceId: DEMO_WORKSPACE_ID,
+    action: "configuration.model_profile_toggled",
+    actorId: "demo-user",
+    actorRole: "owner",
+    targetType: "model_profile",
+    targetId: modelProfileId,
+    traceId: mutation.traceId,
+    requestId: mutation.requestId,
+    createdAt: mutation.createdAt,
+    summary: mutation.summary,
+    inputRefs: [`object://model-profiles/${modelProfileId}`],
+    outputRefs: [`object://configuration/default`],
+  };
+
   return {
     ...state,
     configurationSnapshot: {
       ...state.configurationSnapshot,
       modelProfiles,
     },
+    configurationMutations: [...state.configurationMutations, mutation],
+    auditEvents: [...state.auditEvents, auditEvent],
     providerCallsByWriting,
     writingRuns,
-    activityLog: [
-      ...state.activityLog,
-      enabled
-        ? `已启用模型 profile：${modelProfileId}。`
-        : `已禁用模型 profile：${modelProfileId}，路由已切换到 fallback。`,
-    ],
+    activityLog: [...state.activityLog, mutation.summary],
+  };
+}
+
+export function updateQualityGateProfileInState(
+  state: PhaseTwoState,
+  qualityGateProfileId: string,
+  aiFlavorThreshold: number,
+  originalitySafetyThreshold: number,
+): PhaseTwoState {
+  const occurrence = state.configurationMutations.filter((item) => item.mutationType === "quality_gate_profile_updated").length + 1;
+  const qualityGateProfiles = state.configurationSnapshot.qualityGateProfiles.map((item) =>
+    item.qualityGateProfileId === qualityGateProfileId
+      ? { ...item, aiFlavorThreshold, originalitySafetyThreshold }
+      : item,
+  );
+  const summary = `已更新质量阈值：AI 味 ${aiFlavorThreshold}，原创安全 ${originalitySafetyThreshold}。`;
+  const mutation = {
+    mutationId: `cfg-quality-${qualityGateProfileId}-${occurrence}`,
+    mutationType: "quality_gate_profile_updated",
+    targetId: qualityGateProfileId,
+    actorId: "demo-user",
+    actorRole: "owner",
+    status: "succeeded",
+    requestId: `req-quality-${qualityGateProfileId}-${occurrence}`,
+    traceId: `trace-quality-${qualityGateProfileId}-${occurrence}`,
+    createdAt: "2026-07-11T03:10:00Z",
+    summary,
+  };
+  const auditEvent = {
+    auditEventId: `audit-quality-${qualityGateProfileId}-${occurrence}`,
+    workspaceId: DEMO_WORKSPACE_ID,
+    action: "configuration.quality_gate_profile_updated",
+    actorId: "demo-user",
+    actorRole: "owner",
+    targetType: "quality_gate_profile",
+    targetId: qualityGateProfileId,
+    traceId: mutation.traceId,
+    requestId: mutation.requestId,
+    createdAt: mutation.createdAt,
+    summary,
+    inputRefs: [`object://quality-gate-profiles/${qualityGateProfileId}`],
+    outputRefs: [`object://configuration/default`],
+  };
+
+  return {
+    ...state,
+    configurationSnapshot: {
+      ...state.configurationSnapshot,
+      qualityGateProfiles,
+    },
+    configurationMutations: [...state.configurationMutations, mutation],
+    auditEvents: [...state.auditEvents, auditEvent],
+    activityLog: [...state.activityLog, summary],
+  };
+}
+
+export function updateAgentAssignmentInState(
+  state: PhaseTwoState,
+  assignmentId: string,
+  modelProfileId: string,
+): PhaseTwoState {
+  const occurrence = state.configurationMutations.filter((item) => item.mutationType === "agent_model_assignment_updated").length + 1;
+  const agentModelAssignments = state.configurationSnapshot.agentModelAssignments.map((item) =>
+    item.assignmentId === assignmentId ? { ...item, modelProfileId } : item,
+  );
+  const assignment = agentModelAssignments.find((item) => item.assignmentId === assignmentId);
+  const summary = `已更新 Agent 分配：${assignment?.agentRole ?? assignmentId} 改用 ${modelProfileId}。`;
+  const mutation = {
+    mutationId: `cfg-assignment-${assignmentId}-${occurrence}`,
+    mutationType: "agent_model_assignment_updated",
+    targetId: assignmentId,
+    actorId: "demo-user",
+    actorRole: "owner",
+    status: "succeeded",
+    requestId: `req-assignment-${assignmentId}-${occurrence}`,
+    traceId: `trace-assignment-${assignmentId}-${occurrence}`,
+    createdAt: "2026-07-11T03:11:00Z",
+    summary,
+  };
+  const auditEvent = {
+    auditEventId: `audit-assignment-${assignmentId}-${occurrence}`,
+    workspaceId: DEMO_WORKSPACE_ID,
+    action: "configuration.agent_model_assignment_updated",
+    actorId: "demo-user",
+    actorRole: "owner",
+    targetType: "agent_model_assignment",
+    targetId: assignmentId,
+    traceId: mutation.traceId,
+    requestId: mutation.requestId,
+    createdAt: mutation.createdAt,
+    summary,
+    inputRefs: [`object://agent-model-assignments/${assignmentId}`],
+    outputRefs: [`object://configuration/default`],
+  };
+
+  return {
+    ...state,
+    configurationSnapshot: {
+      ...state.configurationSnapshot,
+      agentModelAssignments,
+    },
+    configurationMutations: [...state.configurationMutations, mutation],
+    auditEvents: [...state.auditEvents, auditEvent],
+    activityLog: [...state.activityLog, summary],
+  };
+}
+
+export function updatePromptVersionInState(state: PhaseTwoState, agentRole: string, templateRef: string): PhaseTwoState {
+  const occurrence = state.configurationMutations.filter((item) => item.mutationType === "prompt_version_updated").length + 1;
+  const promptVersions = state.configurationSnapshot.promptVersions.map((item) =>
+    item.agentRole === agentRole ? { ...item, templateRef } : item,
+  );
+  const summary = `已更新 Prompt 版本：${agentRole} 改到 ${templateRef}。`;
+  const mutation = {
+    mutationId: `cfg-prompt-${agentRole}-${occurrence}`,
+    mutationType: "prompt_version_updated",
+    targetId: agentRole,
+    actorId: "demo-user",
+    actorRole: "owner",
+    status: "succeeded",
+    requestId: `req-prompt-${agentRole}-${occurrence}`,
+    traceId: `trace-prompt-${agentRole}-${occurrence}`,
+    createdAt: "2026-07-11T03:12:00Z",
+    summary,
+  };
+  const auditEvent = {
+    auditEventId: `audit-prompt-${agentRole}-${occurrence}`,
+    workspaceId: DEMO_WORKSPACE_ID,
+    action: "configuration.prompt_version_updated",
+    actorId: "demo-user",
+    actorRole: "owner",
+    targetType: "prompt_version",
+    targetId: agentRole,
+    traceId: mutation.traceId,
+    requestId: mutation.requestId,
+    createdAt: mutation.createdAt,
+    summary,
+    inputRefs: [`object://prompt-versions/${agentRole}`],
+    outputRefs: [templateRef],
+  };
+
+  return {
+    ...state,
+    configurationSnapshot: {
+      ...state.configurationSnapshot,
+      promptVersions,
+    },
+    configurationMutations: [...state.configurationMutations, mutation],
+    auditEvents: [...state.auditEvents, auditEvent],
+    activityLog: [...state.activityLog, summary],
+  };
+}
+
+export function promoteStrategySuggestionInState(state: PhaseTwoState, suggestionId: string): PhaseTwoState {
+  const occurrence = state.configurationMutations.filter((item) => item.mutationType === "feedback_record_promoted").length + 1;
+  const strategySuggestions = state.strategySuggestions.map((item) =>
+    item.suggestionId === suggestionId ? { ...item, status: "approved", promotedAt: "2026-07-11T03:13:00Z" } : item,
+  );
+  const target = strategySuggestions.find((item) => item.suggestionId === suggestionId);
+  const summary = `已提升策略建议：${target?.summary ?? suggestionId}`;
+  const mutation = {
+    mutationId: `feedback-promotion-${suggestionId}-${occurrence}`,
+    mutationType: "feedback_record_promoted",
+    targetId: suggestionId,
+    actorId: "demo-user",
+    actorRole: "owner",
+    status: "succeeded",
+    requestId: `req-feedback-promotion-${suggestionId}-${occurrence}`,
+    traceId: `trace-feedback-promotion-${suggestionId}-${occurrence}`,
+    createdAt: "2026-07-11T03:13:00Z",
+    summary,
+  };
+  const auditEvent = {
+    auditEventId: `audit-feedback-promotion-${suggestionId}-${occurrence}`,
+    workspaceId: DEMO_WORKSPACE_ID,
+    action: "feedback.record_promoted",
+    actorId: "demo-user",
+    actorRole: "owner",
+    targetType: "strategy_suggestion",
+    targetId: suggestionId,
+    traceId: mutation.traceId,
+    requestId: mutation.requestId,
+    createdAt: mutation.createdAt,
+    summary,
+    inputRefs: target ? [`object://feedback-records/${target.basedOnFeedbackRecordId}`] : [],
+    outputRefs: [`object://strategy-suggestions/${suggestionId}`],
+  };
+
+  return {
+    ...state,
+    strategySuggestions,
+    configurationMutations: [...state.configurationMutations, mutation],
+    auditEvents: [...state.auditEvents, auditEvent],
+    activityLog: [...state.activityLog, summary],
   };
 }

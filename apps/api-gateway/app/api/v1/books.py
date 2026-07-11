@@ -21,6 +21,9 @@ def post_book(command: CreateBookCommand, request: Request) -> dict:
         data=book,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -33,6 +36,9 @@ def get_book_detail(book_id: str, request: Request) -> dict:
         data=book,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -46,4 +52,7 @@ def get_book_chapter_list(book_id: str, request: Request) -> dict:
         data={"items": chapters},
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )

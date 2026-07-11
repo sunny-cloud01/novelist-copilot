@@ -13,11 +13,24 @@ class CreateExtractionRunCommand(BaseModel):
 
 @router.post("/extraction-runs", status_code=202)
 def post_extraction_run(command: CreateExtractionRunCommand, request: Request) -> dict:
-    run = create_extraction_run(command.book_id, request.state.trace_id)
+    try:
+        run = create_extraction_run(
+            command.book_id,
+            request.state.trace_id,
+            request.state.request_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return success_envelope(
         data=run,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -30,6 +43,9 @@ def get_extraction_run_detail(run_id: str, request: Request) -> dict:
         data=run,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -42,6 +58,9 @@ def get_extraction_run_report(run_id: str, request: Request) -> dict:
         data=report,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -54,4 +73,7 @@ def post_commit_knowledge_package(run_id: str, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )

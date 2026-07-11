@@ -1,0 +1,13 @@
+{
+  "name": "@novel-factory/shared-types",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api.ts",
+    "./schemas": "./src/schemas.ts"
+  },
+  "scripts": {
+    "lint": "node ../../apps/web/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+  }
+}

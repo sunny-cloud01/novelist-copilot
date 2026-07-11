@@ -5,6 +5,8 @@
   "type": "object",
   "required": [
     "default_model_profile_id",
+    "workspace_id",
+    "trace_id",
     "model_profiles",
     "agent_model_assignments",
     "quality_gate_profiles",
@@ -12,6 +14,8 @@
   ],
   "properties": {
     "default_model_profile_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
     "model_profiles": {
       "type": "array",
       "items": { "$ref": "https://novelfactory.dev/schemas/model-profile.schema.json" },
@@ -28,15 +32,29 @@
         "type": "object",
         "required": [
           "quality_gate_profile_id",
+          "workspace_id",
+          "trace_id",
           "label",
           "ai_flavor_threshold",
-          "originality_safety_threshold"
+          "originality_safety_threshold",
+          "input_refs",
+          "output_refs"
         ],
         "properties": {
           "quality_gate_profile_id": { "type": "string", "minLength": 1 },
+          "workspace_id": { "type": "string", "minLength": 1 },
+          "trace_id": { "type": "string", "minLength": 1 },
           "label": { "type": "string", "minLength": 1 },
           "ai_flavor_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
-          "originality_safety_threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+          "originality_safety_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "input_refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "output_refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
         },
         "additionalProperties": false
       },

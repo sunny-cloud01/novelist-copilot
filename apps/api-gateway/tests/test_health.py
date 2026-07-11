@@ -27,5 +27,11 @@ def test_gateway_health_uses_api_envelope() -> None:
     assert payload["errors"] == []
     assert payload["meta"]["request_id"]
     assert payload["meta"]["trace_id"]
+    assert payload["meta"]["workspace_id"] == "demo-workspace"
+    assert payload["meta"]["actor_id"] == "demo-user"
+    assert payload["meta"]["actor_role"] == "owner"
     assert response.headers["x-request-id"] == payload["meta"]["request_id"]
     assert response.headers["x-trace-id"] == payload["meta"]["trace_id"]
+    assert response.headers["x-workspace-id"] == payload["meta"]["workspace_id"]
+    assert response.headers["x-actor-id"] == payload["meta"]["actor_id"]
+    assert response.headers["x-actor-role"] == payload["meta"]["actor_role"]

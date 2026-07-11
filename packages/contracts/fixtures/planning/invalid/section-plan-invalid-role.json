@@ -3,6 +3,9 @@
   "section_plan_id": "01JZSECT0000000000000001",
   "workspace_id": "01JZWORKSPACE0000000000001",
   "chapter_plan_id": "01JZCHPLAN000000000000001",
+  "trace_id": "01JZTRC000000000000000002",
+  "input_refs": ["object://chapter-plans/01JZCHPLAN000000000000001"],
+  "output_refs": ["object://section-plans/01JZSECT0000000000000001"],
   "section_index": 1,
   "planning_role": "bridge",
   "payload": {

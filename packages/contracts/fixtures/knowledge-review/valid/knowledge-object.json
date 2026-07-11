@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "object_id": "01JZOBJ0000000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "trace_id": "01JZTRC000000000000000001",
+  "object_type": "character",
+  "canonical_name": "Xiao Yan",
+  "lifecycle_status": "candidate",
+  "review_status": "pending",
+  "confidence": 0.58,
+  "evidence_refs": ["evidence://01JZEVIDENCE0000000000001"],
+  "input_refs": ["object://source-books/01JZBOOK000000000000000001"],
+  "output_refs": ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+  "payload": {
+    "schema_version": 1,
+    "aliases": ["Yan"]
+  }
+}

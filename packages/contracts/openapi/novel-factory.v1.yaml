@@ -500,18 +500,7 @@ paths:
 components:
   schemas:
     RequestMeta:
-      type: object
-      required:
-        - request_id
-        - trace_id
-      properties:
-        request_id:
-          type: string
-          minLength: 1
-        trace_id:
-          type: string
-          minLength: 1
-      additionalProperties: false
+      $ref: ../schemas/request-meta.schema.json
     ApiError:
       type: object
       required:
@@ -589,3 +578,5 @@ components:
       $ref: ../schemas/quality-report.schema.json
     FeedbackRecord:
       $ref: ../schemas/feedback-record.schema.json
+    AuditEvent:
+      $ref: ../schemas/audit-event.schema.json

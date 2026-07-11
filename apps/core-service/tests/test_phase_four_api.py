@@ -59,6 +59,21 @@ def test_get_configuration_snapshot_and_toggle_model_profile() -> None:
     assert enable_response.status_code == 200
     assert enable_response.json()["data"]["model_profile"]["enabled"] is True
 
+    audit_response = client.get("/v1/audit-events")
+    assert any(item["action"] == "configuration.model_profile_toggled" for item in audit_response.json()["data"]["items"])
+
+
+def test_model_profile_toggle_requires_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/model-profiles/model_profile_default/disable",
+        headers={"x-actor-role": "editor", "x-actor-id": "editor-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+
 
 def test_create_writing_run_returns_seeded_quality_and_provider_calls() -> None:
     client = make_client()
@@ -90,7 +105,13 @@ def test_create_writing_run_returns_seeded_quality_and_provider_calls() -> None:
 
     assert writing_response.status_code == 202
     payload = writing_response.json()
-    assert payload["meta"] == {"request_id": "req-writing", "trace_id": "trace-writing"}
+    assert payload["meta"] == {
+        "request_id": "req-writing",
+        "trace_id": "trace-writing",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
+    }
     assert payload["data"]["writing_run"]["status"] == "queued"
     assert payload["data"]["writing_run"]["critic_model_profile_id"] == "model_profile_structured_fallback"
     assert payload["data"]["task"]["task_type"] == "create_writing_run"
@@ -112,13 +133,22 @@ def test_accept_chapter_marks_writing_run_and_returns_feedback_records() -> None
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["meta"] == {"request_id": "req-accept", "trace_id": "trace-accept"}
+    assert payload["meta"] == {
+        "request_id": "req-accept",
+        "trace_id": "trace-accept",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
+    }
     assert payload["data"]["writing_run"]["status"] == "succeeded"
     assert payload["data"]["writing_run"]["accepted_chapter_ref"]
     assert payload["data"]["writing_run"]["chapter_snapshot"]["chapter_title"] == "乌坦城风起"
     assert payload["data"]["writing_run"]["manuscript_state"]["current_story_state"]["quality_gate_status"] == "passed"
     assert payload["data"]["chapter_snapshot"]["chapter_snapshot_id"].startswith("chapter-snapshot:")
     assert payload["data"]["manuscript_state"]["manuscript_state_id"].startswith("manuscript-state:")
+
+    audit_response = client.get("/v1/audit-events")
+    assert any(item["action"] == "writing.accept_chapter" and item["trace_id"] == "trace-accept" for item in audit_response.json()["data"]["items"])
 
 
 def test_accept_chapter_returns_conflict_when_dependencies_incomplete() -> None:

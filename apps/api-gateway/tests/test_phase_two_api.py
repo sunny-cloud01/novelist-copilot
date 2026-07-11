@@ -43,6 +43,9 @@ def test_create_book_returns_gateway_envelope() -> None:
     assert payload["meta"] == {
         "request_id": "req-gateway-book",
         "trace_id": "trace-gateway-book",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
     }
 
 
@@ -82,12 +85,29 @@ def test_gateway_extraction_report_and_review_flow() -> None:
     assert graph_response.json()["data"]["node_count"] == 3
 
 
-def test_gateway_missing_resources_return_not_found() -> None:
+def test_gateway_review_action_requires_editor_or_owner() -> None:
     client = make_client()
 
-    assert client.get("/v1/books/missing").status_code == 404
-    assert client.get("/v1/extraction-runs/missing").status_code == 404
-    assert client.post(
-        "/v1/knowledge-objects/missing/review-actions",
+    response = client.post(
+        "/v1/knowledge-objects/01JZOBJ0000000000000000001/review-actions",
         json={"action": "approve"},
-    ).status_code == 404
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+
+
+def test_gateway_extraction_run_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/extraction-runs",
+        json={"book_id": "01JZBOOK000000000000000001"},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+
+

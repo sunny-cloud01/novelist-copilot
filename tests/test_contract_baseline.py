@@ -73,6 +73,7 @@ def test_phase_two_schema_files_exist() -> None:
     assert Path("packages/contracts/schemas/writing-run.schema.json").exists()
     assert Path("packages/contracts/schemas/quality-report.schema.json").exists()
     assert Path("packages/contracts/schemas/feedback-record.schema.json").exists()
+    assert Path("packages/contracts/schemas/audit-event.schema.json").exists()
 
 
 def test_fixture_directories_exist() -> None:
@@ -83,6 +84,7 @@ def test_fixture_directories_exist() -> None:
     assert Path("packages/contracts/fixtures/extraction-runs/valid/extraction-run.json").exists()
     assert Path("packages/contracts/fixtures/extraction-runs/invalid/extraction-run-invalid-stage.json").exists()
     assert Path("packages/contracts/fixtures/knowledge-review/valid/review-action-merge-alias.json").exists()
+    assert Path("packages/contracts/fixtures/knowledge-review/valid/knowledge-object.json").exists()
     assert Path("packages/contracts/fixtures/knowledge-review/invalid/review-action-merge-alias-missing-target.json").exists()
     assert Path("packages/contracts/fixtures/projects/valid/novel-project.json").exists()
     assert Path("packages/contracts/fixtures/projects/invalid/novel-project-missing-title.json").exists()
@@ -104,6 +106,8 @@ def test_fixture_directories_exist() -> None:
     assert Path("packages/contracts/fixtures/configuration/invalid/provider-call-invalid-latency.json").exists()
     assert Path("packages/contracts/fixtures/configuration/valid/configuration-snapshot.json").exists()
     assert Path("packages/contracts/fixtures/configuration/invalid/configuration-snapshot-empty.json").exists()
+    assert Path("packages/contracts/fixtures/configuration/valid/audit-event.json").exists()
+    assert Path("packages/contracts/fixtures/configuration/invalid/audit-event-missing-request-id.json").exists()
     assert Path("packages/contracts/fixtures/manuscript/valid/chapter-snapshot.json").exists()
     assert Path("packages/contracts/fixtures/manuscript/invalid/chapter-snapshot-missing-text.json").exists()
     assert Path("packages/contracts/fixtures/manuscript/valid/manuscript-state.json").exists()

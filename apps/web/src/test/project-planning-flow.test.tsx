@@ -80,6 +80,10 @@ describe("project and planning pages", () => {
     expect(screen.getByRole("heading", { name: "章节规划器" })).toBeInTheDocument();
     expect(screen.getByText("第 1 节 · 铺垫")).toBeInTheDocument();
     expect(screen.getByText("主角立下三年之约")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "关联任务" })).toBeInTheDocument();
+    expect(screen.getByText("create_chapter_plan · 待复核 · 章节规划已生成，等待确认。", { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "任务事件" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "规划审计轨迹" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "进入写作工作台（下一阶段）" })).toBeInTheDocument();
   });
 });

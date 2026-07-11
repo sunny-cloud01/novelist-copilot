@@ -20,11 +20,24 @@ class CreateNovelProjectCommand(BaseModel):
 
 @router.post("/novel-projects", status_code=202)
 def post_novel_project(command: CreateNovelProjectCommand, request: Request) -> dict:
-    project = create_novel_project(command.model_dump(exclude_none=True), request.state.trace_id)
+    try:
+        project = create_novel_project(
+            command.model_dump(exclude_none=True),
+            request.state.trace_id,
+            request.state.request_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return success_envelope(
         data=project,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -37,4 +50,7 @@ def get_novel_project_detail(project_id: str, request: Request) -> dict:
         data=project,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )

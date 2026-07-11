@@ -40,6 +40,7 @@ const ajv = new Ajv2020({ allErrors: true, strict: false, schemas: [
   JSON.parse(fs.readFileSync(path.join(root, "schemas/writing-run.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/quality-report.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/feedback-record.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/audit-event.schema.json"), "utf8")),
 ] });
 addFormats(ajv);
 
@@ -98,6 +99,12 @@ assertInvalid(
   "https://novelfactory.dev/schemas/extraction-run.schema.json",
   readFixture("fixtures/extraction-runs/invalid/extraction-run-invalid-stage.json"),
   "extraction-run",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/knowledge-object.schema.json",
+  readFixture("fixtures/knowledge-review/valid/knowledge-object.json"),
+  "knowledge-object",
 );
 
 assertValid(
@@ -219,6 +226,17 @@ assertInvalid(
   "https://novelfactory.dev/schemas/configuration-snapshot.schema.json",
   readFixture("fixtures/configuration/invalid/configuration-snapshot-empty.json"),
   "configuration-snapshot",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/audit-event.schema.json",
+  readFixture("fixtures/configuration/valid/audit-event.json"),
+  "audit-event",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/audit-event.schema.json",
+  readFixture("fixtures/configuration/invalid/audit-event-missing-request-id.json"),
+  "audit-event",
 );
 
 assertValid(

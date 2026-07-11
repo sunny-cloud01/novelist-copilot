@@ -8,6 +8,9 @@
     "chapter_plan_id",
     "workspace_id",
     "project_id",
+    "trace_id",
+    "input_refs",
+    "output_refs",
     "chapter_index",
     "status",
     "target_word_count",
@@ -19,8 +22,17 @@
     "chapter_plan_id": { "type": "string", "minLength": 1 },
     "workspace_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "input_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "chapter_index": { "type": "integer", "minimum": 1 },
-    "status": { "type": "string", "enum": ["queued", "running", "succeeded", "failed", "requires_review", "blocked", "approved"] },
+    "status": { "type": "string", "enum": ["queued", "running", "retrying", "succeeded", "failed", "requires_review", "blocked", "approved"] },
     "target_word_count": { "type": "integer", "minimum": 1 },
     "payload": { "type": "object" },
     "created_at": { "type": "string", "format": "date-time" },

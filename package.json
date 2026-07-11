@@ -5,7 +5,8 @@
   "scripts": {
     "contracts:lint": "pnpm --filter @novel-factory/contracts lint",
     "contracts:test": "pnpm --filter @novel-factory/contracts test",
-    "lint": "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:lint && pnpm --filter @novel-factory/web lint",
+    "packages:lint": "pnpm --filter @novel-factory/shared-types lint && pnpm --filter @novel-factory/prompt-schemas lint && pnpm --filter @novel-factory/config lint && pnpm --filter @novel-factory/ui lint",
+    "lint": "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q && pnpm contracts:lint && pnpm packages:lint && pnpm --filter @novel-factory/web lint",
     "test": "python3 -m pytest -q && pnpm contracts:test && pnpm --filter @novel-factory/web test --run",
     "smoke": "bash scripts/dev/smoke.sh"
   }

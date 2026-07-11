@@ -16,7 +16,11 @@ import {
   deriveLowConfidenceItems,
   DEFAULT_MODEL_PROFILE_ID,
   STRUCTURED_FALLBACK_MODEL_PROFILE_ID,
+  promoteStrategySuggestionInState,
   toggleModelProfileInState,
+  updateAgentAssignmentInState,
+  updatePromptVersionInState,
+  updateQualityGateProfileInState,
 } from "./components/phase-two-state";
 
 const statusLabels: Record<string, string> = {
@@ -106,6 +110,10 @@ type PhaseTwoContextValue = {
   applyReviewAction: (objectId: string, action: ReviewAction, targetObjectId?: string) => void;
   applyWritingReviewAction: (writingRunId: string, sectionRunId: string, action: WritingReviewAction) => void;
   toggleModelProfile: (modelProfileId: string, enabled: boolean) => void;
+  updateQualityGateProfile: (qualityGateProfileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) => void;
+  updateAgentAssignment: (assignmentId: string, modelProfileId: string) => void;
+  updatePromptVersion: (agentRole: string, templateRef: string) => void;
+  promoteStrategySuggestion: (suggestionId: string) => void;
   commitRun: () => void;
 };
 
@@ -132,6 +140,20 @@ export function PhaseTwoProvider({ children }: { children: React.ReactNode }) {
       },
       toggleModelProfile: (modelProfileId, enabled) => {
         setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
+      },
+      updateQualityGateProfile: (qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold) => {
+        setState((current) =>
+          updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
+        );
+      },
+      updateAgentAssignment: (assignmentId, modelProfileId) => {
+        setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
+      },
+      updatePromptVersion: (agentRole, templateRef) => {
+        setState((current) => updatePromptVersionInState(current, agentRole, templateRef));
+      },
+      promoteStrategySuggestion: (suggestionId) => {
+        setState((current) => promoteStrategySuggestionInState(current, suggestionId));
       },
       commitRun: () => {
         setState((current) => commitKnowledgePackage(current));
@@ -498,12 +520,19 @@ export function PlannerPage() {
   }
 
   const chapterPlans = state.chapterPlans.filter((item) => item.projectId === project.projectId);
+  const projectTaskIds = new Set(chapterPlans.map((item) => `object://chapter-plans/${item.chapterPlanId}`));
+  const plannerTasks = state.agentTasks.filter(
+    (item) => item.taskType === "create_chapter_plan" || projectTaskIds.has(item.targetRef),
+  );
+  const plannerAuditEvents = state.auditEvents.filter(
+    (item) => item.targetType === "chapter_plan" || item.targetType === "quality_gate_profile",
+  );
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <div>
         <h2>章节规划器</h2>
-        <p>查看章节目标、场景拆解与 beat 明细。</p>
+        <p>查看章节目标、场景拆解、beat 明细、相关任务和审计记录。</p>
       </div>
       {chapterPlans.map((plan) => {
         const sections = state.sectionPlansByChapter[plan.chapterPlanId] ?? [];
@@ -526,6 +555,36 @@ export function PlannerPage() {
                         <li key={`${section.sectionPlanId}-${beat.index}`}>{beat.summary}</li>
                       ))}
                     </ol>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h4>关联任务</h4>
+              <ul>
+                {plannerTasks.map((task) => (
+                  <li key={task.taskId}>
+                    {task.taskType} · {labelOf(statusLabels, task.status)} · {task.summary}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h4>任务事件</h4>
+              <ul>
+                {plannerTasks.flatMap((task) => task.events).map((event) => (
+                  <li key={event.eventId}>
+                    {event.eventType} · {labelOf(statusLabels, event.status)} · {event.summary}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h4>规划审计轨迹</h4>
+              <ul>
+                {plannerAuditEvents.map((event) => (
+                  <li key={event.auditEventId}>
+                    {event.action} · {event.summary} · {event.traceId}
                   </li>
                 ))}
               </ul>
@@ -830,22 +889,28 @@ export function WritingStudioPage() {
 }
 
 export function FeedbackPage() {
-  const { state } = usePhaseTwo();
+  const { state, promoteStrategySuggestion } = usePhaseTwo();
   const writingRun = state.writingRuns[0];
   const qualityReport = state.qualityReports.find((item) => item.qualityReportId === writingRun?.qualityReportId);
   const feedbackRecords = (state.feedbackRecords ?? []).filter(
     (item) => item.targetId === writingRun?.writingRunId || item.targetId === writingRun?.qualityReportId,
   );
+  const strategySuggestions = (state.strategySuggestions ?? []).filter((item) =>
+    feedbackRecords.some((record) => record.feedbackRecordId === item.basedOnFeedbackRecordId),
+  );
   const memoryPackage = (state.memoryPackages ?? []).find((item) => item.writingRunId === writingRun?.writingRunId);
   const promptPackage = (state.promptPackages ?? []).find((item) => item.writingRunId === writingRun?.writingRunId);
   const chapterSnapshot = writingRun?.chapterSnapshot;
   const manuscriptState = writingRun?.manuscriptState;
+  const feedbackAuditEvents = state.auditEvents.filter(
+    (item) => item.action.startsWith("feedback.") || item.targetType === "strategy_suggestion",
+  );
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <div>
         <h2>反馈看板</h2>
-        <p>查看成本、质量、风格反馈和证据链。</p>
+        <p>查看成本、质量、风格反馈、策略建议和证据链。</p>
       </div>
       <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
         <h3>质量报告摘要</h3>
@@ -889,6 +954,31 @@ export function FeedbackPage() {
         </ul>
       </section>
       <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>策略建议</h3>
+        <ul>
+          {strategySuggestions.map((item) => (
+            <li key={item.suggestionId}>
+              <strong>{item.targetScope}</strong> · {item.status} · {item.summary}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" onClick={() => promoteStrategySuggestion(item.suggestionId)}>
+                  提升为已批准策略
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>反馈审计轨迹</h3>
+        <ul>
+          {feedbackAuditEvents.map((item) => (
+            <li key={item.auditEventId}>
+              {item.action} · {item.summary} · {item.traceId}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
         <h3>章节入稿后状态</h3>
         {chapterSnapshot && manuscriptState ? (
           <>
@@ -923,7 +1013,13 @@ export function FeedbackPage() {
 }
 
 export function ConfigurationPage() {
-  const { state, toggleModelProfile } = usePhaseTwo();
+  const {
+    state,
+    toggleModelProfile,
+    updateQualityGateProfile,
+    updateAgentAssignment,
+    updatePromptVersion,
+  } = usePhaseTwo();
   const snapshot = state.configurationSnapshot;
   const project = state.projects[0];
   const writingRun = state.writingRuns[0];
@@ -935,7 +1031,7 @@ export function ConfigurationPage() {
     <section style={{ display: "grid", gap: 16 }}>
       <div>
         <h2>配置中心</h2>
-        <p>查看模型路由、Agent 分配、质量阈值、提示版本与最近调用指标。</p>
+        <p>查看模型路由、Agent 分配、质量阈值、提示版本、调用指标与配置审计。</p>
       </div>
       <section style={{ border: "1px solid #d4d4d8", padding: 16, display: "grid", gap: 12 }}>
         <h3>模型 Profile</h3>
@@ -960,6 +1056,11 @@ export function ConfigurationPage() {
           {snapshot.agentModelAssignments.map((assignment) => (
             <li key={assignment.assignmentId}>
               {assignment.agentRole} · {assignment.outputMode} · {assignment.modelProfileId} · max_retry {assignment.maxRetry} · max_cost {assignment.maxCost}
+              {assignment.agentRole === "writer" ? (
+                <button type="button" style={{ marginLeft: 8 }} onClick={() => updateAgentAssignment(assignment.assignmentId, STRUCTURED_FALLBACK_MODEL_PROFILE_ID)}>
+                  改用 fallback
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -970,6 +1071,9 @@ export function ConfigurationPage() {
           {snapshot.qualityGateProfiles.map((profile) => (
             <li key={profile.qualityGateProfileId}>
               {profile.label} · AI 味阈值 {profile.aiFlavorThreshold} · 原创安全阈值 {profile.originalitySafetyThreshold}
+              <button type="button" style={{ marginLeft: 8 }} onClick={() => updateQualityGateProfile(profile.qualityGateProfileId, 0.4, 0.9)}>
+                应用更严格阈值
+              </button>
             </li>
           ))}
         </ul>
@@ -979,7 +1083,14 @@ export function ConfigurationPage() {
         <h3>Prompt 版本与规则</h3>
         <ul>
           {snapshot.promptVersions.map((item) => (
-            <li key={`${item.agentRole}-${item.templateRef}`}>{item.agentRole} · {item.templateRef}</li>
+            <li key={`${item.agentRole}-${item.templateRef}`}>
+              {item.agentRole} · {item.templateRef}
+              {item.agentRole === "writer" ? (
+                <button type="button" style={{ marginLeft: 8 }} onClick={() => updatePromptVersion(item.agentRole, "prompt://writer/chapter-compact") }>
+                  切到紧凑版
+                </button>
+              ) : null}
+            </li>
           ))}
         </ul>
       </section>
@@ -1009,6 +1120,28 @@ export function ConfigurationPage() {
           默认 profile {writerProfile?.enabled ? "可用" : "已关闭"}，critic 结构化输出走 {STRUCTURED_FALLBACK_MODEL_PROFILE_ID}。
           默认 profile 关闭时，writer / humanizer 改走 {fallbackProfile?.enabled ? STRUCTURED_FALLBACK_MODEL_PROFILE_ID : "无可用 fallback"}。
         </p>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>配置变更记录</h3>
+        <ul>
+          {state.configurationMutations.map((item) => (
+            <li key={item.mutationId}>
+              {item.mutationType} · {item.summary} · {item.traceId}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>配置审计轨迹</h3>
+        <ul>
+          {state.auditEvents
+            .filter((item) => item.action.startsWith("configuration."))
+            .map((item) => (
+              <li key={item.auditEventId}>
+                {item.action} · {item.summary} · {item.requestId}
+              </li>
+            ))}
+        </ul>
       </section>
     </section>
   );

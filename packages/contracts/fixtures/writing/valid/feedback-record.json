@@ -2,6 +2,9 @@
   "schema_version": 1,
   "feedback_record_id": "01JZFDBK0000000000000001",
   "workspace_id": "01JZWORKSPACE0000000000001",
+  "request_id": "req-feedback-quality",
+  "trace_id": "trace-feedback-quality",
+  "actor_id": "demo-reviewer",
   "target_type": "writing_run",
   "target_id": "01JZWRITING00000000000001",
   "feedback_type": "quality",
@@ -12,6 +15,9 @@
     "quality_report_id": "01JZQLTREP000000000000001",
     "summary": "质量门禁通过后保留了节奏与可读性指标。"
   },
+  "promotion_status": "pending",
+  "input_refs": ["object://quality-reports/01JZQLTREP000000000000001"],
+  "output_refs": ["object://feedback-records/01JZFDBK0000000000000001"],
   "created_at": "2026-07-11T03:10:00Z",
   "updated_at": "2026-07-11T03:10:00Z"
 }

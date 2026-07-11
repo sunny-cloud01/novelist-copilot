@@ -41,3 +41,6 @@ jobs:
 
       - name: Run root test gate
         run: pnpm test
+
+      - name: Run MVP smoke gate
+        run: pnpm smoke

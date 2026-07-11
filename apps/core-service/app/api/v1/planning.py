@@ -21,13 +21,26 @@ class CreateSectionPlansCommand(BaseModel):
 
 @router.post("/chapter-plans", status_code=202)
 def post_chapter_plan(command: CreateChapterPlanCommand, request: Request) -> dict:
-    result = create_chapter_plan(command.model_dump(), request.state.trace_id)
+    try:
+        result = create_chapter_plan(
+            command.model_dump(),
+            request.state.trace_id,
+            request.state.request_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     if not result:
         raise HTTPException(status_code=404, detail="novel project not found")
     return success_envelope(
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -40,6 +53,9 @@ def get_chapter_plan_detail(chapter_plan_id: str, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
@@ -52,16 +68,33 @@ def get_section_plan_list(chapter_plan_id: str, request: Request) -> dict:
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )
 
 
 @router.post("/chapter-plans/{chapter_plan_id}/section-plans", status_code=202)
 def post_section_plans(chapter_plan_id: str, command: CreateSectionPlansCommand, request: Request) -> dict:
-    result = create_section_plans(chapter_plan_id, command.section_count, request.state.trace_id)
+    try:
+        result = create_section_plans(
+            chapter_plan_id,
+            command.section_count,
+            request.state.trace_id,
+            request.state.request_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     if not result:
         raise HTTPException(status_code=404, detail="chapter plan not found")
     return success_envelope(
         data=result,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
     )

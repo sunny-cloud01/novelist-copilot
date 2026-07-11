@@ -3,10 +3,13 @@
   "$id": "https://novelfactory.dev/schemas/request-meta.schema.json",
   "title": "RequestMeta",
   "type": "object",
-  "required": ["request_id", "trace_id"],
+  "required": ["request_id", "trace_id", "workspace_id", "actor_id", "actor_role"],
   "properties": {
     "request_id": { "type": "string", "minLength": 1 },
-    "trace_id": { "type": "string", "minLength": 1 }
+    "trace_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "actor_id": { "type": "string", "minLength": 1 },
+    "actor_role": { "type": "string", "minLength": 1 }
   },
   "additionalProperties": false
 }

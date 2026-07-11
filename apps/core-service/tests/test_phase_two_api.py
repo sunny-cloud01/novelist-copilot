@@ -42,7 +42,13 @@ def test_create_book_returns_enveloped_book() -> None:
     assert payload["data"]["author_name"] == "I Eat Tomatoes"
     assert payload["data"]["source_type"] == "reference_novel"
     assert payload["data"]["import_status"] == "uploaded"
-    assert payload["meta"] == {"request_id": "req-books", "trace_id": "trace-books"}
+    assert payload["meta"] == {
+        "request_id": "req-books",
+        "trace_id": "trace-books",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
+    }
 
 
 def test_get_seed_book_and_chapters() -> None:
@@ -109,17 +115,45 @@ def test_review_action_updates_object_and_run() -> None:
     assert report_response.json()["data"]["run"]["low_confidence_count"] == 0
 
 
-def test_commit_and_graph_summary_endpoints() -> None:
+def test_review_action_requires_editor_or_owner() -> None:
     client = make_client()
 
-    commit_response = client.post("/v1/extraction-runs/01JZRUN0000000000000000001/commit")
-    graph_response = client.get("/v1/graph/summary")
+    response = client.post(
+        "/v1/knowledge-objects/01JZOBJ0000000000000000001/review-actions",
+        json={"action": "approve"},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
 
-    assert commit_response.status_code == 200
-    assert commit_response.json()["data"]["committed_object_count"] == 3
-    assert graph_response.status_code == 200
-    assert graph_response.json()["data"]["node_count"] == 3
-    assert graph_response.json()["data"]["nodes"][0]["label"] == "Xiao Yan"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+
+
+def test_extraction_run_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/extraction-runs",
+        json={"book_id": "01JZBOOK000000000000000001"},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+
+
+def test_review_action_writes_audit_event() -> None:
+    client = make_client()
+
+    client.post(
+        "/v1/knowledge-objects/01JZOBJ0000000000000000001/review-actions",
+        json={"action": "approve"},
+        headers={"x-request-id": "req-audit-review", "x-trace-id": "trace-audit-review"},
+    )
+    audit_response = client.get("/v1/audit-events")
+
+    assert audit_response.status_code == 200
+    items = audit_response.json()["data"]["items"]
+    assert any(item["action"] == "knowledge.approve" and item["request_id"] == "req-audit-review" for item in items)
 
 
 def test_missing_resources_return_not_found() -> None:

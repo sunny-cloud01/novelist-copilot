@@ -1,0 +1,11 @@
+{
+  "name": "@novel-factory/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "node ../../apps/web/node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
+  }
+}

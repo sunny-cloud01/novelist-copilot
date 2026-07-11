@@ -40,7 +40,13 @@ def test_create_and_fetch_novel_project() -> None:
     payload = create_response.json()
     assert payload["data"]["project"]["title"] == "凡人修仙同人"
     assert payload["data"]["story_bible"]["trace_id"] == "trace-project"
-    assert payload["meta"] == {"request_id": "req-project", "trace_id": "trace-project"}
+    assert payload["meta"] == {
+        "request_id": "req-project",
+        "trace_id": "trace-project",
+        "workspace_id": "demo-workspace",
+        "actor_id": "demo-user",
+        "actor_role": "owner",
+    }
 
     project_id = payload["data"]["project"]["project_id"]
     detail_response = client.get(f"/v1/novel-projects/{project_id}")
@@ -50,6 +56,19 @@ def test_create_and_fetch_novel_project() -> None:
     assert detail["project"]["project_id"] == project_id
     assert detail["story_bible"]["project_id"] == project_id
     assert detail["chapter_plans"] == []
+
+
+def test_novel_project_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/novel-projects",
+        json={"title": "凡人修仙同人", "genre_scope": "仙侠成长流"},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_get_seed_project_detail() -> None:
@@ -81,6 +100,8 @@ def test_create_and_fetch_chapter_plan_and_section_plans() -> None:
     assert create_plan.status_code == 202
     created_plan = create_plan.json()["data"]
     assert created_plan["chapter_plan"]["status"] == "queued"
+    assert created_plan["chapter_plan"]["trace_id"] == "trace-plan"
+    assert created_plan["chapter_plan"]["input_refs"] == ["object://novel-projects/01JZPROJECT000000000000001"]
     assert created_plan["task"]["task_type"] == "create_chapter_plan"
 
     chapter_plan_id = created_plan["chapter_plan"]["chapter_plan_id"]
@@ -100,7 +121,21 @@ def test_create_and_fetch_chapter_plan_and_section_plans() -> None:
     section_payload = create_sections.json()["data"]
     assert len(section_payload["items"]) == 4
     assert section_payload["items"][0]["planning_role"] == "setup"
+    assert section_payload["items"][0]["trace_id"] == "trace-sections"
     assert section_payload["task"]["status"] == "succeeded"
+
+
+def test_chapter_plan_requires_editor_or_owner() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/chapter-plans",
+        json={"project_id": "01JZPROJECT000000000000001", "chapter_index": 2, "target_word_count": 3600},
+        headers={"x-actor-role": "viewer", "x-actor-id": "viewer-user"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_seed_chapter_plan_lists_seed_sections() -> None:
