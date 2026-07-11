@@ -4,8 +4,8 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "contracts:lint": "python3 scripts/build_docs.py --check",
-    "contracts:test": "python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
-    "lint": "python3 scripts/build_docs.py --check && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
-    "test": "python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
+    "contracts:test": "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
+    "lint": "python3 scripts/build_docs.py --check && docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q",
+    "test": "docker compose -f infra/docker-compose.yml config >/tmp/novel-factory.compose.out && python3 -m pytest tests/test_build_docs.py tests/test_repo_layout.py tests/test_infra_compose.py -q"
   }
 }

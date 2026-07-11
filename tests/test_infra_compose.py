@@ -30,4 +30,7 @@ def test_pgvector_init_and_env_example_exist() -> None:
     env = Path(".env.example").read_text()
     assert "NOVEL_FACTORY_POSTGRES_URL=" in env
     assert "NOVEL_FACTORY_REDIS_URL=" in env
-    assert "NOVEL_FACTORY_MINIO_SECRET_KEY=" in env
+    assert "NOVEL_FACTORY_MINIO_SECRET_KEY=replace-me" in env
+
+    compose = Path("infra/docker-compose.yml").read_text()
+    assert 'MINIO_ROOT_PASSWORD: replace-me' in compose
