@@ -5,10 +5,10 @@ import json
 def test_root_workspace_files_exist_and_expose_required_scripts() -> None:
     package = json.loads(Path("package.json").read_text())
     assert package["private"] is True
-    assert package["scripts"]["contracts:lint"] == "pnpm --filter @novel-factory/contracts lint"
-    assert package["scripts"]["contracts:test"] == "pnpm --filter @novel-factory/contracts test"
-    assert package["scripts"]["lint"] == "pnpm contracts:lint && pnpm --filter @novel-factory/web lint && pytest tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q"
-    assert package["scripts"]["test"] == "pytest -q && pnpm contracts:test && pnpm --filter @novel-factory/web test --run"
+    assert package["scripts"]["contracts:lint"] == "python3 scripts/build_docs.py --check"
+    assert package["scripts"]["contracts:test"] == "pytest tests/test_build_docs.py tests/test_repo_layout.py -q"
+    assert package["scripts"]["lint"] == "python3 scripts/build_docs.py --check && pytest tests/test_build_docs.py tests/test_repo_layout.py -q"
+    assert package["scripts"]["test"] == "pytest tests/test_build_docs.py tests/test_repo_layout.py -q"
 
 
 def test_workspace_membership_and_bootstrap_docs_are_present() -> None:
@@ -22,5 +22,5 @@ def test_workspace_membership_and_bootstrap_docs_are_present() -> None:
 
     readme = Path("README.md").read_text()
     assert "## Implementation Bootstrap" in readme
-    assert "pnpm contracts:lint" in readme
-    assert "docker compose -f infra/docker-compose.yml up -d" in readme
+    assert "python3 scripts/build_docs.py --check" in readme
+    assert "Later scaffold tasks add pnpm workspace apps and infra commands after those paths exist." in readme

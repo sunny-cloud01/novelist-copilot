@@ -156,13 +156,9 @@ Milestone 7: Product-Level Implementation Blueprint
 ## Implementation Bootstrap
 
 ```sh
-pnpm install
-python -m pip install -e apps/api-gateway -e apps/core-service -e apps/ai-worker -e apps/scheduler pytest
-Docker compose -f infra/docker-compose.yml up -d
-pnpm contracts:lint
-pnpm contracts:test
-pytest -q
-pnpm --filter @novel-factory/web dev
+pytest tests/test_repo_layout.py -q
+python3 scripts/build_docs.py --check
+pytest tests/test_build_docs.py tests/test_repo_layout.py -q
 ```
 
-For shell environments that require the newer CLI spelling, the equivalent command is `docker compose -f infra/docker-compose.yml up -d`.
+Later scaffold tasks add pnpm workspace apps and infra commands after those paths exist.
