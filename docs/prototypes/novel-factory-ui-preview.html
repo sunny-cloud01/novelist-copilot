@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Novel Factory UI Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,650&family=Roboto+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #eef3f1;
+        --surface: #fbfcf8;
+        --surface-deep: #dfe8e4;
+        --ink: #15211f;
+        --ink-soft: #56615d;
+        --line: #b7c4bd;
+        --copper: #b45f34;
+        --cyan: #35b9aa;
+        --red: #a7352f;
+        --gold: #d6a844;
+        --shadow: rgba(18, 30, 27, 0.14);
+        --radius: 8px;
+        --nav-width: 248px;
+        --right-width: 330px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-height: 100%;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "IBM Plex Sans SC", "Noto Sans CJK SC", sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--ink);
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 3px solid rgba(53, 185, 170, 0.55);
+        outline-offset: 3px;
+      }
+
+      .app-shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: var(--nav-width) minmax(0, 1fr) var(
+            --right-width
+          );
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: rgba(251, 252, 248, 0.84);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        padding: 24px 22px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-kicker,
+      .eyebrow,
+      .label,
+      .mono {
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        letter-spacing: 0;
+      }
+
+      .brand-kicker {
+        color: var(--copper);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .brand-name {
+        margin-top: 8px;
+        font-family: "Newsreader", Georgia, serif;
+        font-size: 31px;
+        font-weight: 650;
+        line-height: 0.95;
+      }
+
+      .brand-subtitle {
+        max-width: 185px;
+        margin-top: 12px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .nav-section {
+        padding: 17px 12px 4px;
+      }
+
+      .section-title {
+        margin: 0 10px 8px;
+        color: var(--ink-soft);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      .nav-item span:first-child {
+        overflow-wrap: anywhere;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .nav-item:hover,
+      .nav-item.active {
+        border-color: rgba(180, 95, 52, 0.35);
+        background: rgba(180, 95, 52, 0.1);
+      }
+
+      .nav-count {
+        min-width: 24px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: var(--surface);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 11px;
+        text-align: center;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 14px 12px 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .status-card {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .status-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+      }
+
+      .pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--cyan);
+      }
+
+      .main {
+        min-width: 0;
+        padding: 24px;
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .crumbs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .crumbs strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .button {
+        min-height: 38px;
+        padding: 8px 13px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .button.primary {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--surface);
+      }
+
+      .button.warn {
+        border-color: rgba(167, 53, 47, 0.45);
+        background: rgba(167, 53, 47, 0.1);
+        color: var(--red);
+      }
+
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.72fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .hero-panel,
+      .panel,
+      .rail-panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 252, 248, 0.94);
+      }
+
+      .hero-panel {
+        position: relative;
+        overflow: hidden;
+        min-height: 210px;
+        padding: 22px;
+      }
+
+      .hero-content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 18px;
+        align-items: end;
+        min-height: 166px;
+      }
+
+      .eyebrow {
+        color: var(--copper);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 520px;
+        margin-bottom: 10px;
+        font-family: "Newsreader", Georgia, serif;
+        font-size: clamp(26px, 2.7vw, 36px);
+        font-weight: 650;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        max-width: 620px;
+        margin-bottom: 0;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .manuscript-meter {
+        position: relative;
+        display: grid;
+        justify-self: end;
+        width: min(230px, 100%);
+        gap: 9px;
+        padding: 14px;
+        border: 1px solid rgba(21, 33, 31, 0.18);
+        border-radius: var(--radius);
+        background: rgba(238, 243, 241, 0.72);
+      }
+
+      .meter-row {
+        display: grid;
+        grid-template-columns: 64px 1fr 36px;
+        gap: 8px;
+        align-items: center;
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 11px;
+      }
+
+      .meter-track {
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(21, 33, 31, 0.14);
+      }
+
+      .meter-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--cyan);
+      }
+
+      .meter-fill.copper {
+        background: var(--copper);
+      }
+
+      .meter-fill.gold {
+        background: var(--gold);
+      }
+
+      .panel {
+        padding: 16px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .panel-title {
+        margin-bottom: 2px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .panel-note {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .flow-strip {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .flow-step {
+        min-height: 94px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .flow-step.active {
+        border-color: rgba(53, 185, 170, 0.65);
+        background: rgba(53, 185, 170, 0.11);
+      }
+
+      .flow-step.blocked {
+        border-color: rgba(167, 53, 47, 0.45);
+        background: rgba(167, 53, 47, 0.08);
+      }
+
+      .step-code {
+        color: var(--ink-soft);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 11px;
+      }
+
+      .step-title {
+        margin-top: 9px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .step-meta {
+        margin-top: 8px;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .studio {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr) 270px;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .beats,
+      .draft,
+      .quality {
+        min-height: 430px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .beats {
+        padding: 10px;
+      }
+
+      .beat {
+        display: grid;
+        gap: 4px;
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        cursor: pointer;
+      }
+
+      .beat + .beat {
+        margin-top: 6px;
+      }
+
+      .beat.active {
+        border-color: rgba(180, 95, 52, 0.42);
+        background: rgba(180, 95, 52, 0.1);
+      }
+
+      .beat-state {
+        color: var(--ink-soft);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 10px;
+      }
+
+      .beat-name {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .beat-purpose {
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .draft {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .draft-toolbar {
+        display: flex;
+        min-height: 48px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-deep);
+      }
+
+      .draft-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .draft-body {
+        padding: 20px 22px 22px;
+        font-family: "Newsreader", "IBM Plex Sans SC", serif;
+        font-size: 20px;
+        line-height: 1.82;
+      }
+
+      .draft-body p {
+        margin-bottom: 14px;
+      }
+
+      .annotation {
+        display: inline;
+        padding: 0 3px 2px;
+        border-bottom: 2px solid rgba(53, 185, 170, 0.75);
+        background: rgba(53, 185, 170, 0.12);
+      }
+
+      .quality {
+        padding: 12px;
+      }
+
+      .score-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+      }
+
+      .score-card + .score-card {
+        margin-top: 9px;
+      }
+
+      .score-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .score-value {
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      .score-label {
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      .score-bar {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(21, 33, 31, 0.12);
+      }
+
+      .score-bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--cyan);
+      }
+
+      .score-bar span.risk {
+        background: var(--red);
+      }
+
+      .trace-column {
+        min-width: 0;
+        border-left: 1px solid var(--line);
+        background: rgba(223, 232, 228, 0.72);
+      }
+
+      .trace-header {
+        padding: 24px 20px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .trace-title {
+        margin-bottom: 6px;
+        font-family: "Newsreader", Georgia, serif;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .trace-copy {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .trace-rail {
+        position: relative;
+        padding: 20px 18px 22px 34px;
+      }
+
+      .trace-rail::before {
+        position: absolute;
+        top: 20px;
+        bottom: 24px;
+        left: 20px;
+        width: 2px;
+        background: linear-gradient(var(--copper), var(--cyan), var(--gold));
+        content: "";
+      }
+
+      .trace-node {
+        position: relative;
+        padding: 0 0 18px 18px;
+      }
+
+      .trace-node::before {
+        position: absolute;
+        top: 2px;
+        left: -20px;
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--surface);
+        border-radius: 50%;
+        background: var(--ink);
+        content: "";
+      }
+
+      .trace-node.active::before {
+        background: var(--cyan);
+      }
+
+      .trace-node.warn::before {
+        background: var(--red);
+      }
+
+      .trace-node h3 {
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .trace-node p {
+        margin-bottom: 8px;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .trace-ref {
+        display: inline-flex;
+        max-width: 100%;
+        padding: 3px 6px;
+        border: 1px solid rgba(21, 33, 31, 0.16);
+        border-radius: 999px;
+        color: var(--ink);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 10px;
+        overflow-wrap: anywhere;
+      }
+
+      .lower-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .queue-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .queue-item {
+        display: grid;
+        grid-template-columns: 86px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 23px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: rgba(21, 33, 31, 0.08);
+        color: var(--ink-soft);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 10px;
+      }
+
+      .tag.live {
+        background: rgba(53, 185, 170, 0.16);
+        color: #11786f;
+      }
+
+      .tag.blocked {
+        background: rgba(167, 53, 47, 0.12);
+        color: var(--red);
+      }
+
+      .queue-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .queue-sub {
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      @media (max-width: 1180px) {
+        .app-shell {
+          grid-template-columns: 210px minmax(0, 1fr);
+        }
+
+        .trace-column {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+
+        .trace-rail {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          padding-left: 20px;
+        }
+
+        .trace-rail::before,
+        .trace-node::before {
+          display: none;
+        }
+
+        .trace-node {
+          padding: 12px;
+          border: 1px solid var(--line);
+          border-radius: var(--radius);
+          background: var(--surface);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          min-height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .nav-section {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 6px;
+        }
+
+        .section-title {
+          grid-column: 1 / -1;
+        }
+
+        .workspace-grid,
+        .studio,
+        .lower-grid,
+        .hero-content {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-strip {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .main {
+          padding: 14px;
+        }
+
+        h1 {
+          font-size: 32px;
+        }
+
+        .flow-strip,
+        .queue-item,
+        .trace-rail {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .actions {
+          justify-content: stretch;
+        }
+
+        .button {
+          flex: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <div class="brand-kicker">NF-MVP / one-click writing</div>
+          <div class="brand-name">Novel<br />Factory</div>
+          <p class="brand-subtitle">
+            把知识包、Story Bible、章节方向和质量门禁压成一个生成入口。
+          </p>
+        </div>
+
+        <nav>
+          <div class="nav-section">
+            <p class="section-title">工作台</p>
+            <a class="nav-item active" href="#"
+              ><span>Writing Run</span><span class="nav-count">1</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Chapter Setup</span><span class="nav-count">1</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Story Bible</span><span class="nav-count">1</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Review</span><span class="nav-count">2</span></a
+            >
+          </div>
+          <div class="nav-section">
+            <p class="section-title">系统</p>
+            <a class="nav-item" href="#"
+              ><span>Feedback</span><span class="nav-count">6</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Model Profiles</span><span class="nav-count">3</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Quality Gates</span><span class="nav-count">5</span></a
+            >
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="status-card">
+            <div class="status-line">
+              <span class="label">local runtime</span
+              ><span class="pulse" aria-hidden="true"></span>
+            </div>
+            <div class="status-line" style="margin-top: 10px">
+              <span>postgres / redis / minio</span><strong>ready</strong>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="crumbs">
+            <span>Workspace</span><span>/</span><strong>玄门试写项目</strong
+            ><span>/</span><span>Chapter 012</span>
+          </div>
+          <div class="actions">
+            <button class="button">Run details</button>
+            <button class="button warn">Resolve blockers</button>
+            <button class="button primary">Approve chapter</button>
+          </div>
+        </header>
+
+        <section class="workspace-grid" aria-label="写作总览">
+          <div class="hero-panel">
+            <div class="hero-content">
+              <div>
+                <div class="eyebrow">current production run</div>
+                <h1>一键生成 Chapter 012</h1>
+                <p class="hero-copy">
+                  目标字数 3000。系统已锁定 Memory Package 和 Story
+                  Bible，正在完成整章草稿、Critic、Humanizer 与质量门禁。Creator
+                  只处理阻塞问题和最终批准。
+                </p>
+              </div>
+              <div class="manuscript-meter" aria-label="章节质量概览">
+                <div class="meter-row">
+                  <span>trace</span
+                  ><span class="meter-track"
+                    ><span class="meter-fill" style="width: 94%"></span></span
+                  ><strong>94</strong>
+                </div>
+                <div class="meter-row">
+                  <span>voice</span
+                  ><span class="meter-track"
+                    ><span
+                      class="meter-fill copper"
+                      style="width: 82%"
+                    ></span></span
+                  ><strong>82</strong>
+                </div>
+                <div class="meter-row">
+                  <span>mobile</span
+                  ><span class="meter-track"
+                    ><span
+                      class="meter-fill gold"
+                      style="width: 88%"
+                    ></span></span
+                  ><strong>88</strong>
+                </div>
+                <div class="meter-row">
+                  <span>ai taste</span
+                  ><span class="meter-track"
+                    ><span
+                      class="meter-fill copper"
+                      style="width: 18%"
+                    ></span></span
+                  ><strong>18</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Run state</h2>
+                <p class="panel-note">
+                  一个 writing_run 对外呈现为一次章节生成；内部步骤可展开查看。
+                </p>
+              </div>
+              <span class="tag live">running</span>
+            </div>
+            <div class="queue-list">
+              <div class="queue-item">
+                <span class="tag live">active</span>
+                <div>
+                  <div class="queue-title">quality_gate</div>
+                  <div class="queue-sub">整章一致性和 AI 味检测</div>
+                </div>
+                <span class="mono">72%</span>
+              </div>
+              <div class="queue-item">
+                <span class="tag">queued</span>
+                <div>
+                  <div class="queue-title">humanizer_pass</div>
+                  <div class="queue-sub">已完成，未改变事实</div>
+                </div>
+                <span class="mono">next</span>
+              </div>
+              <div class="queue-item">
+                <span class="tag blocked">review</span>
+                <div>
+                  <div class="queue-title">blocking issue</div>
+                  <div class="queue-sub">对白锋利度需 Creator 决定</div>
+                </div>
+                <span class="mono">1</span>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="panel" style="margin-top: 16px" aria-label="端到端流程">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Production flow</h2>
+              <p class="panel-note">
+                MVP 主链路：上传、自动拆书、确认设定、一键生成、质检、批准。
+              </p>
+            </div>
+            <span class="tag">trace_id TRC-012-7AF</span>
+          </div>
+          <div class="flow-strip">
+            <div class="flow-step">
+              <div class="step-code">source</div>
+              <div class="step-title">参考作品已导入</div>
+              <div class="step-meta">42 chapters / checksum locked</div>
+            </div>
+            <div class="flow-step">
+              <div class="step-code">knowledge</div>
+              <div class="step-title">知识包已落库</div>
+              <div class="step-meta">163 objects / 3 exceptions resolved</div>
+            </div>
+            <div class="flow-step active">
+              <div class="step-code">writing</div>
+              <div class="step-title">章节生成中</div>
+              <div class="step-meta">draft 3000 words / internal sections</div>
+            </div>
+            <div class="flow-step blocked">
+              <div class="step-code">quality</div>
+              <div class="step-title">等待处理阻塞项</div>
+              <div class="step-meta">voice drift needs decision</div>
+            </div>
+            <div class="flow-step">
+              <div class="step-code">feedback</div>
+              <div class="step-title">反馈待采集</div>
+              <div class="step-meta">cost ratio pending</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" style="margin-top: 16px" aria-label="写作工作台">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Writing Run</h2>
+              <p class="panel-note">
+                中间是整章草稿，左侧是折叠的内部生成细节，右侧只突出质量门禁和阻塞项。
+              </p>
+            </div>
+            <button class="button primary">Generate chapter</button>
+          </div>
+
+          <div class="studio">
+            <aside class="beats" aria-label="内部生成细节">
+              <div class="beat">
+                <span class="beat-state">done</span
+                ><span class="beat-name">Story context</span
+                ><span class="beat-purpose"
+                  >知识包、角色状态和禁用变化已锁定。</span
+                >
+              </div>
+              <div class="beat">
+                <span class="beat-state">done</span
+                ><span class="beat-name">Internal sections</span
+                ><span class="beat-purpose"
+                  >系统内部拆成 5 个 section 生成。</span
+                >
+              </div>
+              <div class="beat active">
+                <span class="beat-state">review</span
+                ><span class="beat-name">Quality gate</span
+                ><span class="beat-purpose">一处对白风格需要确认。</span>
+              </div>
+              <div class="beat">
+                <span class="beat-state">queued</span
+                ><span class="beat-name">Approval</span
+                ><span class="beat-purpose">阻塞项处理后批准章节。</span>
+              </div>
+            </aside>
+
+            <article class="draft" aria-label="当前草稿">
+              <div class="draft-toolbar">
+                <h2 class="draft-title">Chapter 012 draft</h2>
+                <span class="tag live">writer_model: cn-longform-a</span>
+              </div>
+              <div class="draft-body">
+                <p>
+                  石阶上的雾气还没散，沈临舟先把袖口压住。那道旧伤没有再疼，反而像被什么东西从皮肉下轻轻拨了一下。
+                </p>
+                <p>
+                  他没有抬头解释，只把残片放到铜盘中央。<span class="annotation"
+                    >裂纹亮起的方向，正对着昨夜塌陷的西墙。</span
+                  >
+                </p>
+                <p>殿内安静了一息。</p>
+                <p>
+                  先前出声最重的执事把手从案边收回，指节擦过木纹，声音低了半截：“这不是普通妖气。”
+                </p>
+                <p>沈临舟这才抬眼：“所以，我不是回来求一个名额。”</p>
+              </div>
+            </article>
+
+            <aside class="quality" aria-label="质量门禁">
+              <div class="score-card">
+                <div class="score-top">
+                  <span class="score-label">knowledge consistency</span
+                  ><span class="score-value">92</span>
+                </div>
+                <div class="score-bar"><span style="width: 92%"></span></div>
+              </div>
+              <div class="score-card">
+                <div class="score-top">
+                  <span class="score-label">voice fit</span
+                  ><span class="score-value">81</span>
+                </div>
+                <div class="score-bar"><span style="width: 81%"></span></div>
+              </div>
+              <div class="score-card">
+                <div class="score-top">
+                  <span class="score-label">ai flavor</span
+                  ><span class="score-value">18</span>
+                </div>
+                <div class="score-bar">
+                  <span class="risk" style="width: 18%"></span>
+                </div>
+              </div>
+              <div class="score-card">
+                <div class="score-top">
+                  <span class="score-label">mobile readability</span
+                  ><span class="score-value">88</span>
+                </div>
+                <div class="score-bar"><span style="width: 88%"></span></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="lower-grid" aria-label="底部数据区">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Blocking issues</h2>
+                <p class="panel-note">
+                  只把阻塞项交给 Creator，不要求逐 Beat 审核。
+                </p>
+              </div>
+            </div>
+            <div class="queue-list">
+              <div class="queue-item">
+                <span class="tag live">ok</span>
+                <div>
+                  <div class="queue-title">知识冲突</div>
+                  <div class="queue-sub">无 blocking issue</div>
+                </div>
+                <span class="mono">0</span>
+              </div>
+              <div class="queue-item">
+                <span class="tag blocked">decide</span>
+                <div>
+                  <div class="queue-title">对白锋利度</div>
+                  <div class="queue-sub">选择更冷或更锐后自动局部重写</div>
+                </div>
+                <span class="mono">1</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Cost signal</h2>
+                <p class="panel-note">低质量高成本路线会自动降权。</p>
+              </div>
+            </div>
+            <div class="queue-list">
+              <div class="queue-item">
+                <span class="tag">tokens</span>
+                <div>
+                  <div class="queue-title">current run</div>
+                  <div class="queue-sub">prompt 12.8k / completion 2.1k</div>
+                </div>
+                <span class="mono">$0.42</span>
+              </div>
+              <div class="queue-item">
+                <span class="tag live">ratio</span>
+                <div>
+                  <div class="queue-title">accepted output</div>
+                  <div class="queue-sub">chapter draft / 1 local rewrite</div>
+                </div>
+                <span class="mono">80%</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="trace-column" aria-label="证据追踪栏">
+        <div class="trace-header">
+          <div class="eyebrow">signature rail</div>
+          <h2 class="trace-title">Trace rail</h2>
+          <p class="trace-copy">
+            每段文字都能向上追到知识、记忆包、Prompt、模型和质量报告。
+          </p>
+        </div>
+        <div class="trace-rail">
+          <div class="trace-node active">
+            <h3>Source evidence</h3>
+            <p>秘境西墙塌陷来自参考作品第 31 章证据片段。</p>
+            <span class="trace-ref">evidence:EVD-31-088</span>
+          </div>
+          <div class="trace-node active">
+            <h3>Memory Package</h3>
+            <p>角色旧伤、法器残片、宗门审议状态已锁定。</p>
+            <span class="trace-ref">memory:MEM-012-04</span>
+          </div>
+          <div class="trace-node">
+            <h3>Prompt Package</h3>
+            <p>Writer 生成整章草稿，内部按 section 控制节奏和证据。</p>
+            <span class="trace-ref">prompt:PPK-7791</span>
+          </div>
+          <div class="trace-node warn">
+            <h3>Critic issue</h3>
+            <p>一处对白可以更贴近角色冷静口吻，等待人工确认。</p>
+            <span class="trace-ref">review:CRI-04-02</span>
+          </div>
+          <div class="trace-node">
+            <h3>Feedback target</h3>
+            <p>接受后写入 voice_fit 与 model_cost_quality 信号。</p>
+            <span class="trace-ref">feedback:pending</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      document.querySelectorAll(".beat").forEach(function (beat) {
+        beat.addEventListener("click", function () {
+          document.querySelectorAll(".beat").forEach(function (item) {
+            item.classList.remove("active");
+          });
+          beat.classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>

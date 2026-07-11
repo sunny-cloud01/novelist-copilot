@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Novel Factory Book Analysis Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+SC:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,650&family=Roboto+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #edf3f0;
+        --surface: #fbfcf8;
+        --surface-deep: #dfe8e4;
+        --ink: #15211f;
+        --ink-soft: #56615d;
+        --line: #b7c4bd;
+        --copper: #b45f34;
+        --cyan: #35b9aa;
+        --red: #a7352f;
+        --gold: #d6a844;
+        --violet-ink: #3f4b6b;
+        --shadow: rgba(18, 30, 27, 0.14);
+        --radius: 8px;
+        --nav-width: 238px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-height: 100%;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "IBM Plex Sans SC", "Noto Sans CJK SC", sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      textarea:focus-visible {
+        outline: 3px solid rgba(53, 185, 170, 0.55);
+        outline-offset: 3px;
+      }
+
+      .app-shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: var(--nav-width) minmax(0, 1fr);
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: rgba(251, 252, 248, 0.86);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        padding: 24px 20px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .mono,
+      .eyebrow,
+      .label,
+      .brand-kicker {
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        letter-spacing: 0;
+      }
+
+      .brand-kicker {
+        color: var(--copper);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .brand-name {
+        margin-top: 8px;
+        font-family: "Newsreader", Georgia, serif;
+        font-size: 30px;
+        font-weight: 650;
+        line-height: 0.95;
+      }
+
+      .brand-subtitle {
+        max-width: 180px;
+        margin: 12px 0 0;
+        color: var(--ink-soft);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .nav-section {
+        padding: 16px 12px 4px;
+      }
+
+      .section-title {
+        margin: 0 10px 8px;
+        color: var(--ink-soft);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      .nav-item span:first-child {
+        overflow-wrap: anywhere;
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .nav-item.active,
+      .nav-item:hover {
+        border-color: rgba(180, 95, 52, 0.35);
+        background: rgba(180, 95, 52, 0.1);
+      }
+
+      .nav-count {
+        min-width: 24px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: var(--surface);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 11px;
+        text-align: center;
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 14px 12px 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .runtime-card {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .runtime-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      .runtime-row + .runtime-row {
+        margin-top: 9px;
+      }
+
+      .pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--cyan);
+      }
+
+      .main {
+        min-width: 0;
+        padding: 24px;
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .crumbs {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .crumbs strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .button {
+        min-height: 38px;
+        padding: 8px 13px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .button.primary {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--surface);
+      }
+
+      .button.warn {
+        border-color: rgba(167, 53, 47, 0.45);
+        background: rgba(167, 53, 47, 0.1);
+        color: var(--red);
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 252, 248, 0.94);
+      }
+
+      .hero::before {
+        position: absolute;
+        inset: 0;
+        content: "";
+        background: linear-gradient(
+          90deg,
+          rgba(180, 95, 52, 0.16) 0 8px,
+          transparent 8px 100%
+        );
+        pointer-events: none;
+      }
+
+      .hero-inner {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+        padding: 24px;
+        align-items: end;
+      }
+
+      .eyebrow {
+        color: var(--copper);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 620px;
+        margin-bottom: 12px;
+        font-family: "Newsreader", Georgia, serif;
+        font-size: clamp(26px, 2.8vw, 38px);
+        font-weight: 650;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        max-width: 680px;
+        margin-bottom: 0;
+        color: var(--ink-soft);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .extraction-grid {
+        display: grid;
+        grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr) minmax(
+            320px,
+            0.82fr
+          );
+        gap: 16px;
+        margin-top: 16px;
+        align-items: start;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(251, 252, 248, 0.94);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 15px 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(223, 232, 228, 0.58);
+      }
+
+      .panel-title {
+        margin-bottom: 3px;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .panel-note {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 23px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: rgba(21, 33, 31, 0.08);
+        color: var(--ink-soft);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .tag.live {
+        background: rgba(53, 185, 170, 0.16);
+        color: #11786f;
+      }
+      .tag.warn {
+        background: rgba(180, 95, 52, 0.14);
+        color: var(--copper);
+      }
+      .tag.blocked {
+        background: rgba(167, 53, 47, 0.12);
+        color: var(--red);
+      }
+
+      .source-panel {
+        position: relative;
+        min-height: 650px;
+        overflow: hidden;
+      }
+
+      .source-panel::before {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 8px;
+        background: var(--copper);
+        content: "";
+      }
+
+      .chapter-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px 16px 0 28px;
+      }
+
+      .mini-stat {
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .mini-stat strong {
+        display: block;
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 16px;
+      }
+
+      .mini-stat span {
+        color: var(--ink-soft);
+        font-size: 11px;
+      }
+
+      .source-text {
+        padding: 18px 18px 20px 30px;
+        font-family: "Newsreader", "IBM Plex Sans SC", serif;
+        font-size: 18px;
+        line-height: 1.86;
+      }
+
+      .source-text p {
+        margin-bottom: 13px;
+      }
+
+      .mark {
+        padding: 0 3px 2px;
+        border-bottom: 2px solid rgba(53, 185, 170, 0.75);
+        background: rgba(53, 185, 170, 0.13);
+      }
+
+      .mark.copper {
+        border-color: rgba(180, 95, 52, 0.72);
+        background: rgba(180, 95, 52, 0.13);
+      }
+
+      .range-label {
+        display: inline-flex;
+        transform: translateY(-2px);
+        margin-left: 4px;
+        color: var(--violet-ink);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 10px;
+      }
+
+      .pipeline {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 11px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .stage.active {
+        border-color: rgba(53, 185, 170, 0.66);
+        background: rgba(53, 185, 170, 0.1);
+      }
+
+      .stage.review {
+        border-color: rgba(180, 95, 52, 0.45);
+        background: rgba(180, 95, 52, 0.09);
+      }
+
+      .stage-index {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--ink);
+        color: var(--surface);
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 11px;
+      }
+
+      .stage-name {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .stage-desc {
+        margin-top: 3px;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .object-list {
+        display: grid;
+        gap: 9px;
+        padding: 14px;
+      }
+
+      .object-card {
+        display: grid;
+        gap: 9px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .object-card.active {
+        border-color: rgba(53, 185, 170, 0.66);
+        background: rgba(53, 185, 170, 0.1);
+      }
+
+      .object-top {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .object-name {
+        margin-bottom: 2px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .object-desc {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .evidence-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .review-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .small-button {
+        min-height: 32px;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .small-button.primary {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--surface);
+      }
+
+      .small-button.warn {
+        border-color: rgba(167, 53, 47, 0.4);
+        color: var(--red);
+      }
+
+      .lower-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 0.62fr);
+        gap: 16px;
+        margin-top: 16px;
+        align-items: start;
+      }
+
+      .graph-stage {
+        position: relative;
+        min-height: 285px;
+        overflow: hidden;
+        padding: 18px;
+      }
+
+      .graph-stage::before {
+        position: absolute;
+        inset: 16px;
+        border: 1px dashed rgba(21, 33, 31, 0.18);
+        border-radius: var(--radius);
+        content: "";
+      }
+
+      .graph-node {
+        position: absolute;
+        display: grid;
+        min-width: 110px;
+        min-height: 54px;
+        place-items: center;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .graph-node.a {
+        top: 42px;
+        left: 38px;
+        border-color: rgba(53, 185, 170, 0.65);
+      }
+      .graph-node.b {
+        top: 96px;
+        left: 240px;
+      }
+      .graph-node.c {
+        top: 188px;
+        left: 130px;
+        border-color: rgba(180, 95, 52, 0.55);
+      }
+      .graph-node.d {
+        top: 52px;
+        right: 42px;
+        border-color: rgba(214, 168, 68, 0.7);
+      }
+      .graph-line {
+        position: absolute;
+        height: 2px;
+        transform-origin: left center;
+        background: rgba(21, 33, 31, 0.28);
+      }
+
+      .graph-line.one {
+        top: 86px;
+        left: 148px;
+        width: 118px;
+        transform: rotate(14deg);
+      }
+      .graph-line.two {
+        top: 150px;
+        left: 252px;
+        width: 118px;
+        transform: rotate(-34deg);
+      }
+      .graph-line.three {
+        top: 178px;
+        left: 190px;
+        width: 128px;
+        transform: rotate(-26deg);
+      }
+
+      .metrics {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .metric {
+        display: grid;
+        gap: 7px;
+        padding: 11px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .metric-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .metric-value {
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .metric-label {
+        color: var(--ink-soft);
+        font-size: 12px;
+      }
+
+      .bar {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(21, 33, 31, 0.12);
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--cyan);
+      }
+
+      .bar span.copper {
+        background: var(--copper);
+      }
+      .bar span.gold {
+        background: var(--gold);
+      }
+
+      @media (max-width: 1220px) {
+        .hero-inner,
+        .extraction-grid,
+        .lower-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .source-panel {
+          min-height: auto;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          min-height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .nav-section {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .section-title {
+          grid-column: 1 / -1;
+        }
+        .main {
+          padding: 16px;
+        }
+        .topbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        .actions {
+          justify-content: stretch;
+        }
+        .button {
+          flex: 1;
+        }
+        .chapter-meta {
+          grid-template-columns: 1fr;
+        }
+        .review-actions {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        h1 {
+          font-size: 28px;
+        }
+        .hero-inner {
+          padding: 18px;
+        }
+        .stage {
+          grid-template-columns: 30px minmax(0, 1fr);
+        }
+        .stage .tag {
+          grid-column: 2;
+          justify-self: start;
+        }
+        .graph-node {
+          position: relative;
+          top: auto !important;
+          left: auto !important;
+          right: auto !important;
+          margin-bottom: 8px;
+        }
+        .graph-line {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <div class="brand-kicker">NF-MVP / auto analysis</div>
+          <div class="brand-name">Novel<br />Factory</div>
+          <p class="brand-subtitle">
+            上传作品后自动拆书、抽取、归一化，只把异常交给创作者处理。
+          </p>
+        </div>
+
+        <nav>
+          <div class="nav-section">
+            <p class="section-title">自动拆书</p>
+            <a class="nav-item active" href="#"
+              ><span>Analyze Run</span><span class="nav-count">1</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Extraction Summary</span
+              ><span class="nav-count">1</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Needs Attention</span><span class="nav-count">3</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Story Graph View</span><span class="nav-count">31</span></a
+            >
+          </div>
+          <div class="nav-section">
+            <p class="section-title">质量</p>
+            <a class="nav-item" href="#"
+              ><span>Evidence</span><span class="nav-count">286</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Conflicts</span><span class="nav-count">3</span></a
+            >
+            <a class="nav-item" href="#"
+              ><span>Knowledge Package</span><span class="nav-count">1</span></a
+            >
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="runtime-card">
+            <div class="runtime-row">
+              <span class="label">auto analysis</span
+              ><span class="pulse" aria-hidden="true"></span>
+            </div>
+            <div class="runtime-row">
+              <span>EXT-000145</span><strong>running</strong>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="crumbs">
+            <span>Source Library</span><span>/</span
+            ><strong>《九曜残卷》</strong><span>/</span><span>Analyze Run</span>
+          </div>
+          <div class="actions">
+            <button class="button">View evidence</button>
+            <button class="button warn">Resolve exceptions</button>
+            <button class="button primary">Commit knowledge</button>
+          </div>
+        </header>
+
+        <section class="hero" aria-label="拆书总览">
+          <div class="hero-inner">
+            <div>
+              <div class="eyebrow">upload to knowledge package</div>
+              <h1>自动拆书完成，只处理异常。</h1>
+              <p class="hero-copy">
+                系统已自动完成章节切分、对象抽取、证据绑定和候选归一化。创作者只需要查看摘要、处理低置信度项，然后把知识包落库。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="extraction-grid" aria-label="拆书主工作台">
+          <article class="panel source-panel" aria-label="原文与证据标注">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Evidence sample</h2>
+                <p class="panel-note">
+                  默认不要求逐段审核；这里只展示可追踪证据样例。
+                </p>
+              </div>
+              <span class="tag live">normalized</span>
+            </div>
+            <div class="chapter-meta">
+              <div class="mini-stat">
+                <strong>031</strong><span>chapter_index</span>
+              </div>
+              <div class="mini-stat">
+                <strong>7</strong><span>scene candidates</span>
+              </div>
+              <div class="mini-stat">
+                <strong>94%</strong><span>segment confidence</span>
+              </div>
+            </div>
+            <div class="source-text">
+              <p>山门外的铜钟响到第三声，沈临舟才从石阶尽头抬头。</p>
+              <p>
+                <span class="mark">西墙塌陷处还留着昨夜的焦痕</span
+                ><span class="range-label">R31:088</span
+                >，风从裂缝里钻出来，带着很淡的腥甜气。
+              </p>
+              <p>
+                执事看了他一眼，把名册合上：“你旧伤未愈，秘境名额不该给你。”
+              </p>
+              <p>
+                沈临舟没有辩解，只从袖中取出一枚残片。<span class="mark copper"
+                  >残片边缘的纹路，与宗门禁地图上的九曜纹完全一致</span
+                ><span class="range-label">R31:102</span>。
+              </p>
+              <p>
+                殿内几位长老同时停下笔。先前低声议论的人，也在这一刻看向铜盘。
+              </p>
+            </div>
+          </article>
+
+          <section class="panel" aria-label="抽取流水线">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Auto analysis run</h2>
+                <p class="panel-note">
+                  按 NF-NKS-100 自动执行；失败或低置信度时才打断。
+                </p>
+              </div>
+              <span class="tag live">completed</span>
+            </div>
+            <div class="pipeline">
+              <div class="stage">
+                <div class="stage-index">1</div>
+                <div>
+                  <div class="stage-name">Text normalization</div>
+                  <div class="stage-desc">
+                    去广告、水印，保留章节标题和段落顺序。
+                  </div>
+                </div>
+                <span class="tag live">done</span>
+              </div>
+              <div class="stage">
+                <div class="stage-index">2</div>
+                <div>
+                  <div class="stage-name">Chapter segmentation</div>
+                  <div class="stage-desc">42 章边界连续，未发现缺章。</div>
+                </div>
+                <span class="tag live">done</span>
+              </div>
+              <div class="stage active">
+                <div class="stage-index">3</div>
+                <div>
+                  <div class="stage-name">Entity extraction</div>
+                  <div class="stage-desc">
+                    角色、地点、法器和宗门规则已抽取。
+                  </div>
+                </div>
+                <span class="tag live">done</span>
+              </div>
+              <div class="stage active">
+                <div class="stage-index">4</div>
+                <div>
+                  <div class="stage-name">Evidence binding</div>
+                  <div class="stage-desc">
+                    候选对象已绑定 source_text_excerpt 和 text_range。
+                  </div>
+                </div>
+                <span class="tag live">done</span>
+              </div>
+              <div class="stage review">
+                <div class="stage-index">5</div>
+                <div>
+                  <div class="stage-name">Exception review</div>
+                  <div class="stage-desc">
+                    3 个低置信度项需要 Creator 决定。
+                  </div>
+                </div>
+                <span class="tag warn">review</span>
+              </div>
+              <div class="stage">
+                <div class="stage-index">6</div>
+                <div>
+                  <div class="stage-name">Knowledge commit</div>
+                  <div class="stage-desc">
+                    异常处理后即可落库为 Knowledge Package。
+                  </div>
+                </div>
+                <span class="tag">queued</span>
+              </div>
+            </div>
+          </section>
+
+          <aside class="panel" aria-label="异常处理">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Needs attention</h2>
+                <p class="panel-note">
+                  只展示系统无法可靠判断的问题，不逐项审核全部候选。
+                </p>
+              </div>
+              <span class="tag warn">3 items</span>
+            </div>
+            <div class="object-list">
+              <div class="object-card active">
+                <div class="object-top">
+                  <div>
+                    <div class="object-name">沈临舟 / 沈师兄</div>
+                    <p class="object-desc">
+                      Alias confidence below threshold。
+                    </p>
+                  </div>
+                  <span class="tag warn">needs merge</span>
+                </div>
+                <div class="evidence-row">
+                  <span class="tag">R31:076</span
+                  ><span class="tag">R31:091</span
+                  ><span class="tag">alias: 沈师兄</span>
+                </div>
+                <div class="review-actions">
+                  <button class="small-button primary">Merge alias</button
+                  ><button class="small-button">Keep separate</button
+                  ><button class="small-button warn">Reextract</button>
+                </div>
+              </div>
+              <div class="object-card">
+                <div class="object-top">
+                  <div>
+                    <div class="object-name">九曜纹残片</div>
+                    <p class="object-desc">关系来源清晰，可自动进入知识包。</p>
+                  </div>
+                  <span class="tag live">auto approved</span>
+                </div>
+                <div class="evidence-row">
+                  <span class="tag">R31:102</span
+                  ><span class="tag">R29:044</span>
+                </div>
+                <div class="review-actions">
+                  <button class="small-button primary">View evidence</button
+                  ><button class="small-button">Inspect graph</button
+                  ><button class="small-button warn">Flag</button>
+                </div>
+              </div>
+              <div class="object-card">
+                <div class="object-top">
+                  <div>
+                    <div class="object-name">西墙塌陷</div>
+                    <p class="object-desc">事件关系缺少明确原因链。</p>
+                  </div>
+                  <span class="tag warn">74%</span>
+                </div>
+                <div class="evidence-row">
+                  <span class="tag">R31:088</span
+                  ><span class="tag blocked">needs relation</span>
+                </div>
+                <div class="review-actions">
+                  <button class="small-button primary">Accept as event</button
+                  ><button class="small-button">Request relation</button
+                  ><button class="small-button warn">Ignore</button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="lower-grid" aria-label="图谱和节奏">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Story Graph view</h2>
+                <p class="panel-note">
+                  图谱用于辅助查看关系和证据来源，不作为默认编辑画布。
+                </p>
+              </div>
+              <span class="tag live">snapshot ready</span>
+            </div>
+            <div class="graph-stage">
+              <div class="graph-line one"></div>
+              <div class="graph-line two"></div>
+              <div class="graph-line three"></div>
+              <div class="graph-node a">
+                沈临舟<br /><span class="mono">Character</span>
+              </div>
+              <div class="graph-node b">
+                九曜纹残片<br /><span class="mono">Artifact</span>
+              </div>
+              <div class="graph-node c">
+                西墙塌陷<br /><span class="mono">Event</span>
+              </div>
+              <div class="graph-node d">
+                宗门禁地图<br /><span class="mono">Rule</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Extraction summary</h2>
+                <p class="panel-note">
+                  摘要帮助 Creator 判断知识包是否可用于新书项目。
+                </p>
+              </div>
+              <span class="tag live">pass</span>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-top">
+                  <span class="metric-label">conflict_index</span
+                  ><span class="metric-value">82</span>
+                </div>
+                <div class="bar"><span style="width: 82%"></span></div>
+              </div>
+              <div class="metric">
+                <div class="metric-top">
+                  <span class="metric-label">suspense_index</span
+                  ><span class="metric-value">76</span>
+                </div>
+                <div class="bar">
+                  <span class="copper" style="width: 76%"></span>
+                </div>
+              </div>
+              <div class="metric">
+                <div class="metric-top">
+                  <span class="metric-label">evidence coverage</span
+                  ><span class="metric-value">94</span>
+                </div>
+                <div class="bar"><span style="width: 94%"></span></div>
+              </div>
+              <div class="metric">
+                <div class="metric-top">
+                  <span class="metric-label">needs attention</span
+                  ><span class="metric-value">19</span>
+                </div>
+                <div class="bar">
+                  <span class="gold" style="width: 39%"></span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      document.querySelectorAll(".object-card").forEach(function (card) {
+        card.addEventListener("click", function () {
+          document.querySelectorAll(".object-card").forEach(function (item) {
+            item.classList.remove("active");
+          });
+          card.classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>
