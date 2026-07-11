@@ -1,0 +1,11 @@
+{
+  "name": "novel-factory",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "contracts:lint": "pnpm --filter @novel-factory/contracts lint",
+    "contracts:test": "pnpm --filter @novel-factory/contracts test",
+    "lint": "pnpm contracts:lint && pnpm --filter @novel-factory/web lint && pytest tests/test_repo_layout.py tests/test_infra_compose.py tests/test_contract_baseline.py -q",
+    "test": "pytest -q && pnpm contracts:test && pnpm --filter @novel-factory/web test --run"
+  }
+}

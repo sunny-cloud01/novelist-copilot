@@ -152,3 +152,17 @@ Milestone 7: Product-Level Implementation Blueprint
 - Step 1: NF-IMPL-001 Product-Level Implementation Blueprint
 - Step 2: NF-IMPL-002 MVP Delivery Plan
 - Step 3: NF-IMPL-003 Service Build Plan
+
+## Implementation Bootstrap
+
+```sh
+pnpm install
+python -m pip install -e apps/api-gateway -e apps/core-service -e apps/ai-worker -e apps/scheduler pytest
+Docker compose -f infra/docker-compose.yml up -d
+pnpm contracts:lint
+pnpm contracts:test
+pytest -q
+pnpm --filter @novel-factory/web dev
+```
+
+For shell environments that require the newer CLI spelling, the equivalent command is `docker compose -f infra/docker-compose.yml up -d`.
