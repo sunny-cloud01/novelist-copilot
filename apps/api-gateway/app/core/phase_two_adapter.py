@@ -237,6 +237,79 @@ def get_quality_report(quality_report_id: str) -> Optional[dict[str, Any]]:
     return _STORE.get_quality_report(quality_report_id)
 
 
+def get_consistency_report(consistency_report_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_consistency_report(consistency_report_id)
+
+
+def get_revision_summary(revision_summary_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_revision_summary(revision_summary_id)
+
+
+def list_rules() -> list[dict[str, Any]]:
+    return _STORE.list_rules()
+
+
+def list_patterns(status: Optional[str] = None, pattern_type: Optional[str] = None) -> list[dict[str, Any]]:
+    return _STORE.list_patterns(status, pattern_type)
+
+
+def get_pattern(pattern_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_pattern(pattern_id)
+
+
+def create_pattern(
+    payload: dict[str, Any],
+    request_id: str = "system-pattern",
+    trace_id: str = "system-trace",
+    actor_id: str = _STORE.USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    return _STORE.create_pattern(payload, request_id, trace_id, actor_id, actor_role, workspace_id)
+
+
+def list_rhythm_profiles(status: Optional[str] = None, target_id: Optional[str] = None) -> list[dict[str, Any]]:
+    return _STORE.list_rhythm_profiles(status, target_id)
+
+
+def get_rhythm_profile(rhythm_profile_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_rhythm_profile(rhythm_profile_id)
+
+
+def create_rhythm_profile(
+    payload: dict[str, Any],
+    request_id: str = "system-rhythm",
+    trace_id: str = "system-trace",
+    actor_id: str = _STORE.USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    return _STORE.create_rhythm_profile(payload, request_id, trace_id, actor_id, actor_role, workspace_id)
+
+
+def list_assets(status: Optional[str] = None, asset_type: Optional[str] = None) -> list[dict[str, Any]]:
+    return _STORE.list_assets(status, asset_type)
+
+
+def get_asset(asset_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_asset(asset_id)
+
+
+def create_asset(
+    payload: dict[str, Any],
+    request_id: str = "system-asset",
+    trace_id: str = "system-trace",
+    actor_id: str = _STORE.USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    return _STORE.create_asset(payload, request_id, trace_id, actor_id, actor_role, workspace_id)
+
+
+def get_rule(rule_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_rule(rule_id)
+
+
 def accept_chapter(
     writing_run_id: str,
     trace_id: str,
@@ -248,8 +321,24 @@ def accept_chapter(
     return _STORE.accept_chapter(writing_run_id, trace_id, request_id, actor_id, actor_role, workspace_id)
 
 
+def apply_writing_review_action(
+    writing_run_id: str,
+    payload: dict[str, Any],
+    request_id: str = "system-writing-review",
+    trace_id: str = "system-trace",
+    actor_id: str = _STORE.USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    return _STORE.apply_writing_review_action(writing_run_id, payload, request_id, trace_id, actor_id, actor_role, workspace_id)
+
+
 def list_feedback_records(target_type: Optional[str] = None, target_id: Optional[str] = None) -> list[dict[str, Any]]:
     return _STORE.list_feedback_records(target_type, target_id)
+
+
+def get_prompt_ranking_snapshot(target_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    return _STORE.get_prompt_ranking_snapshot(target_id)
 
 
 def promote_feedback_record(

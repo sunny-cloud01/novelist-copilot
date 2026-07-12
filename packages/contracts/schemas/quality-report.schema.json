@@ -21,7 +21,7 @@
     "quality_report_id": { "type": "string", "minLength": 1 },
     "workspace_id": { "type": "string", "minLength": 1 },
     "writing_run_id": { "type": "string", "minLength": 1 },
-    "status": { "type": "string", "enum": ["queued", "passed", "blocked"] },
+    "status": { "type": "string", "enum": ["queued", "passed", "blocked", "requires_review"] },
     "ai_flavor_score": { "type": "number", "minimum": 0, "maximum": 1 },
     "mobile_readability_score": { "type": "number", "minimum": 0, "maximum": 1 },
     "originality_safety_score": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -29,15 +29,7 @@
     "blocking_issues": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["issue_id", "category", "summary", "affected_text_ref"],
-        "properties": {
-          "issue_id": { "type": "string", "minLength": 1 },
-          "category": { "type": "string", "minLength": 1 },
-          "summary": { "type": "string", "minLength": 1 },
-          "affected_text_ref": { "type": "string", "minLength": 1 }
-        },
-        "additionalProperties": false
+        "$ref": "https://novelfactory.dev/schemas/consistency-issue.schema.json"
       }
     },
     "created_at": { "type": "string", "format": "date-time" },

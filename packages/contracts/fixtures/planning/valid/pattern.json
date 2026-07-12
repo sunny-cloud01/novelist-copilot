@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "pattern_id": "01JZPATTERN00000000000001",
+  "workspace_id": "demo-workspace",
+  "trace_id": "trace-pattern-1",
+  "canonical_name": "退婚立誓",
+  "pattern_type": "conflict_escalation",
+  "status": "approved",
+  "intent": "用公开羞辱触发主角长期目标与情绪反弹。",
+  "preconditions": ["主角处于低谷", "公开场合发生身份压迫"],
+  "steps": [
+    { "index": 1, "summary": "先压低主角处境" },
+    { "index": 2, "summary": "让压迫升级到无法退让" },
+    { "index": 3, "summary": "主角公开立誓，把羞辱转为主线目标" }
+  ],
+  "slots": ["压迫者", "见证者", "誓约代价"],
+  "expected_reader_effect": "先压后燃，形成升级流期待。",
+  "compatible_rhythm_profile_id": "01JZRHYTHM00000000000001",
+  "evidence_refs": ["evidence://01JZEVIDENCE0000000000101"],
+  "created_at": "2026-07-12T01:00:00Z",
+  "updated_at": "2026-07-12T01:02:00Z"
+}

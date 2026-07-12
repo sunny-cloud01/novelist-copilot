@@ -80,6 +80,11 @@ describe("project and planning pages", () => {
     expect(screen.getByRole("heading", { name: "章节规划器" })).toBeInTheDocument();
     expect(screen.getByText("第 1 节 · 铺垫")).toBeInTheDocument();
     expect(screen.getByText("主角立下三年之约")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "已选资源" })).toBeInTheDocument();
+    expect(screen.getByText("退婚立誓 · conflict_escalation")).toBeInTheDocument();
+    expect(screen.getByText("退婚压迫三段式 · climax 0.86")).toBeInTheDocument();
+    expect(screen.getByText("三年之约宣言模板")).toBeInTheDocument();
+    expect(screen.getByText("expression · 用于公开立誓场景的短句式资产。")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "关联任务" })).toBeInTheDocument();
     expect(screen.getByText("create_chapter_plan · 待复核 · 章节规划已生成，等待确认。", { exact: false })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "任务事件" })).toBeInTheDocument();

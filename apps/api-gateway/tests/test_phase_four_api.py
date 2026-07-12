@@ -28,18 +28,34 @@ def test_gateway_get_seed_writing_run_and_quality_report() -> None:
 
     writing_response = client.get("/v1/writing-runs/01JZWRITING00000000000001")
     quality_response = client.get("/v1/quality-reports/01JZQLTREP000000000000001")
+    consistency_response = client.get("/v1/consistency-reports/01JZCONSIST00000000000001")
+    revision_response = client.get("/v1/revision-summaries/01JZREVISION0000000000001")
+    rules_response = client.get("/v1/rules")
     feedback_response = client.get("/v1/feedback-records", params={"targetId": "01JZWRITING00000000000001"})
+    rankings_response = client.get("/v1/rankings/prompt", params={"targetId": "01JZWRITING00000000000001"})
 
     assert writing_response.status_code == 200
     payload = writing_response.json()["data"]
-    assert payload["writing_run"]["current_stage"] == "humanizer_pass"
+    assert payload["writing_run"]["current_stage"] == "consistency_review"
+    assert payload["writing_run"]["consistency_report_id"] == "01JZCONSIST00000000000001"
     assert payload["prompt_package"]["prompt_package_id"] == "01JZPROMPTPKG000000000001"
     assert len(payload["section_runs"]) == 3
     assert len(payload["feedback_records"]) >= 2
     assert quality_response.status_code == 200
     assert quality_response.json()["data"]["status"] == "blocked"
+    assert consistency_response.status_code == 200
+    assert consistency_response.json()["data"]["blocking_issue_count"] == 1
+    assert revision_response.status_code == 200
+    assert revision_response.json()["data"]["status"] == "requested"
+    assert rules_response.status_code == 200
+    assert rules_response.json()["data"]["items"][0]["rule_id"] == "rule-01JZPOWER000000000000001"
     assert feedback_response.status_code == 200
     assert len(feedback_response.json()["data"]["items"]) >= 1
+    assert rankings_response.status_code == 200
+    rankings = rankings_response.json()["data"]
+    assert rankings["ranking_type"] == "prompt"
+    assert rankings["items"][0]["target_id"] == "prompt://writer/chapter-default"
+    assert rankings["signals"][1]["signal_type"] == "reader_interest"
 
 
 def test_gateway_get_configuration_snapshot_and_toggle_model_profile() -> None:
@@ -152,11 +168,40 @@ def test_gateway_create_writing_run_returns_seeded_quality_and_provider_calls() 
 def test_gateway_accept_chapter_marks_writing_run_and_returns_feedback_records() -> None:
     client = make_client()
 
+    resolve_response = client.post(
+        "/v1/writing-runs/01JZWRITING00000000000001/review-actions",
+        json={
+            "schema_version": 1,
+            "writing_run_id": "01JZWRITING00000000000001",
+            "action": "mark_issue_resolved",
+            "requested_by": "demo-reviewer",
+            "trace_id": "trace-gateway-accept-resolve",
+            "issue_id": "01JZCONSISTISSUE000000001",
+            "note": "已人工确认并补写修订。",
+            "output_ref": "object://revision-summaries/01JZREVISION0000000000001",
+        },
+        headers={"x-request-id": "req-gateway-accept-resolve", "x-trace-id": "trace-gateway-accept-resolve"},
+    )
+    approve_response = client.post(
+        "/v1/writing-runs/01JZWRITING00000000000001/review-actions",
+        json={
+            "schema_version": 1,
+            "writing_run_id": "01JZWRITING00000000000001",
+            "action": "approve_draft",
+            "requested_by": "demo-reviewer",
+            "trace_id": "trace-gateway-accept-approve",
+            "note": "一致性问题已关闭，允许收录。",
+            "output_ref": "object://review-notes/gateway-approve-draft",
+        },
+        headers={"x-request-id": "req-gateway-accept-approve", "x-trace-id": "trace-gateway-accept-approve"},
+    )
     response = client.post(
         "/v1/writing-runs/01JZWRITING00000000000001/accept-chapter",
         headers={"x-request-id": "req-gateway-accept", "x-trace-id": "trace-gateway-accept"},
     )
 
+    assert resolve_response.status_code == 200
+    assert approve_response.status_code == 200
     assert response.status_code == 200
     payload = response.json()
     assert payload["meta"] == {
@@ -170,6 +215,8 @@ def test_gateway_accept_chapter_marks_writing_run_and_returns_feedback_records()
     assert payload["data"]["writing_run"]["accepted_chapter_ref"]
     assert payload["data"]["writing_run"]["chapter_snapshot"]["chapter_title"] == "乌坦城风起"
     assert payload["data"]["writing_run"]["manuscript_state"]["current_story_state"]["quality_gate_status"] == "passed"
+    assert payload["data"]["writing_run"]["consistency_report"]["status"] == "passed"
+    assert payload["data"]["writing_run"]["revision_summary"]["status"] == "accepted"
     assert payload["data"]["chapter_snapshot"]["chapter_snapshot_id"].startswith("chapter-snapshot:")
     assert payload["data"]["manuscript_state"]["manuscript_state_id"].startswith("manuscript-state:")
 
@@ -257,12 +304,53 @@ def test_gateway_feedback_promotion_and_agent_task_routes() -> None:
     assert any(item["action"] == "feedback.record_promoted" for item in audit_response.json()["data"]["items"])
 
 
+def test_gateway_writing_review_action_resolves_issue_and_writes_audit() -> None:
+    client = make_client()
+
+    response = client.post(
+        "/v1/writing-runs/01JZWRITING00000000000001/review-actions",
+        json={
+            "schema_version": 1,
+            "writing_run_id": "01JZWRITING00000000000001",
+            "action": "mark_issue_resolved",
+            "requested_by": "demo-reviewer",
+            "trace_id": "trace-gateway-writing-review",
+            "issue_id": "01JZCONSISTISSUE000000001",
+            "note": "已人工确认并补写修订。",
+            "output_ref": "object://revision-summaries/01JZREVISION0000000000001",
+        },
+        headers={"x-request-id": "req-gateway-writing-review", "x-trace-id": "trace-gateway-writing-review"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["consistency_report"]["blocking_issue_count"] == 0
+    assert payload["revision_summary"]["status"] == "revised"
+    assert payload["quality_report"]["status"] == "requires_review"
+
+    audit_response = client.get("/v1/audit-events")
+    assert any(item["action"] == "writing.mark_issue_resolved" for item in audit_response.json()["data"]["items"])
+
+
 def test_gateway_writing_resources_missing_return_not_found() -> None:
     client = make_client()
 
     assert client.get("/v1/writing-runs/missing").status_code == 404
     assert client.post("/v1/writing-runs/missing/accept-chapter").status_code == 404
+    assert client.post(
+        "/v1/writing-runs/missing/review-actions",
+        json={
+            "schema_version": 1,
+            "writing_run_id": "missing",
+            "action": "approve_draft",
+            "requested_by": "demo-reviewer",
+            "trace_id": "trace-gateway-missing",
+        },
+    ).status_code == 404
     assert client.get("/v1/quality-reports/missing").status_code == 404
+    assert client.get("/v1/consistency-reports/missing").status_code == 404
+    assert client.get("/v1/revision-summaries/missing").status_code == 404
+    assert client.get("/v1/rules/missing").status_code == 404
     assert client.post(
         "/v1/writing-runs",
         json={"project_id": "missing", "chapter_plan_id": "missing"},

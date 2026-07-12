@@ -362,6 +362,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /writing-runs/{writingRunId}/review-actions:
+    post:
+      operationId: reviewWritingRun
+      parameters:
+        - in: path
+          name: writingRunId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WritingReviewActionCommand'
+      responses:
+        '200':
+          description: Writing review action applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Writing run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /quality-reports/{qualityReportId}:
     get:
       operationId: getQualityReport
@@ -380,6 +408,50 @@ paths:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
         '404':
           description: Quality report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /consistency-reports/{consistencyReportId}:
+    get:
+      operationId: getConsistencyReport
+      parameters:
+        - in: path
+          name: consistencyReportId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consistency report detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Consistency report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /revision-summaries/{revisionSummaryId}:
+    get:
+      operationId: getRevisionSummary
+      parameters:
+        - in: path
+          name: revisionSummaryId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revision summary detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Revision summary not found
           content:
             application/json:
               schema:
@@ -405,6 +477,210 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /rankings/prompt:
+    get:
+      operationId: getPromptRankingSnapshot
+      parameters:
+        - in: query
+          name: targetId
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Prompt ranking snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /patterns:
+    get:
+      operationId: listPatterns
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: patternType
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pattern library items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+    post:
+      operationId: createPattern
+      responses:
+        '201':
+          description: Pattern created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /patterns/{patternId}:
+    get:
+      operationId: getPattern
+      parameters:
+        - in: path
+          name: patternId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pattern detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Pattern not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /rhythm-profiles:
+    get:
+      operationId: listRhythmProfiles
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: targetId
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rhythm profiles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+    post:
+      operationId: createRhythmProfile
+      responses:
+        '201':
+          description: Rhythm profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /rhythm-profiles/{rhythmProfileId}:
+    get:
+      operationId: getRhythmProfile
+      parameters:
+        - in: path
+          name: rhythmProfileId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rhythm profile detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Rhythm profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /assets:
+    get:
+      operationId: listAssets
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: assetType
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset library items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+    post:
+      operationId: createAsset
+      responses:
+        '201':
+          description: Asset created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /assets/{assetId}:
+    get:
+      operationId: getAsset
+      parameters:
+        - in: path
+          name: assetId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Asset detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /rules:
+    get:
+      operationId: listRules
+      responses:
+        '200':
+          description: Rule profiles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /rules/{ruleId}:
+    get:
+      operationId: getRule
+      parameters:
+        - in: path
+          name: ruleId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /configuration:
     get:
       operationId: getConfigurationSnapshot
@@ -566,6 +842,28 @@ components:
       $ref: ../schemas/chapter-snapshot.schema.json
     ManuscriptState:
       $ref: ../schemas/manuscript-state.schema.json
+    ConsistencyIssue:
+      $ref: ../schemas/consistency-issue.schema.json
+    RuleProfile:
+      $ref: ../schemas/rule-profile.schema.json
+    ConsistencyReport:
+      $ref: ../schemas/consistency-report.schema.json
+    RevisionSummary:
+      $ref: ../schemas/revision-summary.schema.json
+    RankingSignal:
+      $ref: ../schemas/ranking-signal.schema.json
+    RankingSuggestion:
+      $ref: ../schemas/ranking-suggestion.schema.json
+    RankingSnapshot:
+      $ref: ../schemas/ranking-snapshot.schema.json
+    Pattern:
+      $ref: ../schemas/pattern.schema.json
+    RhythmProfile:
+      $ref: ../schemas/rhythm-profile.schema.json
+    Asset:
+      $ref: ../schemas/asset.schema.json
+    WritingReviewActionCommand:
+      $ref: ../schemas/writing-review-action-command.schema.json
     ModelProfile:
       $ref: ../schemas/model-profile.schema.json
     AgentModelAssignment:

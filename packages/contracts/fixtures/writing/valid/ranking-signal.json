@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "signal_id": "01JZRANKSIG00000000000001",
+  "workspace_id": "demo-workspace",
+  "trace_id": "trace-ranking-prompt-1",
+  "ranking_type": "prompt",
+  "target_type": "prompt_version",
+  "target_id": "prompt://writer/chapter-default",
+  "signal_type": "prompt_effectiveness",
+  "score": 0.87,
+  "weight": 0.7,
+  "source": "quality_gate",
+  "source_feedback_record_id": "01JZFDBK0000000000000001",
+  "summary": "默认 writer prompt 在质量门禁后保留了节奏与可读性。",
+  "evidence_refs": [
+    "object://quality-reports/01JZQLTREP000000000000001"
+  ],
+  "input_refs": [
+    "object://feedback-records/01JZFDBK0000000000000001"
+  ],
+  "output_refs": [
+    "object://rankings/prompt/signals/01JZRANKSIG00000000000001"
+  ],
+  "created_at": "2026-07-12T01:30:00Z",
+  "updated_at": "2026-07-12T01:30:00Z"
+}

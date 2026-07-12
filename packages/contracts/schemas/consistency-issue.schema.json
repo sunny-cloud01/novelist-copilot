@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/consistency-issue.schema.json",
+  "title": "ConsistencyIssue",
+  "type": "object",
+  "required": [
+    "issue_id",
+    "category",
+    "severity",
+    "summary",
+    "affected_text_ref",
+    "rule_id",
+    "resolution_status",
+    "input_refs",
+    "output_refs"
+  ],
+  "properties": {
+    "issue_id": { "type": "string", "minLength": 1 },
+    "category": {
+      "type": "string",
+      "enum": [
+        "character_continuity",
+        "relationship_state",
+        "timeline_continuity",
+        "location_continuity",
+        "power_system_constraint",
+        "artifact_uniqueness",
+        "foreshadowing_constraint",
+        "world_rule"
+      ]
+    },
+    "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "affected_text_ref": { "type": "string", "minLength": 1 },
+    "rule_id": { "type": "string", "minLength": 1 },
+    "resolution_status": { "type": "string", "enum": ["open", "resolved", "waived"] },
+    "input_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "note": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

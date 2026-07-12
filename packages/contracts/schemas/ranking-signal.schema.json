@@ -1,47 +1,43 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://novelfactory.dev/schemas/feedback-record.schema.json",
-  "title": "FeedbackRecord",
+  "$id": "https://novelfactory.dev/schemas/ranking-signal.schema.json",
+  "title": "RankingSignal",
   "type": "object",
   "required": [
     "schema_version",
-    "feedback_record_id",
+    "signal_id",
     "workspace_id",
-    "request_id",
     "trace_id",
-    "actor_id",
+    "ranking_type",
     "target_type",
     "target_id",
-    "feedback_type",
+    "signal_type",
     "score",
+    "weight",
     "source",
-    "comment_ref",
-    "payload",
-    "promotion_status",
+    "summary",
+    "evidence_refs",
     "input_refs",
     "output_refs",
     "created_at"
   ],
   "properties": {
     "schema_version": { "type": "integer", "minimum": 1 },
-    "feedback_record_id": { "type": "string", "minLength": 1 },
+    "signal_id": { "type": "string", "minLength": 1 },
     "workspace_id": { "type": "string", "minLength": 1 },
-    "request_id": { "type": "string", "minLength": 1 },
     "trace_id": { "type": "string", "minLength": 1 },
-    "actor_id": { "type": "string", "minLength": 1 },
+    "ranking_type": {
+      "type": "string",
+      "enum": ["prompt", "pattern", "knowledge", "rhythm", "asset"]
+    },
     "target_type": {
       "type": "string",
-      "enum": ["writing_run", "quality_report", "section_run", "chapter", "prompt_version", "pattern", "knowledge_object", "rhythm_profile", "asset"]
+      "enum": ["prompt_version", "pattern", "knowledge_object", "rhythm_profile", "asset"]
     },
     "target_id": { "type": "string", "minLength": 1 },
-    "feedback_type": {
+    "signal_type": {
       "type": "string",
       "enum": [
-        "acceptance",
-        "quality",
-        "style",
-        "cost",
-        "edit_distance",
         "prompt_effectiveness",
         "pattern_fit",
         "rhythm_fit",
@@ -53,18 +49,16 @@
       ]
     },
     "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "weight": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
     "source": {
       "type": "string",
-      "enum": ["human_review", "critic", "quality_gate", "system"]
+      "enum": ["quality_gate", "critic", "human_review", "system"]
     },
-    "comment_ref": { "type": ["string", "null"], "minLength": 1 },
-    "payload": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "promotion_status": {
-      "type": "string",
-      "enum": ["pending", "promoted", "rolled_back"]
+    "source_feedback_record_id": { "type": ["string", "null"], "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
     },
     "input_refs": {
       "type": "array",

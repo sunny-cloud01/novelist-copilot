@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "consistency_report_id": "01JZCONSIST00000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "writing_run_id": "01JZWRITING00000000000001",
+  "trace_id": "01JZTRC000000000000000003",
+  "task_id": "01JZWRITETASK0000000000001",
+  "status": "blocked",
+  "issue_count": 1,
+  "blocking_issue_count": 1,
+  "checked_domains": ["character_continuity", "power_system_constraint"],
+  "issues": [
+    {
+      "issue_id": "01JZCONSISTISSUE000000001",
+      "category": "power_system_constraint",
+      "severity": "critical",
+      "summary": "主角境界被写回斗之气三段，与已批准状态冲突。",
+      "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p2",
+      "rule_id": "rule-01JZPOWER000000000000001",
+      "resolution_status": "open",
+      "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+      "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001/issues/1"],
+      "note": null
+    }
+  ],
+  "input_refs": ["object://writing-runs/01JZWRITING00000000000001"],
+  "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001"],
+  "created_at": "2026-07-12T01:15:00Z",
+  "updated_at": "2026-07-12T01:15:00Z"
+}

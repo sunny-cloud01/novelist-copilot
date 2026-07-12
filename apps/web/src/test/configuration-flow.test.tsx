@@ -28,6 +28,15 @@ describe("configuration page", () => {
     expect(screen.getByText(/critic · model_profile_default .* structured_output_validation_failed/)).toBeInTheDocument();
   });
 
+  it("shows ranking suggestions separate from governed configuration mutations", () => {
+    renderConfigurationRoute();
+
+    expect(screen.getByRole("heading", { name: "Prompt 排名建议与受控变更" })).toBeInTheDocument();
+    expect(screen.getByText(/ranking suggestion 仅进入审核队列；正式生效仍需通过配置变更动作。/)).toBeInTheDocument();
+    expect(screen.getByText(/切换到 prompt:\/\/writer\/chapter-compact 进行下一轮写作。/)).toBeInTheDocument();
+    expect(screen.getByText(/writer · prompt:\/\/writer\/chapter-default/)).toBeInTheDocument();
+  });
+
   it("updates governance records for config mutations", () => {
     renderConfigurationRoute();
 

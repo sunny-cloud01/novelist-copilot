@@ -1,5 +1,16 @@
 export type ReviewAction = "approve" | "reject" | "merge_alias" | "request_reextract";
-export type WritingReviewAction = "accept_section" | "accept_chapter" | "request_rewrite" | "edit_and_accept" | "block_generation";
+export type WritingReviewAction =
+  | "accept_section"
+  | "accept_chapter"
+  | "request_rewrite"
+  | "edit_and_accept"
+  | "block_generation"
+  | "approve_draft"
+  | "request_revision"
+  | "reject_draft"
+  | "edit_draft"
+  | "mark_issue_resolved"
+  | "create_rule_update_request";
 
 export type KnowledgeObject = {
   objectId: string;
@@ -78,6 +89,9 @@ export type ChapterPlanState = {
   targetWordCount: number;
   title: string;
   summary: string;
+  selectedPatternId: string | null;
+  selectedRhythmProfileId: string | null;
+  selectedAssetIds: string[];
 };
 
 export type SectionBeatState = {
@@ -136,12 +150,20 @@ export type PromptPackageState = {
   templateRefs: string[];
 };
 
-export type QualityIssueState = {
+export type ConsistencyIssueState = {
   issueId: string;
   category: string;
+  severity: string;
   summary: string;
   affectedTextRef: string;
+  ruleId: string;
+  resolutionStatus: string;
+  inputRefs: string[];
+  outputRefs: string[];
+  note: string | null;
 };
+
+export type QualityIssueState = ConsistencyIssueState;
 
 export type QualityReportState = {
   qualityReportId: string;
@@ -154,6 +176,83 @@ export type QualityReportState = {
   blockingIssues: QualityIssueState[];
 };
 
+export type ConsistencyReportState = {
+  consistencyReportId: string;
+  writingRunId: string;
+  status: string;
+  issueCount: number;
+  blockingIssueCount: number;
+  checkedDomains: string[];
+  issues: ConsistencyIssueState[];
+};
+
+export type RevisionSummaryState = {
+  revisionSummaryId: string;
+  writingRunId: string;
+  status: string;
+  revisionRound: number;
+  maxRevisionRounds: number;
+  sourceIssueIds: string[];
+  changeSummary: string;
+  reviewerNoteRef: string | null;
+};
+
+export type RuleProfileState = {
+  ruleId: string;
+  ruleType: string;
+  title: string;
+  severity: string;
+  status: string;
+  scopeType: string;
+  scopeRef: string;
+  description: string;
+  conditionSummary: string;
+  autoBlock: boolean;
+};
+
+export type PatternState = {
+  patternId: string;
+  canonicalName: string;
+  patternType: string;
+  status: string;
+  intent: string;
+  preconditions: string[];
+  steps: SectionBeatState[];
+  slots: string[];
+  expectedReaderEffect: string;
+  compatibleRhythmProfileId: string | null;
+};
+
+export type RhythmProfileState = {
+  rhythmProfileId: string;
+  targetId: string;
+  status: string;
+  label: string;
+  climaxIndex: number;
+  conflictIndex: number;
+  dialogueRatio: number;
+  descriptionRatio: number;
+  battleRatio: number;
+  informationDensity: number;
+  suspenseIndex: number;
+  rewardCount: number;
+  emotionCurve: Array<{ beat: number; intensity: number; summary: string }>;
+};
+
+export type AssetState = {
+  assetId: string;
+  assetType: string;
+  canonicalName: string;
+  status: string;
+  contentSummary: string;
+  styleTags: string[];
+  genreScope: string;
+  usageContext: string;
+  constraints: string[];
+  expressionTypeRefs: string[];
+  qualityScore: number;
+};
+
 export type FeedbackRecordState = {
   feedbackRecordId: string;
   workspaceId: string;
@@ -164,6 +263,54 @@ export type FeedbackRecordState = {
   source: string;
   commentRef: string | null;
   payload: Record<string, string | number | boolean | null>;
+};
+
+export type RankingSignalState = {
+  signalId: string;
+  rankingType: string;
+  targetType: string;
+  targetId: string;
+  signalType: string;
+  score: number;
+  weight: number;
+  source: string;
+  sourceFeedbackRecordId: string | null;
+  summary: string;
+  evidenceRefs: string[];
+};
+
+export type RankingSuggestionState = {
+  suggestionId: string;
+  rankingType: string;
+  targetScope: string;
+  status: string;
+  summary: string;
+  recommendedAction: string;
+  sourceSignalIds: string[];
+  promotedFromFeedbackRecordId: string | null;
+  promotedAt: string | null;
+};
+
+export type RankingSnapshotItemState = {
+  rank: number;
+  targetType: string;
+  targetId: string;
+  label: string;
+  score: number;
+  status: string;
+  signalIds: string[];
+  summary: string | null;
+};
+
+export type RankingSnapshotState = {
+  rankingSnapshotId: string;
+  rankingType: string;
+  scopeRef: string;
+  version: number;
+  updatedAt: string;
+  items: RankingSnapshotItemState[];
+  signals: RankingSignalState[];
+  suggestions: RankingSuggestionState[];
 };
 
 export type ModelCostState = {
@@ -407,18 +554,27 @@ export type WritingRunState = {
   promptPackageId: string;
   chapterDraftId: string;
   qualityReportId: string;
+  consistencyReportId: string;
+  revisionSummaryId: string;
   traceId: string;
   writerModelProfileId: string;
   criticModelProfileId: string;
   humanizerModelProfileId: string;
   assembledChapter: string;
   modelCost: ModelCostState;
+  revisionRound: number;
+  maxRevisionRounds: number;
   acceptedIntoManuscriptAt: string | null;
   acceptedChapterRef: string | null;
   chapterSnapshotId: string | null;
   manuscriptStateId: string | null;
   chapterSnapshot: ChapterSnapshotState | null;
   manuscriptState: ManuscriptStateState | null;
+  consistencyReport: ConsistencyReportState | null;
+  revisionSummary: RevisionSummaryState | null;
+  selectedPatternId: string | null;
+  selectedRhythmProfileId: string | null;
+  selectedAssetIds: string[];
 };
 
 export type PhaseTwoState = {
@@ -439,7 +595,14 @@ export type PhaseTwoState = {
   memoryPackages: MemoryPackageState[];
   promptPackages: PromptPackageState[];
   qualityReports: QualityReportState[];
+  consistencyReports: ConsistencyReportState[];
+  revisionSummaries: RevisionSummaryState[];
+  rules: RuleProfileState[];
+  patterns: PatternState[];
+  rhythmProfiles: RhythmProfileState[];
+  assets: AssetState[];
   feedbackRecords: FeedbackRecordState[];
+  rankingSnapshots: RankingSnapshotState[];
   strategySuggestions: StrategySuggestionState[];
   configurationSnapshot: ConfigurationSnapshotState;
   configurationMutations: ConfigurationMutationState[];
@@ -471,6 +634,12 @@ const writingReviewActionLabels: Record<WritingReviewAction, string> = {
   request_rewrite: "请求重写",
   edit_and_accept: "编辑后接受",
   block_generation: "阻止继续生成",
+  approve_draft: "批准草稿",
+  request_revision: "请求修订",
+  reject_draft: "驳回草稿",
+  edit_draft: "编辑草稿",
+  mark_issue_resolved: "标记问题已解决",
+  create_rule_update_request: "创建规则更新请求",
 };
 
 export function createInitialPhaseTwoState(): PhaseTwoState {
@@ -647,6 +816,9 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         targetWordCount: 3200,
         title: "乌坦城风起",
         summary: "主角在第一章完成进入主线前的势能铺垫。",
+        selectedPatternId: "01JZPATTERN00000000000001",
+        selectedRhythmProfileId: "01JZRHYTHM00000000000001",
+        selectedAssetIds: ["01JZASSET000000000000001"],
       },
     ],
     sectionPlansByChapter: {
@@ -692,12 +864,14 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         projectId: DEMO_PROJECT_ID,
         chapterPlanId: DEMO_CHAPTER_PLAN_ID,
         status: "requires_review",
-        currentStage: "humanizer_pass",
+        currentStage: "consistency_review",
         taskId: "01JZWRITETASK0000000000001",
         memoryPackageId: "01JZMEMPKG000000000000001",
         promptPackageId: "01JZPROMPTPKG000000000001",
         chapterDraftId: "01JZDRAFT0000000000000001",
         qualityReportId: "01JZQLTREP000000000000001",
+        consistencyReportId: "01JZCONSIST00000000000001",
+        revisionSummaryId: "01JZREVISION0000000000001",
         traceId: "01JZTRC000000000000000003",
         writerModelProfileId: DEFAULT_MODEL_PROFILE_ID,
         criticModelProfileId: STRUCTURED_FALLBACK_MODEL_PROFILE_ID,
@@ -716,12 +890,19 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
           humanizerInputTokens: 1780,
           humanizerOutputTokens: 850,
         },
+        revisionRound: 1,
+        maxRevisionRounds: 3,
         acceptedIntoManuscriptAt: null,
         acceptedChapterRef: null,
         chapterSnapshotId: null,
         manuscriptStateId: null,
         chapterSnapshot: null,
         manuscriptState: null,
+        consistencyReport: null,
+        revisionSummary: null,
+        selectedPatternId: "01JZPATTERN00000000000001",
+        selectedRhythmProfileId: "01JZRHYTHM00000000000001",
+        selectedAssetIds: ["01JZASSET000000000000001"],
       },
     ],
     sectionRunsByWriting: {
@@ -832,11 +1013,121 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         blockingIssues: [
           {
             issueId: "01JZQLTISSUE000000000001",
-            category: "character_consistency",
+            category: "power_system_constraint",
+            severity: "high",
             summary: "第二节仍需补足压迫递进。",
-            affectedTextRef: "object://drafts/01JZSECRUN00000000000002#p1",
+            affectedTextRef: "object://drafts/01JZSECRUN00000000000002#p2",
+            ruleId: "rule-01JZPOWER000000000000001",
+            resolutionStatus: "open",
+            inputRefs: ["object://rules/rule-01JZPOWER000000000000001"],
+            outputRefs: ["object://quality-reports/01JZQLTREP000000000000001/issues/1"],
+            note: null,
           },
         ],
+      },
+    ],
+    consistencyReports: [
+      {
+        consistencyReportId: "01JZCONSIST00000000000001",
+        writingRunId: DEMO_WRITING_RUN_ID,
+        status: "blocked",
+        issueCount: 1,
+        blockingIssueCount: 1,
+        checkedDomains: ["character_continuity", "power_system_constraint"],
+        issues: [
+          {
+            issueId: "01JZCONSISTISSUE000000001",
+            category: "power_system_constraint",
+            severity: "critical",
+            summary: "主角境界被写回斗之气三段，与已批准状态冲突。",
+            affectedTextRef: "object://drafts/01JZSECRUN00000000000002#p2",
+            ruleId: "rule-01JZPOWER000000000000001",
+            resolutionStatus: "open",
+            inputRefs: ["object://rules/rule-01JZPOWER000000000000001"],
+            outputRefs: ["object://consistency-reports/01JZCONSIST00000000000001/issues/1"],
+            note: null,
+          },
+        ],
+      },
+    ],
+    revisionSummaries: [
+      {
+        revisionSummaryId: "01JZREVISION0000000000001",
+        writingRunId: DEMO_WRITING_RUN_ID,
+        status: "requested",
+        revisionRound: 1,
+        maxRevisionRounds: 3,
+        sourceIssueIds: ["01JZCONSISTISSUE000000001"],
+        changeSummary: "要求重写第二节，恢复主角当前境界并补足冲突升级。",
+        reviewerNoteRef: "object://review-notes/01JZREVISION0000000000001",
+      },
+    ],
+    rules: [
+      {
+        ruleId: "rule-01JZPOWER000000000000001",
+        ruleType: "power_system_constraint",
+        title: "境界不能倒退",
+        severity: "critical",
+        status: "approved",
+        scopeType: "project",
+        scopeRef: "project://01JZPROJECT000000000000001",
+        description: "主角已批准境界状态不能在后续章节无原因倒退。",
+        conditionSummary: "若当前 draft 中能力状态低于已批准状态，则触发阻断。",
+        autoBlock: true,
+      },
+    ],
+    patterns: [
+      {
+        patternId: "01JZPATTERN00000000000001",
+        canonicalName: "退婚立誓",
+        patternType: "conflict_escalation",
+        status: "approved",
+        intent: "用公开羞辱触发主角长期目标与情绪反弹。",
+        preconditions: ["主角处于低谷", "公开场合发生身份压迫"],
+        steps: [
+          { index: 1, summary: "先压低主角处境" },
+          { index: 2, summary: "让压迫升级到无法退让" },
+          { index: 3, summary: "主角公开立誓，把羞辱转为主线目标" },
+        ],
+        slots: ["压迫者", "见证者", "誓约代价"],
+        expectedReaderEffect: "先压后燃，形成升级流期待。",
+        compatibleRhythmProfileId: "01JZRHYTHM00000000000001",
+      },
+    ],
+    rhythmProfiles: [
+      {
+        rhythmProfileId: "01JZRHYTHM00000000000001",
+        targetId: DEMO_CHAPTER_PLAN_ID,
+        status: "approved",
+        label: "退婚压迫三段式",
+        climaxIndex: 0.86,
+        conflictIndex: 0.78,
+        dialogueRatio: 0.42,
+        descriptionRatio: 0.28,
+        battleRatio: 0,
+        informationDensity: 0.65,
+        suspenseIndex: 0.74,
+        rewardCount: 2,
+        emotionCurve: [
+          { beat: 1, intensity: 0.35, summary: "压抑铺垫" },
+          { beat: 2, intensity: 0.68, summary: "冲突加压" },
+          { beat: 3, intensity: 0.92, summary: "立誓爆点" },
+        ],
+      },
+    ],
+    assets: [
+      {
+        assetId: "01JZASSET000000000000001",
+        assetType: "expression",
+        canonicalName: "三年之约宣言模板",
+        status: "approved",
+        contentSummary: "用于公开立誓场景的短句式资产。",
+        styleTags: ["克制", "燃点前压"],
+        genreScope: "玄幻升级流",
+        usageContext: "公开羞辱后主角反击",
+        constraints: ["避免过早泄露金手指", "句式不超过两行"],
+        expressionTypeRefs: ["expression://oath-line"],
+        qualityScore: 0.88,
       },
     ],
     feedbackRecords: [
@@ -867,6 +1158,78 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
           affectedTextRef: "object://drafts/01JZSECRUN00000000000003#p1",
           summary: "金手指暗示仍偏早，可继续收敛。",
         },
+      },
+    ],
+    rankingSnapshots: [
+      {
+        rankingSnapshotId: "01JZRANKSNAP0000000000001",
+        rankingType: "prompt",
+        scopeRef: `object://writing-runs/${DEMO_WRITING_RUN_ID}`,
+        version: 1,
+        updatedAt: "2026-07-12T01:34:00Z",
+        items: [
+          {
+            rank: 1,
+            targetType: "prompt_version",
+            targetId: "prompt://writer/chapter-default",
+            label: "writer 默认提示",
+            score: 0.83,
+            status: "leading",
+            signalIds: ["01JZRANKSIG00000000000001"],
+            summary: "质量稳定，但风格线索仍偏显性。",
+          },
+          {
+            rank: 2,
+            targetType: "prompt_version",
+            targetId: "prompt://writer/chapter-compact",
+            label: "writer 紧凑提示",
+            score: 0.76,
+            status: "watch",
+            signalIds: ["01JZRANKSIG00000000000002"],
+            summary: "可作为下一轮收紧表达候选。",
+          },
+        ],
+        signals: [
+          {
+            signalId: "01JZRANKSIG00000000000001",
+            rankingType: "prompt",
+            targetType: "prompt_version",
+            targetId: "prompt://writer/chapter-default",
+            signalType: "prompt_effectiveness",
+            score: 0.87,
+            weight: 0.7,
+            source: "quality_gate",
+            sourceFeedbackRecordId: "01JZFDBK0000000000000001",
+            summary: "默认 writer prompt 在质量门禁后保留了节奏与可读性。",
+            evidenceRefs: ["object://quality-reports/01JZQLTREP000000000000001"],
+          },
+          {
+            signalId: "01JZRANKSIG00000000000002",
+            rankingType: "prompt",
+            targetType: "prompt_version",
+            targetId: "prompt://writer/chapter-compact",
+            signalType: "reader_interest",
+            score: 0.72,
+            weight: 0.5,
+            source: "critic",
+            sourceFeedbackRecordId: "01JZFDBK0000000000000002",
+            summary: "批评者认为默认 prompt 对金手指提示过早，紧凑版更适合后续回合。",
+            evidenceRefs: ["object://critic-comments/01JZFDBK0000000000000002"],
+          },
+        ],
+        suggestions: [
+          {
+            suggestionId: "01JZSTRAT000000000000001",
+            rankingType: "prompt",
+            targetScope: "prompt",
+            status: "review_required",
+            summary: "收紧 writer 默认提示中对金手指线索的显性表达。",
+            recommendedAction: "切换到 prompt://writer/chapter-compact 进行下一轮写作。",
+            sourceSignalIds: ["01JZRANKSIG00000000000002"],
+            promotedFromFeedbackRecordId: "01JZFDBK0000000000000002",
+            promotedAt: null,
+          },
+        ],
       },
     ],
     strategySuggestions: [
@@ -1197,8 +1560,33 @@ export function applyWritingReviewActionToState(
   const providerCalls = state.providerCallsByWriting[writingRunId] ?? [];
   const targetRun = state.writingRuns.find((item) => item.writingRunId === writingRunId);
   const qualityReport = state.qualityReports.find((item) => item.writingRunId === writingRunId);
-  const acceptedAt = "2026-07-11T03:12:00Z";
+  const consistencyReport = state.consistencyReports.find((item) => item.writingRunId === writingRunId);
+  const revisionSummary = state.revisionSummaries.find((item) => item.writingRunId === writingRunId);
+
+  if (!targetRun || !qualityReport || !consistencyReport || !revisionSummary) {
+    return state;
+  }
+
+  const acceptedAt = "2026-07-12T01:22:00Z";
   const acceptedChapterRef = `object://manuscripts/${writingRunId}/chapters/1`;
+  const nextWritingRun = { ...targetRun };
+  const nextQualityReport = {
+    ...qualityReport,
+    blockingIssues: qualityReport.blockingIssues.map((item) => ({
+      ...item,
+      inputRefs: [...item.inputRefs],
+      outputRefs: [...item.outputRefs],
+    })),
+  };
+  const nextConsistencyReport = {
+    ...consistencyReport,
+    issues: consistencyReport.issues.map((item) => ({
+      ...item,
+      inputRefs: [...item.inputRefs],
+      outputRefs: [...item.outputRefs],
+    })),
+  };
+  const nextRevisionSummary = { ...revisionSummary };
 
   const nextSectionRuns = sectionRuns.map((item) => {
     if (item.sectionRunId !== sectionRunId) {
@@ -1232,6 +1620,12 @@ export function applyWritingReviewActionToState(
         criticIssues: [],
       };
     }
+    if (action === "edit_draft") {
+      return {
+        ...item,
+        humanizedText: `${item.humanizedText}（已人工补写一致性细节）`,
+      };
+    }
     if (action === "block_generation") {
       return {
         ...item,
@@ -1242,175 +1636,265 @@ export function applyWritingReviewActionToState(
     return item;
   });
 
-  const reviewedSectionRuns =
-    action === "accept_chapter"
-      ? nextSectionRuns.map((item) => ({
-          ...item,
-          status: "beat_approved",
-          beatStatus: item.beatStatus.map((beat) => ({ ...beat, status: "beat_approved" })),
-          criticIssues: [],
-        }))
-      : nextSectionRuns;
+  const matchingQualityIssue = (issue: ConsistencyIssueState, candidate: QualityIssueState) =>
+    candidate.issueId === issue.issueId ||
+    (candidate.ruleId === issue.ruleId && candidate.affectedTextRef === issue.affectedTextRef);
 
-  const allApproved = reviewedSectionRuns.length > 0 && reviewedSectionRuns.every((item) => item.status === "beat_approved");
-  const hasBlocked = reviewedSectionRuns.some((item) => item.status === "blocked");
-  const chapterSnapshot = {
-    chapterSnapshotId: `chapter-snapshot:${writingRunId}`,
-    writingRunId,
-    projectId: targetRun?.projectId ?? DEMO_PROJECT_ID,
-    chapterPlanId: targetRun?.chapterPlanId ?? DEMO_CHAPTER_PLAN_ID,
-    acceptedChapterRef,
-    chapterTitle: state.chapterPlans.find((item) => item.chapterPlanId === targetRun?.chapterPlanId)?.title ?? "当前章节",
-    chapterText: targetRun?.assembledChapter ?? "",
-    sourceSectionRefs: reviewedSectionRuns.map((item) => `object://section-runs/${item.sectionRunId}`),
-    createdAt: acceptedAt,
-  };
-  const manuscriptState = {
-    manuscriptStateId: `manuscript-state:${targetRun?.projectId ?? DEMO_PROJECT_ID}`,
-    projectId: targetRun?.projectId ?? DEMO_PROJECT_ID,
-    writingRunId,
-    currentStoryState: {
-      summary: "第 1 章《乌坦城风起》已进入 manuscript，三年之约正式进入主线。",
+  if (action === "mark_issue_resolved") {
+    const issue = nextConsistencyReport.issues.find((item) => item.resolutionStatus === "open");
+    if (!issue) {
+      return state;
+    }
+    issue.resolutionStatus = "resolved";
+    issue.note = "已在工作台标记为已解决。";
+    nextConsistencyReport.blockingIssueCount = nextConsistencyReport.issues.filter((item) => item.resolutionStatus === "open").length;
+    nextConsistencyReport.status = nextConsistencyReport.blockingIssueCount === 0 ? "passed" : "blocked";
+    nextQualityReport.blockingIssues = nextQualityReport.blockingIssues.filter((item) => !matchingQualityIssue(issue, item));
+    if (nextConsistencyReport.blockingIssueCount === 0) {
+      nextQualityReport.blockingIssues = [];
+      nextQualityReport.status = "requires_review";
+      nextRevisionSummary.status = "revised";
+    }
+  }
+
+  if (action === "approve_draft") {
+    nextWritingRun.status = "requires_review";
+    nextWritingRun.currentStage = "quality_gate";
+    nextQualityReport.status = "requires_review";
+    nextQualityReport.humanReviewRequired = false;
+    nextQualityReport.blockingIssues = [];
+    nextConsistencyReport.status = "passed";
+    nextConsistencyReport.blockingIssueCount = 0;
+    nextConsistencyReport.issues = nextConsistencyReport.issues.map((item) => ({
+      ...item,
+      resolutionStatus: "resolved",
+      note: item.note ?? "已批准通过一致性复核。",
+      inputRefs: [...item.inputRefs],
+      outputRefs: [...item.outputRefs],
+    }));
+    nextRevisionSummary.status = "accepted";
+  }
+
+  if (action === "request_revision") {
+    nextWritingRun.status = "blocked";
+    nextWritingRun.currentStage = "revision_loop";
+    nextWritingRun.revisionRound = Math.min(nextWritingRun.revisionRound + 1, nextWritingRun.maxRevisionRounds);
+    nextQualityReport.status = "blocked";
+    nextQualityReport.humanReviewRequired = true;
+    nextConsistencyReport.status = "blocked";
+    nextConsistencyReport.blockingIssueCount = nextConsistencyReport.issues.filter((item) => item.resolutionStatus === "open").length;
+    nextRevisionSummary.status = nextWritingRun.revisionRound < nextWritingRun.maxRevisionRounds ? "requested" : "blocked";
+    nextRevisionSummary.revisionRound = nextWritingRun.revisionRound;
+    nextRevisionSummary.changeSummary = "要求重写第二节，恢复主角当前境界并补足冲突升级。";
+  }
+
+  if (action === "reject_draft") {
+    nextWritingRun.status = "blocked";
+    nextWritingRun.currentStage = "human_review";
+    nextQualityReport.status = "blocked";
+    nextQualityReport.humanReviewRequired = true;
+    nextConsistencyReport.status = "blocked";
+    nextRevisionSummary.status = "blocked";
+  }
+
+  if (action === "edit_draft") {
+    nextWritingRun.status = "requires_review";
+    nextWritingRun.currentStage = "human_review";
+    nextQualityReport.status = "requires_review";
+    nextQualityReport.humanReviewRequired = true;
+    nextRevisionSummary.status = "requires_review";
+  }
+
+  if (action === "create_rule_update_request") {
+    nextRevisionSummary.status = "requires_review";
+    nextRevisionSummary.reviewerNoteRef = "object://rule-update-requests/rule-01JZPOWER000000000000001";
+  }
+
+  if (action === "request_rewrite") {
+    nextWritingRun.status = "blocked";
+    nextWritingRun.currentStage = "revision_loop";
+    nextQualityReport.status = "blocked";
+    nextQualityReport.humanReviewRequired = true;
+    nextRevisionSummary.status = "requested";
+  }
+
+  if (action === "block_generation") {
+    nextWritingRun.status = "blocked";
+    nextWritingRun.currentStage = "human_review";
+    nextQualityReport.status = "blocked";
+    nextQualityReport.humanReviewRequired = true;
+    nextRevisionSummary.status = "blocked";
+  }
+
+  let feedbackRecords = state.feedbackRecords;
+
+  if (action === "accept_chapter") {
+    const consistencyClear = nextConsistencyReport.blockingIssueCount === 0;
+    const qualityClear = nextQualityReport.blockingIssues.length === 0 && nextQualityReport.status !== "blocked";
+    const reviewClear = !nextQualityReport.humanReviewRequired;
+    const revisionClear = ["accepted", "revised"].includes(nextRevisionSummary.status);
+
+    if (!consistencyClear || !qualityClear || !reviewClear || !revisionClear) {
+      return {
+        ...state,
+        activityLog: [...state.activityLog, "一致性或修订仍未完成，暂不能接受本章。"],
+      };
+    }
+
+    const reviewedSectionRuns = nextSectionRuns.map((item) => ({
+      ...item,
+      status: "beat_approved",
+      beatStatus: item.beatStatus.map((beat) => ({ ...beat, status: "beat_approved" })),
+      criticIssues: [],
+    }));
+
+    const chapterSnapshot = {
+      chapterSnapshotId: `chapter-snapshot:${writingRunId}`,
+      writingRunId,
+      projectId: targetRun.projectId,
+      chapterPlanId: targetRun.chapterPlanId,
       acceptedChapterRef,
-      qualityGateStatus: "passed",
-    },
-    characterDynamicState: [
-      {
-        characterName: "萧炎",
-        stateSummary: "从公开羞辱中立下三年之约，主线动机被明确激活。",
-      },
-    ],
-    relationshipState: [
-      {
-        subject: "萧炎",
-        object: "三年之约",
-        stateSummary: "人物目标从承压转为正面回应，冲突升级为长期承诺。",
-      },
-    ],
-    hookState: [
-      {
-        hookKey: "core_conflict",
-        status: "active",
-        summary: "天赋跌落后的家族压力与三年之约仍是当前核心挂钩。",
-      },
-    ],
-    priorSummaryPack: [
-      { summaryIndex: 1, summary: "议事堂压抑氛围与家族压力被建立。" },
-      { summaryIndex: 2, summary: "纳兰家退婚消息引爆公开冲突。" },
-      { summaryIndex: 3, summary: "主角在羞辱中立下三年之约。" },
-    ],
-    updatedAt: acceptedAt,
-  };
-  const writingRuns = state.writingRuns.map((item) => {
-    if (item.writingRunId !== writingRunId) {
-      return item;
-    }
-    if (action === "accept_chapter") {
-      return {
-        ...item,
-        status: "succeeded",
-        currentStage: "quality_gate",
-        acceptedIntoManuscriptAt: acceptedAt,
+      chapterTitle: state.chapterPlans.find((item) => item.chapterPlanId === targetRun.chapterPlanId)?.title ?? "当前章节",
+      chapterText: targetRun.assembledChapter,
+      sourceSectionRefs: reviewedSectionRuns.map((item) => `object://section-runs/${item.sectionRunId}`),
+      createdAt: acceptedAt,
+    };
+    const manuscriptState = {
+      manuscriptStateId: `manuscript-state:${targetRun.projectId}`,
+      projectId: targetRun.projectId,
+      writingRunId,
+      currentStoryState: {
+        summary: "第 1 章《乌坦城风起》已进入 manuscript，三年之约正式进入主线。",
         acceptedChapterRef,
-        chapterSnapshotId: chapterSnapshot.chapterSnapshotId,
-        manuscriptStateId: manuscriptState.manuscriptStateId,
-        chapterSnapshot,
-        manuscriptState,
-      };
-    }
-    if (hasBlocked) {
-      return {
-        ...item,
-        status: "blocked",
-        currentStage: "critic_review",
-      };
-    }
-    if (allApproved) {
-      return {
-        ...item,
-        status: "succeeded",
-        currentStage: "quality_gate",
-      };
-    }
-    return item;
-  });
+        qualityGateStatus: "passed",
+      },
+      characterDynamicState: [
+        {
+          characterName: "萧炎",
+          stateSummary: "从公开羞辱中立下三年之约，主线动机被明确激活。",
+        },
+      ],
+      relationshipState: [
+        {
+          subject: "萧炎",
+          object: "三年之约",
+          stateSummary: "人物目标从承压转为正面回应，冲突升级为长期承诺。",
+        },
+      ],
+      hookState: [
+        {
+          hookKey: "core_conflict",
+          status: "active",
+          summary: "天赋跌落后的家族压力与三年之约仍是当前核心挂钩。",
+        },
+      ],
+      priorSummaryPack: [
+        { summaryIndex: 1, summary: "议事堂压抑氛围与家族压力被建立。" },
+        { summaryIndex: 2, summary: "纳兰家退婚消息引爆公开冲突。" },
+        { summaryIndex: 3, summary: "主角在羞辱中立下三年之约。" },
+      ],
+      updatedAt: acceptedAt,
+    };
 
-  const qualityReports = state.qualityReports.map((item) => {
-    if (item.writingRunId !== writingRunId) {
-      return item;
-    }
-    if (action === "accept_chapter" || allApproved) {
-      return {
-        ...item,
-        status: "passed",
-        humanReviewRequired: false,
-        blockingIssues: [],
-      };
-    }
-    if (hasBlocked) {
-      return {
-        ...item,
-        status: "blocked",
-        humanReviewRequired: true,
-      };
-    }
-    return item;
-  });
+    nextWritingRun.status = "succeeded";
+    nextWritingRun.currentStage = "quality_gate";
+    nextWritingRun.acceptedIntoManuscriptAt = acceptedAt;
+    nextWritingRun.acceptedChapterRef = acceptedChapterRef;
+    nextWritingRun.chapterSnapshotId = chapterSnapshot.chapterSnapshotId;
+    nextWritingRun.manuscriptStateId = manuscriptState.manuscriptStateId;
+    nextWritingRun.chapterSnapshot = chapterSnapshot;
+    nextWritingRun.manuscriptState = manuscriptState;
+    nextQualityReport.status = "passed";
+    nextQualityReport.humanReviewRequired = false;
+    nextQualityReport.blockingIssues = [];
+    nextConsistencyReport.status = "passed";
+    nextConsistencyReport.blockingIssueCount = 0;
+    nextRevisionSummary.status = "accepted";
 
-  const feedbackRecords =
-    action === "accept_chapter" && targetRun && qualityReport
-      ? [
-          ...state.feedbackRecords,
-          ...[
-            {
-              feedbackRecordId: "01JZFDBK0000000000000101",
-              workspaceId: DEMO_WORKSPACE_ID,
-              targetType: "writing_run",
-              targetId: writingRunId,
-              feedbackType: "acceptance",
-              score: 1,
-              source: "human_review",
-              commentRef: "object://feedback-comments/01JZFDBK0000000000000101",
-              payload: {
-                acceptedChapterRef,
-                summary: "人工复核已接受本章进入 manuscript。",
-              } as Record<string, string | number | boolean | null>,
-            },
-            {
-              feedbackRecordId: "01JZFDBK0000000000000102",
-              workspaceId: DEMO_WORKSPACE_ID,
-              targetType: "writing_run",
-              targetId: writingRunId,
-              feedbackType: "cost",
-              score: 0.78,
-              source: "system",
-              commentRef: null,
-              payload: {
-                estimatedTotalCost: targetRun.modelCost.estimatedTotalCost,
-                retryCount: targetRun.modelCost.retryCount,
-              } as Record<string, string | number | boolean | null>,
-            },
-          ].filter(
-            (nextItem) =>
-              !state.feedbackRecords.some(
-                (current) => current.targetId === nextItem.targetId && current.feedbackType === nextItem.feedbackType,
-              ),
+    feedbackRecords = [
+      ...state.feedbackRecords,
+      ...[
+        {
+          feedbackRecordId: "01JZFDBK0000000000000101",
+          workspaceId: DEMO_WORKSPACE_ID,
+          targetType: "writing_run",
+          targetId: writingRunId,
+          feedbackType: "acceptance",
+          score: 1,
+          source: "human_review",
+          commentRef: "object://feedback-comments/01JZFDBK0000000000000101",
+          payload: {
+            acceptedChapterRef,
+            summary: "人工复核已接受本章进入 manuscript。",
+          } as Record<string, string | number | boolean | null>,
+        },
+        {
+          feedbackRecordId: "01JZFDBK0000000000000102",
+          workspaceId: DEMO_WORKSPACE_ID,
+          targetType: "writing_run",
+          targetId: writingRunId,
+          feedbackType: "cost",
+          score: 0.78,
+          source: "system",
+          commentRef: null,
+          payload: {
+            estimatedTotalCost: targetRun.modelCost.estimatedTotalCost,
+            retryCount: targetRun.modelCost.retryCount,
+          } as Record<string, string | number | boolean | null>,
+        },
+      ].filter(
+        (nextItem) =>
+          !state.feedbackRecords.some(
+            (current) => current.targetId === nextItem.targetId && current.feedbackType === nextItem.feedbackType,
           ),
-        ]
-      : state.feedbackRecords;
+      ),
+    ];
+
+    nextWritingRun.consistencyReport = nextConsistencyReport;
+    nextWritingRun.revisionSummary = nextRevisionSummary;
+    nextWritingRun.revisionRound = nextRevisionSummary.revisionRound;
+    nextWritingRun.maxRevisionRounds = nextRevisionSummary.maxRevisionRounds;
+
+    return {
+      ...state,
+      writingRuns: state.writingRuns.map((item) => (item.writingRunId === writingRunId ? nextWritingRun : item)),
+      qualityReports: state.qualityReports.map((item) => (item.writingRunId === writingRunId ? nextQualityReport : item)),
+      consistencyReports: state.consistencyReports.map((item) =>
+        item.writingRunId === writingRunId ? { ...nextConsistencyReport, issueCount: nextConsistencyReport.issues.length } : item,
+      ),
+      revisionSummaries: state.revisionSummaries.map((item) => (item.writingRunId === writingRunId ? nextRevisionSummary : item)),
+      feedbackRecords,
+      providerCallsByWriting: {
+        ...state.providerCallsByWriting,
+        [writingRunId]: providerCalls,
+      },
+      sectionRunsByWriting: {
+        ...state.sectionRunsByWriting,
+        [writingRunId]: reviewedSectionRuns,
+      },
+      activityLog: [...state.activityLog, `已执行写作审核动作：${writingReviewActionLabels[action]}。`],
+    };
+  }
+
+  nextConsistencyReport.issueCount = nextConsistencyReport.issues.length;
+  nextWritingRun.consistencyReport = nextConsistencyReport;
+  nextWritingRun.revisionSummary = nextRevisionSummary;
+  nextWritingRun.revisionRound = nextRevisionSummary.revisionRound;
+  nextWritingRun.maxRevisionRounds = nextRevisionSummary.maxRevisionRounds;
 
   return {
     ...state,
-    writingRuns,
-    qualityReports,
-    feedbackRecords,
+    writingRuns: state.writingRuns.map((item) => (item.writingRunId === writingRunId ? nextWritingRun : item)),
+    qualityReports: state.qualityReports.map((item) => (item.writingRunId === writingRunId ? nextQualityReport : item)),
+    consistencyReports: state.consistencyReports.map((item) => (item.writingRunId === writingRunId ? nextConsistencyReport : item)),
+    revisionSummaries: state.revisionSummaries.map((item) => (item.writingRunId === writingRunId ? nextRevisionSummary : item)),
     providerCallsByWriting: {
       ...state.providerCallsByWriting,
       [writingRunId]: providerCalls,
     },
     sectionRunsByWriting: {
       ...state.sectionRunsByWriting,
-      [writingRunId]: reviewedSectionRuns,
+      [writingRunId]: nextSectionRuns,
     },
     activityLog: [...state.activityLog, `已执行写作审核动作：${writingReviewActionLabels[action]}。`],
   };

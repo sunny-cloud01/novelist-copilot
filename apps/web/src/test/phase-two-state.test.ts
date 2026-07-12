@@ -56,7 +56,7 @@ describe("phase two state", () => {
     expect(updated.beatStatus.every((beat) => beat.status === "beat_approved")).toBe(true);
   });
 
-  it("accepts whole chapter and passes quality gate", () => {
+  it("blocks direct chapter acceptance until review dependencies clear", () => {
     const next = applyWritingReviewActionToState(
       createInitialPhaseTwoState(),
       "01JZWRITING00000000000001",
@@ -64,16 +64,46 @@ describe("phase two state", () => {
       "accept_chapter",
     );
 
-    expect(next.writingRuns[0].status).toBe("succeeded");
-    expect(next.writingRuns[0].currentStage).toBe("quality_gate");
-    expect(next.writingRuns[0].acceptedChapterRef).toContain("object://manuscripts/");
-    expect(next.writingRuns[0].chapterSnapshot?.chapterTitle).toBe("乌坦城风起");
-    expect(next.writingRuns[0].manuscriptState?.currentStoryState.qualityGateStatus).toBe("passed");
-    expect(next.qualityReports[0].status).toBe("passed");
-    expect(next.qualityReports[0].blockingIssues).toHaveLength(0);
-    expect(next.feedbackRecords.some((item) => item.feedbackType === "acceptance")).toBe(true);
-    expect(next.feedbackRecords.some((item) => item.feedbackType === "cost")).toBe(true);
-    expect(next.sectionRunsByWriting["01JZWRITING00000000000001"].every((item) => item.status === "beat_approved")).toBe(true);
+    expect(next.writingRuns[0].status).toBe("requires_review");
+    expect(next.writingRuns[0].acceptedChapterRef).toBeNull();
+    expect(next.activityLog.at(-1)).toBe("一致性或修订仍未完成，暂不能接受本章。");
+  });
+
+  it("resolves blocker then approves draft before chapter acceptance", () => {
+    const resolved = applyWritingReviewActionToState(
+      createInitialPhaseTwoState(),
+      "01JZWRITING00000000000001",
+      "01JZSECRUN00000000000002",
+      "mark_issue_resolved",
+    );
+    const approved = applyWritingReviewActionToState(
+      resolved,
+      "01JZWRITING00000000000001",
+      "01JZSECRUN00000000000002",
+      "approve_draft",
+    );
+    const accepted = applyWritingReviewActionToState(
+      approved,
+      "01JZWRITING00000000000001",
+      "01JZSECRUN00000000000002",
+      "accept_chapter",
+    );
+
+    expect(resolved.consistencyReports[0].blockingIssueCount).toBe(0);
+    expect(resolved.revisionSummaries[0].status).toBe("revised");
+    expect(resolved.qualityReports[0].status).toBe("requires_review");
+    expect(approved.qualityReports[0].humanReviewRequired).toBe(false);
+    expect(approved.revisionSummaries[0].status).toBe("accepted");
+    expect(accepted.writingRuns[0].status).toBe("succeeded");
+    expect(accepted.writingRuns[0].currentStage).toBe("quality_gate");
+    expect(accepted.writingRuns[0].acceptedChapterRef).toContain("object://manuscripts/");
+    expect(accepted.writingRuns[0].chapterSnapshot?.chapterTitle).toBe("乌坦城风起");
+    expect(accepted.writingRuns[0].manuscriptState?.currentStoryState.qualityGateStatus).toBe("passed");
+    expect(accepted.qualityReports[0].status).toBe("passed");
+    expect(accepted.qualityReports[0].blockingIssues).toHaveLength(0);
+    expect(accepted.feedbackRecords.some((item) => item.feedbackType === "acceptance")).toBe(true);
+    expect(accepted.feedbackRecords.some((item) => item.feedbackType === "cost")).toBe(true);
+    expect(accepted.sectionRunsByWriting["01JZWRITING00000000000001"].every((item) => item.status === "beat_approved")).toBe(true);
   });
 
   it("records unique ids for repeated model toggles", () => {
@@ -86,6 +116,20 @@ describe("phase two state", () => {
     expect(twice.auditEvents.at(-1)?.requestId).toContain("-2");
   });
 
+  it("keeps prompt ranking snapshot while promotion only changes suggestion approval state", () => {
+    const initial = createInitialPhaseTwoState();
+    const next = promoteStrategySuggestionInState(initial, "01JZSTRAT000000000000001");
+
+    expect(initial.rankingSnapshots[0].rankingType).toBe("prompt");
+    expect(initial.rankingSnapshots[0].items[0].targetId).toBe("prompt://writer/chapter-default");
+    expect(initial.rankingSnapshots[0].suggestions[0].summary).toBe("收紧 writer 默认提示中对金手指线索的显性表达。");
+    expect(next.rankingSnapshots[0]).toEqual(initial.rankingSnapshots[0]);
+    expect(next.strategySuggestions[0].status).toBe("approved");
+    expect(next.strategySuggestions[0].promotedAt).toBe("2026-07-11T03:13:00Z");
+    expect(next.auditEvents.at(-1)?.inputRefs).toEqual([
+      `object://feedback-records/${next.strategySuggestions[0].basedOnFeedbackRecordId}`,
+    ]);
+  });
   it("records audit and mutation entries for governance actions", () => {
     const initial = createInitialPhaseTwoState();
     const afterQuality = updateQualityGateProfileInState(initial, "01JZQUALITY00000000000001", 0.4, 0.9);

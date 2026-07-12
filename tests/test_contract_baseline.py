@@ -18,7 +18,7 @@ def test_task_status_schema_matches_spec() -> None:
     assert schema["enum"] == EXPECTED_STATUS
 
 
-def test_openapi_declares_phase_two_and_agent_task_paths() -> None:
+def test_openapi_declares_phase_two_and_phase_one_paths() -> None:
     text = Path("packages/contracts/openapi/novel-factory.v1.yaml").read_text()
     assert "url: /v1" in text
     assert "/books:" in text
@@ -41,8 +41,20 @@ def test_openapi_declares_phase_two_and_agent_task_paths() -> None:
     assert "/writing-runs:" in text
     assert "/writing-runs/{writingRunId}:" in text
     assert "/writing-runs/{writingRunId}/accept-chapter:" in text
+    assert "/writing-runs/{writingRunId}/review-actions:" in text
     assert "/quality-reports/{qualityReportId}:" in text
+    assert "/consistency-reports/{consistencyReportId}:" in text
+    assert "/revision-summaries/{revisionSummaryId}:" in text
     assert "/feedback-records:" in text
+    assert "/rankings/prompt:" in text
+    assert "/patterns:" in text
+    assert "/patterns/{patternId}:" in text
+    assert "/rhythm-profiles:" in text
+    assert "/rhythm-profiles/{rhythmProfileId}:" in text
+    assert "/assets:" in text
+    assert "/assets/{assetId}:" in text
+    assert "/rules:" in text
+    assert "/rules/{ruleId}:" in text
     assert "/configuration:" in text
     assert "/model-profiles/{modelProfileId}/enable:" in text
     assert "/model-profiles/{modelProfileId}/disable:" in text
@@ -50,7 +62,7 @@ def test_openapi_declares_phase_two_and_agent_task_paths() -> None:
     assert "/agent-tasks/{taskId}:" in text
 
 
-def test_phase_two_schema_files_exist() -> None:
+def test_phase_two_and_phase_one_schema_files_exist() -> None:
     assert Path("packages/contracts/schemas/source-book.schema.json").exists()
     assert Path("packages/contracts/schemas/source-chapter.schema.json").exists()
     assert Path("packages/contracts/schemas/extraction-run.schema.json").exists()
@@ -70,9 +82,20 @@ def test_phase_two_schema_files_exist() -> None:
     assert Path("packages/contracts/schemas/configuration-snapshot.schema.json").exists()
     assert Path("packages/contracts/schemas/chapter-snapshot.schema.json").exists()
     assert Path("packages/contracts/schemas/manuscript-state.schema.json").exists()
+    assert Path("packages/contracts/schemas/consistency-issue.schema.json").exists()
+    assert Path("packages/contracts/schemas/rule-profile.schema.json").exists()
+    assert Path("packages/contracts/schemas/consistency-report.schema.json").exists()
+    assert Path("packages/contracts/schemas/revision-summary.schema.json").exists()
+    assert Path("packages/contracts/schemas/writing-review-action-command.schema.json").exists()
     assert Path("packages/contracts/schemas/writing-run.schema.json").exists()
     assert Path("packages/contracts/schemas/quality-report.schema.json").exists()
     assert Path("packages/contracts/schemas/feedback-record.schema.json").exists()
+    assert Path("packages/contracts/schemas/ranking-signal.schema.json").exists()
+    assert Path("packages/contracts/schemas/ranking-suggestion.schema.json").exists()
+    assert Path("packages/contracts/schemas/ranking-snapshot.schema.json").exists()
+    assert Path("packages/contracts/schemas/pattern.schema.json").exists()
+    assert Path("packages/contracts/schemas/rhythm-profile.schema.json").exists()
+    assert Path("packages/contracts/schemas/asset.schema.json").exists()
     assert Path("packages/contracts/schemas/audit-event.schema.json").exists()
 
 
@@ -116,5 +139,25 @@ def test_fixture_directories_exist() -> None:
     assert Path("packages/contracts/fixtures/writing/invalid/writing-run-invalid-status.json").exists()
     assert Path("packages/contracts/fixtures/writing/valid/quality-report.json").exists()
     assert Path("packages/contracts/fixtures/writing/invalid/quality-report-invalid-status.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/consistency-report.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/consistency-report-invalid-status.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/revision-summary.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/revision-summary-invalid-round.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/writing-review-action-command.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/writing-review-action-command-missing-issue-id.json").exists()
     assert Path("packages/contracts/fixtures/writing/valid/feedback-record.json").exists()
     assert Path("packages/contracts/fixtures/writing/invalid/feedback-record-invalid-score.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/ranking-signal.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/ranking-signal-invalid-score.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/ranking-suggestion.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/ranking-suggestion-missing-signals.json").exists()
+    assert Path("packages/contracts/fixtures/writing/valid/ranking-snapshot.json").exists()
+    assert Path("packages/contracts/fixtures/writing/invalid/ranking-snapshot-empty-items.json").exists()
+    assert Path("packages/contracts/fixtures/rules/valid/rule-profile.json").exists()
+    assert Path("packages/contracts/fixtures/rules/invalid/rule-profile-invalid-severity.json").exists()
+    assert Path("packages/contracts/fixtures/planning/valid/pattern.json").exists()
+    assert Path("packages/contracts/fixtures/planning/invalid/pattern-invalid-status.json").exists()
+    assert Path("packages/contracts/fixtures/planning/valid/rhythm-profile.json").exists()
+    assert Path("packages/contracts/fixtures/planning/invalid/rhythm-profile-invalid-climax-index.json").exists()
+    assert Path("packages/contracts/fixtures/planning/valid/asset.json").exists()
+    assert Path("packages/contracts/fixtures/planning/invalid/asset-missing-expression-refs.json").exists()

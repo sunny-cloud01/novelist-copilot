@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "asset_id": "01JZASSET000000000000001",
+  "workspace_id": "demo-workspace",
+  "trace_id": "trace-asset-1",
+  "asset_type": "expression",
+  "canonical_name": "三年之约宣言模板",
+  "status": "approved",
+  "content_summary": "用于公开立誓场景的短句式资产。",
+  "style_tags": ["克制", "燃点前压"],
+  "genre_scope": "玄幻升级流",
+  "usage_context": "公开羞辱后主角反击",
+  "constraints": ["避免过早泄露金手指", "句式不超过两行"],
+  "expression_type_refs": ["expression://oath-line"],
+  "source_refs": ["object://source-books/01JZBOOK000000000000000001"],
+  "evidence_refs": ["evidence://01JZEVIDENCE0000000000201"],
+  "quality_score": 0.88,
+  "created_at": "2026-07-12T01:06:00Z",
+  "updated_at": "2026-07-12T01:08:00Z"
+}

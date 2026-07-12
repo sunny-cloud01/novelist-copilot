@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -79,9 +80,16 @@ class CoreStore:
     memory_packages: dict[str, dict[str, Any]] = field(default_factory=dict)
     prompt_packages: dict[str, dict[str, Any]] = field(default_factory=dict)
     quality_reports: dict[str, dict[str, Any]] = field(default_factory=dict)
+    consistency_reports: dict[str, dict[str, Any]] = field(default_factory=dict)
+    revision_summaries: dict[str, dict[str, Any]] = field(default_factory=dict)
+    rules: dict[str, dict[str, Any]] = field(default_factory=dict)
     chapter_snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
     manuscript_states_by_project: dict[str, dict[str, Any]] = field(default_factory=dict)
     feedback_records: dict[str, dict[str, Any]] = field(default_factory=dict)
+    ranking_snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
+    patterns: dict[str, dict[str, Any]] = field(default_factory=dict)
+    rhythm_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    assets: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     task_events_by_task: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
@@ -117,9 +125,16 @@ def reset_store() -> None:
     STORE.memory_packages.clear()
     STORE.prompt_packages.clear()
     STORE.quality_reports.clear()
+    STORE.consistency_reports.clear()
+    STORE.revision_summaries.clear()
+    STORE.rules.clear()
     STORE.chapter_snapshots.clear()
     STORE.manuscript_states_by_project.clear()
     STORE.feedback_records.clear()
+    STORE.ranking_snapshots.clear()
+    STORE.patterns.clear()
+    STORE.rhythm_profiles.clear()
+    STORE.assets.clear()
     STORE.agent_tasks.clear()
     STORE.task_events_by_task.clear()
     STORE.audit_events.clear()
@@ -561,6 +576,27 @@ def seed_phase_two_demo_data() -> None:
         "created_at": "2026-07-11T03:01:00Z",
         "updated_at": "2026-07-11T03:01:00Z",
     }
+    STORE.rules["rule-01JZPOWER000000000000001"] = {
+        "schema_version": 1,
+        "rule_id": "rule-01JZPOWER000000000000001",
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-rule-power",
+        "rule_type": "power_system_constraint",
+        "title": "境界不能倒退",
+        "severity": "critical",
+        "status": "approved",
+        "scope_type": "project",
+        "scope_ref": "project://01JZPROJECT000000000000001",
+        "description": "主角已批准境界状态不能在后续章节无原因倒退。",
+        "condition_summary": "若当前 draft 中能力状态低于已批准状态，则触发阻断。",
+        "auto_block": True,
+        "source_refs": ["object://story-bibles/01JZBIBLE000000000000001"],
+        "evidence_refs": ["evidence://01JZEVIDENCE0000000000901"],
+        "input_refs": ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+        "output_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+        "created_at": "2026-07-12T01:10:00Z",
+        "updated_at": "2026-07-12T01:10:00Z",
+    }
     STORE.writing_runs[WRITING_RUN_ID] = {
         "schema_version": 1,
         "writing_run_id": WRITING_RUN_ID,
@@ -574,7 +610,7 @@ def seed_phase_two_demo_data() -> None:
         "chapter_draft_id": CHAPTER_DRAFT_ID,
         "quality_report_id": QUALITY_REPORT_ID,
         "trace_id": "01JZTRC000000000000000003",
-        "current_stage": "humanizer_pass",
+        "current_stage": "consistency_review",
         "writer_model_profile_id": MODEL_PROFILE_DEFAULT_ID,
         "critic_model_profile_id": MODEL_PROFILE_STRUCTURED_FALLBACK_ID,
         "humanizer_model_profile_id": MODEL_PROFILE_DEFAULT_ID,
@@ -591,12 +627,21 @@ def seed_phase_two_demo_data() -> None:
             "humanizer_input_tokens": 1780,
             "humanizer_output_tokens": 850,
         },
+        "provider_calls": [],
         "accepted_into_manuscript_at": None,
         "accepted_chapter_ref": None,
         "chapter_snapshot_id": None,
         "manuscript_state_id": None,
-        "created_at": "2026-07-11T03:02:00Z",
-        "updated_at": "2026-07-11T03:08:00Z",
+        "chapter_snapshot": None,
+        "manuscript_state": None,
+        "consistency_report_id": "01JZCONSIST00000000000001",
+        "consistency_report": None,
+        "revision_summary_id": "01JZREVISION0000000000001",
+        "revision_summary": None,
+        "revision_round": 1,
+        "max_revision_rounds": 3,
+        "created_at": "2026-07-12T01:12:00Z",
+        "updated_at": "2026-07-12T01:18:00Z",
     }
     STORE.writing_run_tasks[WRITING_RUN_ID] = {
         "schema_version": 1,
@@ -771,13 +816,67 @@ def seed_phase_two_demo_data() -> None:
         "blocking_issues": [
             {
                 "issue_id": "01JZQLTISSUE000000000001",
-                "category": "character_consistency",
+                "category": "character_continuity",
+                "severity": "high",
                 "summary": "第二节仍需补足压迫递进。",
                 "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p1",
+                "rule_id": "rule-01JZPOWER000000000000001",
+                "resolution_status": "open",
+                "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+                "output_refs": ["object://quality-reports/01JZQLTREP000000000000001/issues/1"],
+                "note": None,
             }
         ],
         "created_at": "2026-07-11T03:08:00Z",
         "updated_at": "2026-07-11T03:08:00Z",
+    }
+    STORE.consistency_reports["01JZCONSIST00000000000001"] = {
+        "schema_version": 1,
+        "consistency_report_id": "01JZCONSIST00000000000001",
+        "workspace_id": _workspace_or_default(),
+        "writing_run_id": WRITING_RUN_ID,
+        "trace_id": "01JZTRC000000000000000003",
+        "task_id": WRITING_TASK_ID,
+        "status": "blocked",
+        "issue_count": 1,
+        "blocking_issue_count": 1,
+        "checked_domains": ["character_continuity", "power_system_constraint"],
+        "issues": [
+            {
+                "issue_id": "01JZCONSISTISSUE000000001",
+                "category": "power_system_constraint",
+                "severity": "critical",
+                "summary": "主角境界被写回斗之气三段，与已批准状态冲突。",
+                "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p2",
+                "rule_id": "rule-01JZPOWER000000000000001",
+                "resolution_status": "open",
+                "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+                "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001/issues/1"],
+                "note": None,
+            }
+        ],
+        "input_refs": [f"object://writing-runs/{WRITING_RUN_ID}"],
+        "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001"],
+        "created_at": "2026-07-12T01:15:00Z",
+        "updated_at": "2026-07-12T01:15:00Z",
+    }
+    STORE.revision_summaries["01JZREVISION0000000000001"] = {
+        "schema_version": 1,
+        "revision_summary_id": "01JZREVISION0000000000001",
+        "workspace_id": _workspace_or_default(),
+        "writing_run_id": WRITING_RUN_ID,
+        "trace_id": "01JZTRC000000000000000003",
+        "status": "requested",
+        "revision_round": 1,
+        "max_revision_rounds": 3,
+        "source_issue_ids": ["01JZCONSISTISSUE000000001"],
+        "change_summary": "要求重写第二节，恢复主角当前境界并补足冲突升级。",
+        "revision_diff_ref": None,
+        "reviewer_note_ref": "object://review-notes/01JZREVISION0000000000001",
+        "input_refs": ["object://consistency-reports/01JZCONSIST00000000000001"],
+        "output_refs": ["object://revision-summaries/01JZREVISION0000000000001"],
+        "created_at": "2026-07-12T01:18:00Z",
+        "updated_at": "2026-07-12T01:18:00Z",
     }
     STORE.task_events_by_task[WRITING_TASK_ID] = [
         {
@@ -795,10 +894,10 @@ def seed_phase_two_demo_data() -> None:
             "task_event_id": "01JZWRITEEVT0000000000002",
             "task_id": WRITING_TASK_ID,
             "event_type": "progress",
-            "message": "Humanizer pass completed, waiting for review.",
+            "message": "Consistency review blocked draft and requested revision.",
             "payload_ref": None,
-            "payload_json": {"current_stage": "humanizer_pass", "retry_count": 1},
-            "created_at": "2026-07-11T03:08:00Z",
+            "payload_json": {"current_stage": "consistency_review", "retry_count": 1, "consistency_report_id": "01JZCONSIST00000000000001"},
+            "created_at": "2026-07-12T01:18:00Z",
         },
     ]
     STORE.feedback_records["01JZFDBK0000000000000001"] = {
@@ -834,6 +933,166 @@ def seed_phase_two_demo_data() -> None:
         },
         "created_at": "2026-07-11T03:11:00Z",
         "updated_at": "2026-07-11T03:11:00Z",
+    }
+    STORE.ranking_snapshots["prompt"] = {
+        "schema_version": 1,
+        "ranking_snapshot_id": "01JZRANKSNAP0000000000001",
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-ranking-prompt-1",
+        "ranking_type": "prompt",
+        "scope_ref": f"object://writing-runs/{WRITING_RUN_ID}",
+        "version": 1,
+        "updated_at": "2026-07-12T01:34:00Z",
+        "items": [
+            {
+                "rank": 1,
+                "target_type": "prompt_version",
+                "target_id": "prompt://writer/chapter-default",
+                "label": "writer 默认提示",
+                "score": 0.83,
+                "status": "leading",
+                "signal_ids": ["01JZRANKSIG00000000000001"],
+                "summary": "质量稳定，但风格线索仍偏显性。",
+            },
+            {
+                "rank": 2,
+                "target_type": "prompt_version",
+                "target_id": "prompt://writer/chapter-compact",
+                "label": "writer 紧凑提示",
+                "score": 0.76,
+                "status": "watch",
+                "signal_ids": ["01JZRANKSIG00000000000002"],
+                "summary": "可作为下一轮收紧表达候选。",
+            },
+        ],
+        "signals": [
+            {
+                "schema_version": 1,
+                "signal_id": "01JZRANKSIG00000000000001",
+                "workspace_id": _workspace_or_default(),
+                "trace_id": "trace-ranking-prompt-1",
+                "ranking_type": "prompt",
+                "target_type": "prompt_version",
+                "target_id": "prompt://writer/chapter-default",
+                "signal_type": "prompt_effectiveness",
+                "score": 0.87,
+                "weight": 0.7,
+                "source": "quality_gate",
+                "source_feedback_record_id": "01JZFDBK0000000000000001",
+                "summary": "默认 writer prompt 在质量门禁后保留了节奏与可读性。",
+                "evidence_refs": [f"object://quality-reports/{QUALITY_REPORT_ID}"],
+                "input_refs": ["object://feedback-records/01JZFDBK0000000000000001"],
+                "output_refs": ["object://rankings/prompt/signals/01JZRANKSIG00000000000001"],
+                "created_at": "2026-07-12T01:30:00Z",
+                "updated_at": "2026-07-12T01:30:00Z",
+            },
+            {
+                "schema_version": 1,
+                "signal_id": "01JZRANKSIG00000000000002",
+                "workspace_id": _workspace_or_default(),
+                "trace_id": "trace-ranking-prompt-1",
+                "ranking_type": "prompt",
+                "target_type": "prompt_version",
+                "target_id": "prompt://writer/chapter-compact",
+                "signal_type": "reader_interest",
+                "score": 0.72,
+                "weight": 0.5,
+                "source": "critic",
+                "source_feedback_record_id": "01JZFDBK0000000000000002",
+                "summary": "批评者认为默认 prompt 对金手指提示过早，紧凑版更适合后续回合。",
+                "evidence_refs": ["object://critic-comments/01JZFDBK0000000000000002"],
+                "input_refs": ["object://feedback-records/01JZFDBK0000000000000002"],
+                "output_refs": ["object://rankings/prompt/signals/01JZRANKSIG00000000000002"],
+                "created_at": "2026-07-12T01:31:00Z",
+                "updated_at": "2026-07-12T01:31:00Z",
+            },
+        ],
+        "suggestions": [
+            {
+                "schema_version": 1,
+                "suggestion_id": "01JZSTRAT000000000000001",
+                "workspace_id": _workspace_or_default(),
+                "trace_id": "trace-ranking-prompt-1",
+                "ranking_type": "prompt",
+                "target_scope": "prompt",
+                "status": "review_required",
+                "summary": "收紧 writer 默认提示中对金手指线索的显性表达。",
+                "recommended_action": "切换到 prompt://writer/chapter-compact 进行下一轮写作。",
+                "source_signal_ids": ["01JZRANKSIG00000000000002"],
+                "promoted_from_feedback_record_id": "01JZFDBK0000000000000002",
+                "input_refs": ["object://rankings/prompt/signals/01JZRANKSIG00000000000002"],
+                "output_refs": ["object://strategy-suggestions/01JZSTRAT000000000000001"],
+                "created_at": "2026-07-12T01:32:00Z",
+                "updated_at": "2026-07-12T01:32:00Z",
+                "promoted_at": None,
+            }
+        ],
+    }
+    STORE.patterns["01JZPATTERN00000000000001"] = {
+        "schema_version": 1,
+        "pattern_id": "01JZPATTERN00000000000001",
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-pattern-1",
+        "canonical_name": "退婚立誓",
+        "pattern_type": "conflict_escalation",
+        "status": "approved",
+        "intent": "用公开羞辱触发主角长期目标与情绪反弹。",
+        "preconditions": ["主角处于低谷", "公开场合发生身份压迫"],
+        "steps": [
+            {"index": 1, "summary": "先压低主角处境"},
+            {"index": 2, "summary": "让压迫升级到无法退让"},
+            {"index": 3, "summary": "主角公开立誓，把羞辱转为主线目标"},
+        ],
+        "slots": ["压迫者", "见证者", "誓约代价"],
+        "expected_reader_effect": "先压后燃，形成升级流期待。",
+        "compatible_rhythm_profile_id": "01JZRHYTHM00000000000001",
+        "evidence_refs": ["evidence://01JZEVIDENCE0000000000101"],
+        "created_at": "2026-07-12T01:00:00Z",
+        "updated_at": "2026-07-12T01:02:00Z",
+    }
+    STORE.rhythm_profiles["01JZRHYTHM00000000000001"] = {
+        "schema_version": 1,
+        "rhythm_profile_id": "01JZRHYTHM00000000000001",
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-rhythm-1",
+        "target_id": CHAPTER_PLAN_ID,
+        "status": "approved",
+        "label": "退婚压迫三段式",
+        "climax_index": 0.86,
+        "conflict_index": 0.78,
+        "dialogue_ratio": 0.42,
+        "description_ratio": 0.28,
+        "battle_ratio": 0,
+        "information_density": 0.65,
+        "suspense_index": 0.74,
+        "reward_count": 2,
+        "emotion_curve": [
+            {"beat": 1, "intensity": 0.35, "summary": "压抑铺垫"},
+            {"beat": 2, "intensity": 0.68, "summary": "冲突加压"},
+            {"beat": 3, "intensity": 0.92, "summary": "立誓爆点"},
+        ],
+        "created_at": "2026-07-12T01:03:00Z",
+        "updated_at": "2026-07-12T01:05:00Z",
+    }
+    STORE.assets["01JZASSET000000000000001"] = {
+        "schema_version": 1,
+        "asset_id": "01JZASSET000000000000001",
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-asset-1",
+        "asset_type": "expression",
+        "canonical_name": "三年之约宣言模板",
+        "status": "approved",
+        "content_summary": "用于公开立誓场景的短句式资产。",
+        "style_tags": ["克制", "燃点前压"],
+        "genre_scope": "玄幻升级流",
+        "usage_context": "公开羞辱后主角反击",
+        "constraints": ["避免过早泄露金手指", "句式不超过两行"],
+        "expression_type_refs": ["expression://oath-line"],
+        "source_refs": [f"object://source-books/{BOOK_ID}"],
+        "evidence_refs": ["evidence://01JZEVIDENCE0000000000201"],
+        "quality_score": 0.88,
+        "created_at": "2026-07-12T01:06:00Z",
+        "updated_at": "2026-07-12T01:08:00Z",
     }
     STORE.section_plan_tasks[CHAPTER_PLAN_ID] = {
         "schema_version": 1,
@@ -1246,6 +1505,26 @@ def _normalize_seed_records() -> None:
             call.setdefault("writing_run_id", writing_run_id)
             call.setdefault("request_id", "seed-request")
             call.setdefault("trace_id", STORE.writing_runs.get(writing_run_id, {}).get("trace_id", "seed-trace"))
+
+    for writing_run in STORE.writing_runs.values():
+        consistency_report_id = writing_run.get("consistency_report_id")
+        revision_summary_id = writing_run.get("revision_summary_id")
+        writing_run["provider_calls"] = deepcopy(STORE.provider_calls_by_writing.get(writing_run["writing_run_id"], []))
+        writing_run["chapter_snapshot"] = None
+        writing_run["manuscript_state"] = None
+        writing_run["consistency_report"] = deepcopy(STORE.consistency_reports.get(consistency_report_id)) if consistency_report_id else None
+        writing_run["revision_summary"] = deepcopy(STORE.revision_summaries.get(revision_summary_id)) if revision_summary_id else None
+        writing_run.setdefault("revision_round", 0)
+        writing_run.setdefault("max_revision_rounds", 3)
+
+    for report in STORE.consistency_reports.values():
+        report.setdefault("updated_at", report["created_at"])
+
+    for summary in STORE.revision_summaries.values():
+        summary.setdefault("updated_at", summary["created_at"])
+
+    for rule in STORE.rules.values():
+        rule.setdefault("updated_at", rule["created_at"])
 
     for record_id, record in STORE.feedback_records.items():
         target_ref = f"object://{record['target_type'].replace('_', '-')}/{record['target_id']}"
@@ -1810,6 +2089,31 @@ def _build_model_cost(provider_calls: list[dict[str, Any]], retry_count: int) ->
     }
 
 
+def _find_consistency_issue(report: Optional[dict[str, Any]], issue_id: Optional[str]) -> Optional[dict[str, Any]]:
+    if not report or not issue_id:
+        return None
+    return next((item for item in report["issues"] if item["issue_id"] == issue_id), None)
+
+
+def _quality_issue_matches_consistency_issue(issue: dict[str, Any], candidate: dict[str, Any]) -> bool:
+    if candidate.get("issue_id") == issue["issue_id"]:
+        return True
+    return candidate.get("rule_id") == issue.get("rule_id") and candidate.get("affected_text_ref") == issue.get("affected_text_ref")
+
+
+def _sync_writing_run_phase_one_state(writing_run: dict[str, Any]) -> None:
+    consistency_report_id = writing_run.get("consistency_report_id")
+    revision_summary_id = writing_run.get("revision_summary_id")
+    consistency_report = STORE.consistency_reports.get(consistency_report_id) if consistency_report_id else None
+    revision_summary = STORE.revision_summaries.get(revision_summary_id) if revision_summary_id else None
+    writing_run["provider_calls"] = deepcopy(STORE.provider_calls_by_writing.get(writing_run["writing_run_id"], []))
+    writing_run["consistency_report"] = deepcopy(consistency_report) if consistency_report else None
+    writing_run["revision_summary"] = deepcopy(revision_summary) if revision_summary else None
+    if revision_summary:
+        writing_run["revision_round"] = revision_summary["revision_round"]
+        writing_run["max_revision_rounds"] = revision_summary["max_revision_rounds"]
+
+
 def create_novel_project(
     payload: dict[str, Any],
     trace_id: str,
@@ -1877,6 +2181,9 @@ def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
         "project": project,
         "story_bible": story_bible,
         "chapter_plans": list_chapter_plans_for_project(project_id),
+        "patterns": list_patterns(status="approved"),
+        "rhythm_profiles": list_rhythm_profiles(status="approved"),
+        "assets": list_assets(status="approved"),
     }
 
 
@@ -1964,6 +2271,9 @@ def get_chapter_plan(chapter_plan_id: str) -> Optional[dict[str, Any]]:
         "task": task,
         "events": events,
         "section_plan_count": len(STORE.section_plans_by_chapter.get(chapter_plan_id, [])),
+        "pattern_options": list_patterns(status="approved"),
+        "rhythm_profile_options": list_rhythm_profiles(status="approved", target_id=chapter_plan_id),
+        "asset_options": list_assets(status="approved"),
     }
 
 
@@ -1977,6 +2287,9 @@ def list_section_plans(chapter_plan_id: str) -> Optional[dict[str, Any]]:
         "items": STORE.section_plans_by_chapter.get(chapter_plan_id, []),
         "task": task,
         "events": events,
+        "pattern_options": list_patterns(status="approved"),
+        "rhythm_profile_options": list_rhythm_profiles(status="approved", target_id=chapter_plan_id),
+        "asset_options": list_assets(status="approved"),
     }
 
 
@@ -2005,6 +2318,9 @@ def create_section_plans(
             "items": existing_items,
             "task": task,
             "events": events,
+            "pattern_options": list_patterns(status="approved"),
+            "rhythm_profile_options": list_rhythm_profiles(status="approved", target_id=chapter_plan_id),
+            "asset_options": list_assets(status="approved"),
         }
 
     task_id = str(ulid.new())
@@ -2085,6 +2401,9 @@ def create_section_plans(
         "items": items,
         "task": task,
         "events": STORE.task_events_by_task[task_id],
+        "pattern_options": list_patterns(status="approved"),
+        "rhythm_profile_options": list_rhythm_profiles(status="approved", target_id=chapter_plan_id),
+        "asset_options": list_assets(status="approved"),
     }
 
 
@@ -2265,6 +2584,8 @@ def create_writing_run(
         finished_at=None,
         latency_ms=None,
     )
+    consistency_report_id = str(ulid.new())
+    revision_summary_id = str(ulid.new())
     writing_run = {
         "schema_version": 1,
         "writing_run_id": writing_run_id,
@@ -2284,10 +2605,19 @@ def create_writing_run(
         "humanizer_model_profile_id": humanizer_resolution["selected_profile"]["model_profile_id"],
         "assembled_chapter": "",
         "model_cost": _build_model_cost(provider_calls, retry_count),
+        "provider_calls": deepcopy(provider_calls),
         "accepted_into_manuscript_at": None,
         "accepted_chapter_ref": None,
         "chapter_snapshot_id": None,
         "manuscript_state_id": None,
+        "chapter_snapshot": None,
+        "manuscript_state": None,
+        "consistency_report_id": consistency_report_id,
+        "consistency_report": None,
+        "revision_summary_id": revision_summary_id,
+        "revision_summary": None,
+        "revision_round": 0,
+        "max_revision_rounds": 3,
         "created_at": now,
         "updated_at": now,
     }
@@ -2305,12 +2635,50 @@ def create_writing_run(
         "created_at": now,
         "updated_at": now,
     }
+    consistency_report = {
+        "schema_version": 1,
+        "consistency_report_id": consistency_report_id,
+        "workspace_id": context["workspace_id"],
+        "writing_run_id": writing_run_id,
+        "trace_id": trace_id,
+        "task_id": task_id,
+        "status": "queued",
+        "issue_count": 0,
+        "blocking_issue_count": 0,
+        "checked_domains": ["character_continuity", "power_system_constraint"],
+        "issues": [],
+        "input_refs": [f"object://writing-runs/{writing_run_id}"],
+        "output_refs": [f"object://consistency-reports/{consistency_report_id}"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    revision_summary = {
+        "schema_version": 1,
+        "revision_summary_id": revision_summary_id,
+        "workspace_id": context["workspace_id"],
+        "writing_run_id": writing_run_id,
+        "trace_id": trace_id,
+        "status": "queued",
+        "revision_round": 0,
+        "max_revision_rounds": 3,
+        "source_issue_ids": [],
+        "change_summary": "待一致性复核完成后生成修订要求。",
+        "revision_diff_ref": None,
+        "reviewer_note_ref": None,
+        "input_refs": [f"object://consistency-reports/{consistency_report_id}"],
+        "output_refs": [f"object://revision-summaries/{revision_summary_id}"],
+        "created_at": now,
+        "updated_at": now,
+    }
 
     STORE.writing_runs[writing_run_id] = writing_run
     STORE.writing_run_tasks[writing_run_id] = task
     STORE.provider_calls_by_writing[writing_run_id] = provider_calls
     STORE.section_runs_by_writing[writing_run_id] = section_runs
     STORE.quality_reports[quality_report_id] = quality_report
+    STORE.consistency_reports[consistency_report_id] = consistency_report
+    STORE.revision_summaries[revision_summary_id] = revision_summary
+    _sync_writing_run_phase_one_state(writing_run)
     STORE.task_events_by_task[task_id] = []
     _append_task_event(
         task,
@@ -2333,6 +2701,15 @@ def list_feedback_records(target_type: Optional[str] = None, target_id: Optional
     if target_id:
         records = [item for item in records if item["target_id"] == target_id]
     return sorted(records, key=lambda item: item["created_at"])
+
+
+def get_prompt_ranking_snapshot(target_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    snapshot = STORE.ranking_snapshots.get("prompt")
+    if not snapshot:
+        return None
+    if target_id and target_id not in snapshot.get("scope_ref", ""):
+        return None
+    return deepcopy(snapshot)
 
 
 def promote_feedback_record(
@@ -2505,9 +2882,15 @@ def _build_manuscript_state(writing_run: dict[str, Any], chapter_plan: Optional[
 def _acceptance_ready(writing_run: dict[str, Any], quality_report: Optional[dict[str, Any]], section_runs: list[dict[str, Any]]) -> bool:
     if not quality_report or not section_runs:
         return False
+    consistency_report = STORE.consistency_reports.get(writing_run.get("consistency_report_id", ""))
+    revision_summary = STORE.revision_summaries.get(writing_run.get("revision_summary_id", ""))
     has_feedback = any(item["target_id"] in {writing_run["writing_run_id"], writing_run["quality_report_id"]} for item in STORE.feedback_records.values())
     has_section_outputs = all(section_run["writer_output"] and section_run["humanized_text"] for section_run in section_runs)
-    return has_feedback and has_section_outputs
+    consistency_clear = not consistency_report or consistency_report["blocking_issue_count"] == 0
+    quality_clear = quality_report["status"] in {"passed", "requires_review"} and not quality_report["blocking_issues"]
+    review_clear = not quality_report["human_review_required"]
+    revision_clear = not revision_summary or revision_summary["status"] in {"accepted", "revised"}
+    return has_feedback and has_section_outputs and consistency_clear and quality_clear and review_clear and revision_clear
 
 
 def accept_chapter(
@@ -2524,6 +2907,7 @@ def accept_chapter(
     writing_run = STORE.writing_runs.get(writing_run_id)
     if not writing_run:
         return None
+    _sync_writing_run_phase_one_state(writing_run)
 
     task = STORE.writing_run_tasks.get(writing_run_id)
     quality_report = STORE.quality_reports.get(writing_run["quality_report_id"])
@@ -2583,6 +2967,23 @@ def accept_chapter(
         quality_report["human_review_required"] = False
         quality_report["blocking_issues"] = []
         quality_report["updated_at"] = now
+
+    consistency_report = STORE.consistency_reports.get(writing_run.get("consistency_report_id", ""))
+    if consistency_report:
+        consistency_report["status"] = "passed"
+        consistency_report["blocking_issue_count"] = 0
+        for issue in consistency_report["issues"]:
+            if issue["resolution_status"] == "open":
+                issue["resolution_status"] = "resolved"
+                issue["note"] = issue.get("note") or "Accepted into manuscript after review."
+        consistency_report["updated_at"] = now
+
+    revision_summary = STORE.revision_summaries.get(writing_run.get("revision_summary_id", ""))
+    if revision_summary:
+        revision_summary["status"] = "accepted"
+        revision_summary["updated_at"] = now
+
+    _sync_writing_run_phase_one_state(writing_run)
 
     run_records = list_feedback_records("writing_run", writing_run_id)
     run_feedback_types = {item["feedback_type"] for item in run_records}
@@ -2675,18 +3076,24 @@ def get_writing_run(writing_run_id: str) -> Optional[dict[str, Any]]:
     writing_run = STORE.writing_runs.get(writing_run_id)
     if not writing_run:
         return None
+    _sync_writing_run_phase_one_state(writing_run)
     task = STORE.writing_run_tasks.get(writing_run_id)
     memory_package = STORE.memory_packages.get(writing_run["memory_package_id"])
     prompt_package = STORE.prompt_packages.get(writing_run["prompt_package_id"])
     quality_report = STORE.quality_reports.get(writing_run["quality_report_id"])
+    consistency_report = STORE.consistency_reports.get(writing_run.get("consistency_report_id", "")) if writing_run.get("consistency_report_id") else None
+    revision_summary = STORE.revision_summaries.get(writing_run.get("revision_summary_id", "")) if writing_run.get("revision_summary_id") else None
     chapter_snapshot = STORE.chapter_snapshots.get(writing_run.get("chapter_snapshot_id", "")) if writing_run.get("chapter_snapshot_id") else None
     manuscript_state = STORE.manuscript_states_by_project.get(writing_run["project_id"])
     events = STORE.task_events_by_task.get(task["task_id"], []) if task else []
     return {
         "writing_run": {
             **writing_run,
+            "provider_calls": deepcopy(STORE.provider_calls_by_writing.get(writing_run_id, [])),
             "chapter_snapshot": chapter_snapshot,
             "manuscript_state": manuscript_state,
+            "consistency_report": deepcopy(consistency_report) if consistency_report else None,
+            "revision_summary": deepcopy(revision_summary) if revision_summary else None,
         },
         "task": task,
         "events": events,
@@ -2694,12 +3101,17 @@ def get_writing_run(writing_run_id: str) -> Optional[dict[str, Any]]:
         "prompt_package": prompt_package,
         "section_runs": STORE.section_runs_by_writing.get(writing_run_id, []),
         "quality_report": quality_report,
-        "provider_calls": STORE.provider_calls_by_writing.get(writing_run_id, []),
+        "consistency_report": deepcopy(consistency_report) if consistency_report else None,
+        "revision_summary": deepcopy(revision_summary) if revision_summary else None,
+        "provider_calls": deepcopy(STORE.provider_calls_by_writing.get(writing_run_id, [])),
         "feedback_records": [
             item
             for item in list_feedback_records()
             if item["target_id"] in {writing_run_id, writing_run["quality_report_id"]}
         ],
+        "pattern_selection": list_patterns(status="approved"),
+        "rhythm_profile_selection": list_rhythm_profiles(status="approved", target_id=writing_run["chapter_plan_id"]),
+        "asset_selection": list_assets(status="approved"),
         "chapter_snapshot": chapter_snapshot,
         "manuscript_state": manuscript_state,
     }
@@ -2707,4 +3119,313 @@ def get_writing_run(writing_run_id: str) -> Optional[dict[str, Any]]:
 
 def get_quality_report(quality_report_id: str) -> Optional[dict[str, Any]]:
     return STORE.quality_reports.get(quality_report_id)
+
+
+def get_consistency_report(consistency_report_id: str) -> Optional[dict[str, Any]]:
+    report = STORE.consistency_reports.get(consistency_report_id)
+    return deepcopy(report) if report else None
+
+
+def get_revision_summary(revision_summary_id: str) -> Optional[dict[str, Any]]:
+    summary = STORE.revision_summaries.get(revision_summary_id)
+    return deepcopy(summary) if summary else None
+
+
+def list_rules() -> list[dict[str, Any]]:
+    return _sorted_store_items(list(STORE.rules.values()), "rule_id")
+
+
+def list_patterns(status: Optional[str] = None, pattern_type: Optional[str] = None) -> list[dict[str, Any]]:
+    items = list(STORE.patterns.values())
+    if status:
+        items = [item for item in items if item["status"] == status]
+    if pattern_type:
+        items = [item for item in items if item["pattern_type"] == pattern_type]
+    return _sorted_store_items(items, "pattern_id")
+
+
+def get_pattern(pattern_id: str) -> Optional[dict[str, Any]]:
+    pattern = STORE.patterns.get(pattern_id)
+    return deepcopy(pattern) if pattern else None
+
+
+def create_pattern(
+    payload: dict[str, Any],
+    request_id: str = "system-pattern",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+    pattern_id = payload.get("pattern_id") or str(ulid.new())
+    now = utc_now()
+    pattern = {
+        "schema_version": 1,
+        "pattern_id": pattern_id,
+        "workspace_id": context["workspace_id"],
+        "trace_id": trace_id,
+        "canonical_name": payload["canonical_name"],
+        "pattern_type": payload["pattern_type"],
+        "status": payload.get("status", "draft"),
+        "intent": payload["intent"],
+        "preconditions": payload["preconditions"],
+        "steps": payload["steps"],
+        "slots": payload["slots"],
+        "expected_reader_effect": payload["expected_reader_effect"],
+        "compatible_rhythm_profile_id": payload.get("compatible_rhythm_profile_id"),
+        "evidence_refs": payload["evidence_refs"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    STORE.patterns[pattern_id] = pattern
+    _append_audit_event(
+        action="feedback.ranking_suggestion_approved",
+        target_type="pattern",
+        target_id=pattern_id,
+        target_ref=f"object://patterns/{pattern_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        payload={"status": pattern["status"]},
+        created_at=now,
+    )
+    return deepcopy(pattern)
+
+
+def list_rhythm_profiles(status: Optional[str] = None, target_id: Optional[str] = None) -> list[dict[str, Any]]:
+    items = list(STORE.rhythm_profiles.values())
+    if status:
+        items = [item for item in items if item["status"] == status]
+    if target_id:
+        items = [item for item in items if item["target_id"] == target_id]
+    return _sorted_store_items(items, "rhythm_profile_id")
+
+
+def get_rhythm_profile(rhythm_profile_id: str) -> Optional[dict[str, Any]]:
+    profile = STORE.rhythm_profiles.get(rhythm_profile_id)
+    return deepcopy(profile) if profile else None
+
+
+def create_rhythm_profile(
+    payload: dict[str, Any],
+    request_id: str = "system-rhythm",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+    rhythm_profile_id = payload.get("rhythm_profile_id") or str(ulid.new())
+    now = utc_now()
+    profile = {
+        "schema_version": 1,
+        "rhythm_profile_id": rhythm_profile_id,
+        "workspace_id": context["workspace_id"],
+        "trace_id": trace_id,
+        "target_id": payload["target_id"],
+        "status": payload.get("status", "draft"),
+        "label": payload["label"],
+        "climax_index": payload["climax_index"],
+        "conflict_index": payload["conflict_index"],
+        "dialogue_ratio": payload["dialogue_ratio"],
+        "description_ratio": payload["description_ratio"],
+        "battle_ratio": payload["battle_ratio"],
+        "information_density": payload["information_density"],
+        "suspense_index": payload["suspense_index"],
+        "reward_count": payload["reward_count"],
+        "emotion_curve": payload["emotion_curve"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    STORE.rhythm_profiles[rhythm_profile_id] = profile
+    return deepcopy(profile)
+
+
+def list_assets(status: Optional[str] = None, asset_type: Optional[str] = None) -> list[dict[str, Any]]:
+    items = list(STORE.assets.values())
+    if status:
+        items = [item for item in items if item["status"] == status]
+    if asset_type:
+        items = [item for item in items if item["asset_type"] == asset_type]
+    return _sorted_store_items(items, "asset_id")
+
+
+def get_asset(asset_id: str) -> Optional[dict[str, Any]]:
+    asset = STORE.assets.get(asset_id)
+    return deepcopy(asset) if asset else None
+
+
+def create_asset(
+    payload: dict[str, Any],
+    request_id: str = "system-asset",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> dict[str, Any]:
+    context = _actor_context(workspace_id or payload.get("workspace_id"), actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+    asset_id = payload.get("asset_id") or str(ulid.new())
+    now = utc_now()
+    asset = {
+        "schema_version": 1,
+        "asset_id": asset_id,
+        "workspace_id": context["workspace_id"],
+        "trace_id": trace_id,
+        "asset_type": payload["asset_type"],
+        "canonical_name": payload["canonical_name"],
+        "status": payload.get("status", "draft"),
+        "content_summary": payload["content_summary"],
+        "style_tags": payload["style_tags"],
+        "genre_scope": payload["genre_scope"],
+        "usage_context": payload["usage_context"],
+        "constraints": payload["constraints"],
+        "expression_type_refs": payload["expression_type_refs"],
+        "source_refs": payload["source_refs"],
+        "evidence_refs": payload["evidence_refs"],
+        "quality_score": payload["quality_score"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    STORE.assets[asset_id] = asset
+    return deepcopy(asset)
+
+
+def get_rule(rule_id: str) -> Optional[dict[str, Any]]:
+    return STORE.rules.get(rule_id)
+
+
+def apply_writing_review_action(
+    writing_run_id: str,
+    payload: dict[str, Any],
+    request_id: str = "system-writing-review",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
+    writing_run = STORE.writing_runs.get(writing_run_id)
+    if not writing_run:
+        return None
+    task = STORE.writing_run_tasks.get(writing_run_id)
+    quality_report = STORE.quality_reports.get(writing_run["quality_report_id"])
+    consistency_report = STORE.consistency_reports.get(writing_run.get("consistency_report_id", ""))
+    revision_summary = STORE.revision_summaries.get(writing_run.get("revision_summary_id", ""))
+    if not consistency_report or not revision_summary:
+        return None
+
+    action = payload["action"]
+    issue = _find_consistency_issue(consistency_report, payload.get("issue_id"))
+    now = utc_now()
+
+    if action == "approve_draft":
+        writing_run["status"] = "requires_review"
+        writing_run["current_stage"] = "quality_gate"
+        quality_report["status"] = "requires_review"
+        quality_report["human_review_required"] = False
+        quality_report["blocking_issues"] = []
+        consistency_report["status"] = "passed"
+        consistency_report["blocking_issue_count"] = 0
+        revision_summary["status"] = "accepted"
+    elif action == "request_revision":
+        writing_run["status"] = "blocked"
+        writing_run["current_stage"] = "revision_loop"
+        writing_run["revision_round"] = min(writing_run["revision_round"] + 1, writing_run["max_revision_rounds"])
+        consistency_report["status"] = "blocked"
+        consistency_report["blocking_issue_count"] = sum(1 for item in consistency_report["issues"] if item["resolution_status"] == "open")
+        revision_summary["status"] = "requested" if writing_run["revision_round"] < writing_run["max_revision_rounds"] else "blocked"
+        revision_summary["revision_round"] = writing_run["revision_round"]
+        revision_summary["change_summary"] = payload.get("note") or revision_summary["change_summary"]
+        revision_summary["reviewer_note_ref"] = payload.get("output_ref") or revision_summary.get("reviewer_note_ref")
+        quality_report["status"] = "blocked"
+        quality_report["human_review_required"] = True
+    elif action == "reject_draft":
+        writing_run["status"] = "blocked"
+        writing_run["current_stage"] = "human_review"
+        consistency_report["status"] = "blocked"
+        revision_summary["status"] = "blocked"
+        quality_report["status"] = "blocked"
+        quality_report["human_review_required"] = True
+    elif action == "edit_draft":
+        writing_run["status"] = "requires_review"
+        writing_run["current_stage"] = "human_review"
+        revision_summary["status"] = "requires_review"
+        revision_summary["reviewer_note_ref"] = payload.get("output_ref") or revision_summary.get("reviewer_note_ref")
+        quality_report["status"] = "requires_review"
+        quality_report["human_review_required"] = True
+    elif action == "mark_issue_resolved":
+        if not issue:
+            return False
+        issue["resolution_status"] = "resolved"
+        issue["note"] = payload.get("note")
+        consistency_report["blocking_issue_count"] = sum(1 for item in consistency_report["issues"] if item["resolution_status"] == "open")
+        consistency_report["status"] = "passed" if consistency_report["blocking_issue_count"] == 0 else "blocked"
+        quality_report["blocking_issues"] = [
+            item for item in quality_report["blocking_issues"] if not _quality_issue_matches_consistency_issue(issue, item)
+        ]
+        if consistency_report["blocking_issue_count"] == 0:
+            quality_report["blocking_issues"] = []
+            quality_report["status"] = "requires_review"
+        revision_summary["status"] = "revised" if consistency_report["blocking_issue_count"] == 0 else revision_summary["status"]
+    elif action == "create_rule_update_request":
+        revision_summary["status"] = "requires_review"
+        revision_summary["reviewer_note_ref"] = payload.get("output_ref") or revision_summary.get("reviewer_note_ref")
+    else:
+        return False
+
+    consistency_report["issue_count"] = len(consistency_report["issues"])
+    consistency_report["updated_at"] = now
+    revision_summary["updated_at"] = now
+    quality_report["updated_at"] = now
+    writing_run["updated_at"] = now
+    _sync_writing_run_phase_one_state(writing_run)
+
+    if task:
+        task["status"] = writing_run["status"]
+        task["progress"] = 100 if action in {"approve_draft", "mark_issue_resolved"} else 85
+        task["error_code"] = None
+        _append_task_event(
+            task,
+            action,
+            f"Writing review action applied: {action}.",
+            task["status"],
+            request_id,
+            trace_id,
+            context["actor_id"],
+            payload_json={
+                "writing_run_id": writing_run_id,
+                "issue_id": payload.get("issue_id"),
+                "output_ref": payload.get("output_ref"),
+            },
+            created_at=now,
+        )
+
+    _append_audit_event(
+        action=f"writing.{action}",
+        target_type="writing_run",
+        target_id=writing_run_id,
+        target_ref=f"object://writing-runs/{writing_run_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        after_ref=payload.get("output_ref"),
+        reason=payload.get("note"),
+        payload={
+            "issue_id": payload.get("issue_id"),
+            "current_stage": writing_run["current_stage"],
+            "revision_round": writing_run["revision_round"],
+        },
+        created_at=now,
+    )
+    return get_writing_run(writing_run_id)
 

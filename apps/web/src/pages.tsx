@@ -34,6 +34,13 @@ const statusLabels: Record<string, string> = {
   succeeded: "已完成",
   uploaded: "已上传",
   queued: "排队中",
+  blocked: "已拦截",
+  accepted: "已接受",
+  revised: "已修订",
+  rejected: "已驳回",
+  requested: "已请求",
+  open: "未解决",
+  resolved: "已解决",
 };
 
 const stageLabels: Record<string, string> = {
@@ -74,6 +81,7 @@ const qualityStatusLabels: Record<string, string> = {
   queued: "待质检",
   passed: "已通过",
   blocked: "已拦截",
+  requires_review: "待复核",
 };
 
 const writingStageLabels: Record<string, string> = {
@@ -83,12 +91,17 @@ const writingStageLabels: Record<string, string> = {
   writer_draft: "写手起草",
   critic_review: "批评复核",
   humanizer_pass: "润色通过",
+  consistency_review: "一致性复核",
+  revision_loop: "修订回合",
+  human_review: "人工复核",
   quality_gate: "质量门禁",
 };
 
 const criticSeverityLabels: Record<string, string> = {
   blocking: "阻断",
   warning: "警告",
+  high: "高",
+  critical: "致命",
 };
 
 function labelOf(labels: Record<string, string>, value: string) {
@@ -527,6 +540,9 @@ export function PlannerPage() {
   const plannerAuditEvents = state.auditEvents.filter(
     (item) => item.targetType === "chapter_plan" || item.targetType === "quality_gate_profile",
   );
+  const patterns = state.patterns ?? [];
+  const rhythmProfiles = state.rhythmProfiles ?? [];
+  const assets = state.assets ?? [];
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -536,6 +552,9 @@ export function PlannerPage() {
       </div>
       {chapterPlans.map((plan) => {
         const sections = state.sectionPlansByChapter[plan.chapterPlanId] ?? [];
+        const selectedPattern = patterns.find((item) => item.patternId === plan.selectedPatternId) ?? null;
+        const selectedRhythmProfile = rhythmProfiles.find((item) => item.rhythmProfileId === plan.selectedRhythmProfileId) ?? null;
+        const selectedAssets = assets.filter((item) => plan.selectedAssetIds.includes(item.assetId));
         return (
           <article key={plan.chapterPlanId} style={{ border: "1px solid #d4d4d8", padding: 16, display: "grid", gap: 12 }}>
             <div>
@@ -543,6 +562,29 @@ export function PlannerPage() {
               <p>{plan.summary}</p>
               <p>{labelOf(statusLabels, plan.status)} · 目标 {plan.targetWordCount} 字</p>
             </div>
+            <section>
+              <h4>已选资源</h4>
+              <dl>
+                <dt>Pattern</dt>
+                <dd>{selectedPattern ? `${selectedPattern.canonicalName} · ${selectedPattern.patternType}` : "未选择"}</dd>
+                <dt>Rhythm</dt>
+                <dd>
+                  {selectedRhythmProfile
+                    ? `${selectedRhythmProfile.label} · climax ${selectedRhythmProfile.climaxIndex}`
+                    : "未选择"}
+                </dd>
+                <dt>Assets</dt>
+                <dd>{selectedAssets.length ? selectedAssets.map((item) => item.canonicalName).join("、") : "未选择"}</dd>
+              </dl>
+              {selectedPattern ? <p>{selectedPattern.expectedReaderEffect}</p> : null}
+              {selectedAssets.length ? (
+                <ul>
+                  {selectedAssets.map((item) => (
+                    <li key={item.assetId}>{item.assetType} · {item.contentSummary}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
             <section>
               <h4>分节规划</h4>
               <ul style={{ display: "grid", gap: 12 }}>
@@ -608,6 +650,9 @@ export function WritingStudioPage() {
   const memoryPackages = state.memoryPackages ?? [];
   const promptPackages = state.promptPackages ?? [];
   const qualityReports = state.qualityReports ?? [];
+  const consistencyReports = state.consistencyReports ?? [];
+  const revisionSummaries = state.revisionSummaries ?? [];
+  const rules = state.rules ?? [];
   const feedbackRecords = state.feedbackRecords ?? [];
   const project = projects.find((item) => item.projectId === projectId) ?? projects[0];
   const writingRun = writingRuns.find((item) => item.writingRunId === writingRunId) ?? writingRuns[0];
@@ -622,13 +667,34 @@ export function WritingStudioPage() {
   const memoryPackage = memoryPackages.find((item) => item.memoryPackageId === writingRun.memoryPackageId);
   const promptPackage = promptPackages.find((item) => item.promptPackageId === writingRun.promptPackageId);
   const qualityReport = qualityReports.find((item) => item.qualityReportId === writingRun.qualityReportId);
+  const consistencyReport =
+    writingRun.consistencyReport ??
+    consistencyReports.find((item) => item.consistencyReportId === writingRun.consistencyReportId) ??
+    null;
+  const revisionSummary =
+    writingRun.revisionSummary ??
+    revisionSummaries.find((item) => item.revisionSummaryId === writingRun.revisionSummaryId) ??
+    null;
+  const activeRules = rules.filter((item) => item.scopeRef.includes(project.projectId));
   const focusSectionRun = sectionRuns.find((item) => item.criticIssues.length > 0) ?? sectionRuns[0];
   const focusSectionPlan = sectionPlans.find((item) => item.sectionPlanId === focusSectionRun?.sectionPlanId);
+  const selectedPattern = state.patterns.find((item) => item.patternId === writingRun.selectedPatternId) ?? null;
+  const selectedRhythmProfile = state.rhythmProfiles.find((item) => item.rhythmProfileId === writingRun.selectedRhythmProfileId) ?? null;
+  const selectedAssets = state.assets.filter((item) => writingRun.selectedAssetIds.includes(item.assetId));
   const runFeedbackRecords = feedbackRecords.filter(
     (item) => item.targetId === writingRun.writingRunId || item.targetId === writingRun.qualityReportId,
   );
   const chapterSnapshot = writingRun.chapterSnapshot;
   const manuscriptState = writingRun.manuscriptState;
+  const canAcceptChapter =
+    !!consistencyReport &&
+    consistencyReport.blockingIssueCount === 0 &&
+    !!qualityReport &&
+    qualityReport.blockingIssues.length === 0 &&
+    qualityReport.status !== "blocked" &&
+    !qualityReport.humanReviewRequired &&
+    !!revisionSummary &&
+    ["accepted", "revised"].includes(revisionSummary.status);
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -665,6 +731,40 @@ export function WritingStudioPage() {
               );
             })}
           </ul>
+          <article>
+            <h4>已选资源</h4>
+            <dl>
+              <dt>Pattern</dt>
+              <dd>{selectedPattern ? `${selectedPattern.canonicalName} · ${selectedPattern.patternType}` : "未选择"}</dd>
+              <dt>Rhythm</dt>
+              <dd>
+                {selectedRhythmProfile
+                  ? `${selectedRhythmProfile.label} · suspense ${selectedRhythmProfile.suspenseIndex}`
+                  : "未选择"}
+              </dd>
+              <dt>Assets</dt>
+              <dd>{selectedAssets.length ? selectedAssets.map((item) => item.canonicalName).join("、") : "未选择"}</dd>
+            </dl>
+            {selectedPattern ? <p>{selectedPattern.intent}</p> : null}
+            {selectedAssets.length ? (
+              <ul>
+                {selectedAssets.map((item) => (
+                  <li key={item.assetId}>{item.assetType} · {item.usageContext}</li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+          <article>
+            <h4>规则卡片</h4>
+            <ul>
+              {activeRules.map((rule) => (
+                <li key={rule.ruleId}>
+                  {rule.title} · {labelOf(criticSeverityLabels, rule.severity)} · {rule.autoBlock ? "自动阻断" : "人工关注"}
+                  <div>{rule.conditionSummary}</div>
+                </li>
+              ))}
+            </ul>
+          </article>
         </section>
 
         <section style={{ border: "1px solid #d4d4d8", padding: 16, display: "grid", gap: 12 }}>
@@ -683,6 +783,25 @@ export function WritingStudioPage() {
           <article>
             <h4>组章结果</h4>
             <p>{writingRun.assembledChapter}</p>
+          </article>
+          <article>
+            <h4>修订摘要</h4>
+            {revisionSummary ? (
+              <dl>
+                <dt>状态</dt>
+                <dd>{labelOf(statusLabels, revisionSummary.status)}</dd>
+                <dt>修订轮次</dt>
+                <dd>
+                  第 {revisionSummary.revisionRound} / {revisionSummary.maxRevisionRounds} 轮
+                </dd>
+                <dt>修订要求</dt>
+                <dd>{revisionSummary.changeSummary}</dd>
+                <dt>审阅说明</dt>
+                <dd>{revisionSummary.reviewerNoteRef ?? "无"}</dd>
+              </dl>
+            ) : (
+              <p>暂无修订摘要。</p>
+            )}
           </article>
           <article>
             <h4>接受状态</h4>
@@ -751,18 +870,48 @@ export function WritingStudioPage() {
             )}
           </article>
           <article>
+            <h4>一致性复核</h4>
+            {consistencyReport ? (
+              <>
+                <dl>
+                  <dt>状态</dt>
+                  <dd>{labelOf(statusLabels, consistencyReport.status)}</dd>
+                  <dt>阻断问题数</dt>
+                  <dd>{consistencyReport.blockingIssueCount}</dd>
+                  <dt>检查域</dt>
+                  <dd>{consistencyReport.checkedDomains.join("、")}</dd>
+                </dl>
+                <ul>
+                  {consistencyReport.issues.map((issue) => (
+                    <li key={issue.issueId}>
+                      {labelOf(criticSeverityLabels, issue.severity)} · {issue.summary}
+                      <div>{labelOf(statusLabels, issue.resolutionStatus)} · {issue.affectedTextRef}</div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </article>
+          <article>
             <h4>质量门禁</h4>
             {qualityReport ? (
-              <dl>
-                <dt>状态</dt>
-                <dd>{labelOf(qualityStatusLabels, qualityReport.status)}</dd>
-                <dt>AI 味分数</dt>
-                <dd>{qualityReport.aiFlavorScore}</dd>
-                <dt>移动端可读性</dt>
-                <dd>{qualityReport.mobileReadabilityScore}</dd>
-                <dt>原创安全分数</dt>
-                <dd>{qualityReport.originalitySafetyScore}</dd>
-              </dl>
+              <>
+                <dl>
+                  <dt>状态</dt>
+                  <dd>{labelOf(qualityStatusLabels, qualityReport.status)}</dd>
+                  <dt>AI 味分数</dt>
+                  <dd>{qualityReport.aiFlavorScore}</dd>
+                  <dt>移动端可读性</dt>
+                  <dd>{qualityReport.mobileReadabilityScore}</dd>
+                  <dt>原创安全分数</dt>
+                  <dd>{qualityReport.originalitySafetyScore}</dd>
+                </dl>
+                <ul>
+                  {qualityReport.blockingIssues.map((issue) => (
+                    <li key={issue.issueId}>{labelOf(criticSeverityLabels, issue.severity)} · {issue.summary}</li>
+                  ))}
+                </ul>
+              </>
             ) : null}
           </article>
           <article>
@@ -829,6 +978,9 @@ export function WritingStudioPage() {
               {qualityReport?.blockingIssues.map((issue) => (
                 <li key={issue.issueId}>{issue.affectedTextRef}</li>
               ))}
+              {consistencyReport?.issues.map((issue) => (
+                <li key={`consistency-${issue.issueId}`}>{issue.affectedTextRef}</li>
+              ))}
             </ul>
           </article>
         </section>
@@ -876,13 +1028,23 @@ export function WritingStudioPage() {
             ))}
           </ul>
         </article>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "accept_section")}>接受当前 section</button>
-          <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "request_rewrite")}>请求重写</button>
-          <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "edit_and_accept")}>编辑后接受</button>
-          <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "block_generation")}>阻止继续生成</button>
-          <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "accept_chapter")}>接受本章</button>
-        </div>
+        <article>
+          <h4>人工动作</h4>
+          <p>{canAcceptChapter ? "当前可接受本章进入 manuscript。" : "需先关闭 blocker 并完成修订确认。"}</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "accept_section")}>接受当前 section</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "request_rewrite")}>请求重写</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "edit_and_accept")}>编辑后接受</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "block_generation")}>阻止继续生成</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "edit_draft")}>编辑草稿</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "mark_issue_resolved")}>标记问题已解决</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "request_revision")}>请求修订</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "approve_draft")}>批准草稿</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "create_rule_update_request")}>创建规则更新请求</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "reject_draft")}>驳回草稿</button>
+            <button type="button" onClick={() => focusSectionRun && applyWritingReviewAction(writingRun.writingRunId, focusSectionRun.sectionRunId, "accept_chapter")}>接受本章</button>
+          </div>
+        </article>
       </section>
     </section>
   );
@@ -895,6 +1057,7 @@ export function FeedbackPage() {
   const feedbackRecords = (state.feedbackRecords ?? []).filter(
     (item) => item.targetId === writingRun?.writingRunId || item.targetId === writingRun?.qualityReportId,
   );
+  const rankingSnapshot = (state.rankingSnapshots ?? []).find((item) => item.rankingType === "prompt");
   const strategySuggestions = (state.strategySuggestions ?? []).filter((item) =>
     feedbackRecords.some((record) => record.feedbackRecordId === item.basedOnFeedbackRecordId),
   );
@@ -943,12 +1106,52 @@ export function FeedbackPage() {
         ) : null}
       </section>
       <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>Prompt 排名</h3>
+        {rankingSnapshot ? (
+          <>
+            <p>{rankingSnapshot.scopeRef} · v{rankingSnapshot.version}</p>
+            <ul>
+              {rankingSnapshot.items.map((item) => (
+                <li key={`${item.rank}-${item.targetId}`}>
+                  #{item.rank} · {item.label} · {item.score} · {item.status}
+                  <div>{item.summary}</div>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p>暂无 prompt 排名快照。</p>
+        )}
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>Ranking signals</h3>
+        <ul>
+          {(rankingSnapshot?.signals ?? []).map((item) => (
+            <li key={item.signalId}>
+              {item.signalType} · {item.targetId} · {item.score} · 权重 {item.weight}
+              <div>{item.summary}</div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
         <h3>反馈记录</h3>
         <ul>
           {feedbackRecords.map((item) => (
             <li key={item.feedbackRecordId}>
               <strong>{item.feedbackType}</strong> · 来源 {item.source} · 分数 {item.score}
               <div>{String(item.payload.summary ?? item.payload.estimatedTotalCost ?? "无附注")}</div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>Prompt 建议</h3>
+        <ul>
+          {(rankingSnapshot?.suggestions ?? []).map((item) => (
+            <li key={item.suggestionId}>
+              <strong>{item.targetScope}</strong> · {item.status} · {item.summary}
+              <div>{item.recommendedAction}</div>
             </li>
           ))}
         </ul>
@@ -1026,6 +1229,7 @@ export function ConfigurationPage() {
   const providerCalls = state.providerCallsByWriting?.[writingRun?.writingRunId ?? ""] ?? [];
   const writerProfile = snapshot.modelProfiles.find((item) => item.modelProfileId === DEFAULT_MODEL_PROFILE_ID);
   const fallbackProfile = snapshot.modelProfiles.find((item) => item.modelProfileId === STRUCTURED_FALLBACK_MODEL_PROFILE_ID);
+  const rankingSnapshot = (state.rankingSnapshots ?? []).find((item) => item.rankingType === "prompt");
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -1090,6 +1294,17 @@ export function ConfigurationPage() {
                   切到紧凑版
                 </button>
               ) : null}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>Prompt 排名建议与受控变更</h3>
+        <p>ranking suggestion 仅进入审核队列；正式生效仍需通过配置变更动作。</p>
+        <ul>
+          {(rankingSnapshot?.suggestions ?? []).map((item) => (
+            <li key={`cfg-${item.suggestionId}`}>
+              {item.summary} · {item.status} · {item.recommendedAction}
             </li>
           ))}
         </ul>

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/asset.schema.json",
+  "title": "Asset",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "asset_id",
+    "workspace_id",
+    "trace_id",
+    "asset_type",
+    "canonical_name",
+    "status",
+    "content_summary",
+    "style_tags",
+    "genre_scope",
+    "usage_context",
+    "constraints",
+    "expression_type_refs",
+    "source_refs",
+    "evidence_refs",
+    "quality_score",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "asset_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "asset_type": { "type": "string", "minLength": 1 },
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["draft", "approved", "archived"] },
+    "content_summary": { "type": "string", "minLength": 1 },
+    "style_tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "genre_scope": { "type": "string", "minLength": 1 },
+    "usage_context": { "type": "string", "minLength": 1 },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "expression_type_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "quality_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -56,6 +56,10 @@ def test_create_and_fetch_novel_project() -> None:
     assert detail["project"]["project_id"] == project_id
     assert detail["story_bible"]["project_id"] == project_id
     assert detail["chapter_plans"] == []
+    assert len(detail["patterns"]) >= 1
+    assert detail["patterns"][0]["canonical_name"] == "退婚立誓"
+    assert len(detail["rhythm_profiles"]) >= 1
+    assert len(detail["assets"]) >= 1
 
 
 def test_novel_project_requires_editor_or_owner() -> None:
@@ -114,15 +118,20 @@ def test_create_and_fetch_chapter_plan_and_section_plans() -> None:
     )
 
     assert detail_response.status_code == 200
-    assert detail_response.json()["data"]["chapter_plan"]["chapter_index"] == 2
+    chapter_detail = detail_response.json()["data"]
+    assert chapter_detail["chapter_plan"]["chapter_index"] == 2
+    assert chapter_detail["pattern_options"][0]["canonical_name"] == "退婚立誓"
+    assert chapter_detail["asset_options"][0]["canonical_name"] == "三年之约宣言模板"
     assert list_sections.status_code == 200
     assert list_sections.json()["data"]["items"] == []
+    assert list_sections.json()["data"]["pattern_options"][0]["pattern_id"] == "01JZPATTERN00000000000001"
     assert create_sections.status_code == 202
     section_payload = create_sections.json()["data"]
     assert len(section_payload["items"]) == 4
     assert section_payload["items"][0]["planning_role"] == "setup"
     assert section_payload["items"][0]["trace_id"] == "trace-sections"
     assert section_payload["task"]["status"] == "succeeded"
+    assert section_payload["rhythm_profile_options"] == []
 
 
 def test_chapter_plan_requires_editor_or_owner() -> None:
@@ -145,11 +154,102 @@ def test_seed_chapter_plan_lists_seed_sections() -> None:
     sections_response = client.get("/v1/chapter-plans/01JZCHPLAN000000000000001/section-plans")
 
     assert chapter_response.status_code == 200
-    assert chapter_response.json()["data"]["chapter_plan"]["status"] == "requires_review"
-    assert chapter_response.json()["data"]["section_plan_count"] == 3
+    chapter_payload = chapter_response.json()["data"]
+    assert chapter_payload["chapter_plan"]["status"] == "requires_review"
+    assert chapter_payload["section_plan_count"] == 3
+    assert chapter_payload["pattern_options"][0]["pattern_id"] == "01JZPATTERN00000000000001"
+    assert chapter_payload["rhythm_profile_options"][0]["rhythm_profile_id"] == "01JZRHYTHM00000000000001"
     assert sections_response.status_code == 200
-    assert len(sections_response.json()["data"]["items"]) == 3
-    assert sections_response.json()["data"]["items"][0]["payload"]["beats"][0]["summary"] == "主角出场"
+    sections_payload = sections_response.json()["data"]
+    assert len(sections_payload["items"]) == 3
+    assert sections_payload["items"][0]["payload"]["beats"][0]["summary"] == "主角出场"
+    assert sections_payload["asset_options"][0]["asset_id"] == "01JZASSET000000000000001"
+
+
+
+
+def test_pattern_rhythm_asset_routes() -> None:
+    client = make_client()
+
+    pattern_list = client.get("/v1/patterns")
+    pattern_detail = client.get("/v1/patterns/01JZPATTERN00000000000001")
+    rhythm_list = client.get("/v1/rhythm-profiles", params={"targetId": "01JZCHPLAN000000000000001"})
+    rhythm_detail = client.get("/v1/rhythm-profiles/01JZRHYTHM00000000000001")
+    asset_list = client.get("/v1/assets", params={"assetType": "expression"})
+    asset_detail = client.get("/v1/assets/01JZASSET000000000000001")
+
+    assert pattern_list.status_code == 200
+    assert pattern_list.json()["data"]["items"][0]["canonical_name"] == "退婚立誓"
+    assert pattern_detail.status_code == 200
+    assert pattern_detail.json()["data"]["compatible_rhythm_profile_id"] == "01JZRHYTHM00000000000001"
+    assert rhythm_list.status_code == 200
+    assert rhythm_list.json()["data"]["items"][0]["label"] == "退婚压迫三段式"
+    assert rhythm_detail.status_code == 200
+    assert rhythm_detail.json()["data"]["target_id"] == "01JZCHPLAN000000000000001"
+    assert asset_list.status_code == 200
+    assert asset_list.json()["data"]["items"][0]["canonical_name"] == "三年之约宣言模板"
+    assert asset_detail.status_code == 200
+    assert asset_detail.json()["data"]["quality_score"] == 0.88
+
+
+def test_create_pattern_rhythm_and_asset() -> None:
+    client = make_client()
+
+    pattern_response = client.post(
+        "/v1/patterns",
+        json={
+            "canonical_name": "压迫后逆袭",
+            "pattern_type": "conflict_escalation",
+            "intent": "先压后扬。",
+            "preconditions": ["主角失势"],
+            "steps": [{"index": 1, "summary": "压低主角处境"}],
+            "slots": ["压迫者"],
+            "expected_reader_effect": "形成反弹期待。",
+            "evidence_refs": ["evidence://demo-pattern"],
+        },
+        headers={"x-request-id": "req-pattern", "x-trace-id": "trace-pattern"},
+    )
+    rhythm_response = client.post(
+        "/v1/rhythm-profiles",
+        json={
+            "target_id": "01JZCHPLAN000000000000001",
+            "label": "高压三拍",
+            "climax_index": 0.9,
+            "conflict_index": 0.8,
+            "dialogue_ratio": 0.4,
+            "description_ratio": 0.3,
+            "battle_ratio": 0.0,
+            "information_density": 0.6,
+            "suspense_index": 0.7,
+            "reward_count": 2,
+            "emotion_curve": [{"beat": 1, "intensity": 0.5, "summary": "起压"}],
+        },
+        headers={"x-request-id": "req-rhythm", "x-trace-id": "trace-rhythm"},
+    )
+    asset_response = client.post(
+        "/v1/assets",
+        json={
+            "asset_type": "expression",
+            "canonical_name": "短誓句式",
+            "content_summary": "短句誓言模板。",
+            "style_tags": ["克制"],
+            "genre_scope": "玄幻升级流",
+            "usage_context": "公开反击",
+            "constraints": ["不超过两行"],
+            "expression_type_refs": ["expression://oath-line"],
+            "source_refs": ["object://source-books/01JZBOOK000000000000000001"],
+            "evidence_refs": ["evidence://demo-asset"],
+            "quality_score": 0.9,
+        },
+        headers={"x-request-id": "req-asset", "x-trace-id": "trace-asset"},
+    )
+
+    assert pattern_response.status_code == 201
+    assert pattern_response.json()["data"]["trace_id"] == "trace-pattern"
+    assert rhythm_response.status_code == 201
+    assert rhythm_response.json()["data"]["target_id"] == "01JZCHPLAN000000000000001"
+    assert asset_response.status_code == 201
+    assert asset_response.json()["data"]["canonical_name"] == "短誓句式"
 
 
 def test_workspace_create_detail_and_home() -> None:
@@ -179,6 +279,8 @@ def test_workspace_create_detail_and_home() -> None:
     assert len(home["recent_tasks"]) >= 1
     assert len(home["pending_reviews"]) >= 1
     assert any(item["route"] == "/configuration" for item in home["quick_links"])
+
+
 def test_project_and_planning_missing_resources_return_not_found() -> None:
     client = make_client()
 

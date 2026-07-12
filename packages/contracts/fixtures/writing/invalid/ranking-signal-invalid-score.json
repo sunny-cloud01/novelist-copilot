@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "signal_id": "01JZRANKSIG00000000000002",
+  "workspace_id": "demo-workspace",
+  "trace_id": "trace-ranking-prompt-2",
+  "ranking_type": "prompt",
+  "target_type": "prompt_version",
+  "target_id": "prompt://writer/chapter-default",
+  "signal_type": "reader_interest",
+  "score": 1.2,
+  "weight": 0.4,
+  "source": "critic",
+  "summary": "分数越界。",
+  "evidence_refs": [],
+  "input_refs": [
+    "object://feedback-records/01JZFDBK0000000000000002"
+  ],
+  "output_refs": [],
+  "created_at": "2026-07-12T01:31:00Z"
+}

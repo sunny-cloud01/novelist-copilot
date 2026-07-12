@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "ranking_snapshot_id": "01JZRANKSNAP0000000000002",
+  "workspace_id": "demo-workspace",
+  "trace_id": "trace-ranking-prompt-2",
+  "ranking_type": "prompt",
+  "scope_ref": "object://writing-runs/01JZWRITING00000000000001",
+  "version": 1,
+  "updated_at": "2026-07-12T01:35:00Z",
+  "items": [],
+  "signals": [],
+  "suggestions": []
+}

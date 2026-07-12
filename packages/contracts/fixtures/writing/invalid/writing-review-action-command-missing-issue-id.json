@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "writing_run_id": "01JZWRITING00000000000001",
+  "action": "mark_issue_resolved",
+  "requested_by": "demo-reviewer",
+  "trace_id": "trace-writing-review"
+}

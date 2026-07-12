@@ -11,7 +11,7 @@
   "chapter_draft_id": "01JZDRAFT0000000000000001",
   "quality_report_id": "01JZQLTREP000000000000001",
   "trace_id": "01JZTRC000000000000000003",
-  "current_stage": "humanizer_pass",
+  "current_stage": "consistency_review",
   "writer_model_profile_id": "writer_default",
   "critic_model_profile_id": "critic_default",
   "humanizer_model_profile_id": "humanizer_default",
@@ -47,93 +47,66 @@
       "cost_estimate": 0.31,
       "status": "succeeded",
       "error_code": null
-    },
-    {
-      "schema_version": 1,
-      "provider_call_id": "01JZPCALL0000000000000002",
-      "workspace_id": "01JZWORKSPACE0000000000001",
-      "task_id": "01JZWRITETASK0000000000001",
-      "writing_run_id": "01JZWRITING00000000000001",
-      "request_id": "req-writing-run",
-      "trace_id": "01JZTRC000000000000000003",
-      "agent_role": "critic",
-      "model_profile_id": "model_profile_structured_fallback",
-      "provider_name": "anthropic",
-      "prompt_tokens": 1400,
-      "completion_tokens": 540,
-      "latency_ms": 980,
-      "retry_count": 1,
-      "cost_estimate": 0.22,
-      "status": "retrying",
-      "error_code": "structured_output_validation_failed"
     }
   ],
-  "accepted_into_manuscript_at": "2026-07-11T03:12:00Z",
-  "accepted_chapter_ref": "object://manuscripts/01JZWRITING00000000000001/chapters/1",
-  "chapter_snapshot_id": "chapter-snapshot:01JZWRITING00000000000001",
-  "manuscript_state_id": "manuscript-state:01JZPROJECT000000000000001",
-  "chapter_snapshot": {
+  "accepted_into_manuscript_at": null,
+  "accepted_chapter_ref": null,
+  "chapter_snapshot_id": null,
+  "manuscript_state_id": null,
+  "chapter_snapshot": null,
+  "manuscript_state": null,
+  "consistency_report_id": "01JZCONSIST00000000000001",
+  "consistency_report": {
     "schema_version": 1,
-    "chapter_snapshot_id": "chapter-snapshot:01JZWRITING00000000000001",
+    "consistency_report_id": "01JZCONSIST00000000000001",
+    "workspace_id": "01JZWORKSPACE0000000000001",
     "writing_run_id": "01JZWRITING00000000000001",
-    "project_id": "01JZPROJECT000000000000001",
-    "chapter_plan_id": "01JZCHPLAN000000000000001",
-    "accepted_chapter_ref": "object://manuscripts/01JZWRITING00000000000001/chapters/1",
-    "chapter_title": "乌坦城风起",
-    "chapter_text": "萧炎在众目睽睽下接住羞辱，也接住了自己的三年之约。",
-    "source_section_refs": [
-      "object://section-runs/01JZSECRUN00000000000001",
-      "object://section-runs/01JZSECRUN00000000000002",
-      "object://section-runs/01JZSECRUN00000000000003"
+    "trace_id": "01JZTRC000000000000000003",
+    "task_id": "01JZWRITETASK0000000000001",
+    "status": "blocked",
+    "issue_count": 1,
+    "blocking_issue_count": 1,
+    "checked_domains": ["character_continuity", "power_system_constraint"],
+    "issues": [
+      {
+        "issue_id": "01JZCONSISTISSUE000000001",
+        "category": "power_system_constraint",
+        "severity": "critical",
+        "summary": "主角境界被写回斗之气三段，与已批准状态冲突。",
+        "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p2",
+        "rule_id": "rule-01JZPOWER000000000000001",
+        "resolution_status": "open",
+        "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+        "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001/issues/1"],
+        "note": null
+      }
     ],
-    "created_at": "2026-07-11T03:12:00Z"
+    "input_refs": ["object://writing-runs/01JZWRITING00000000000001"],
+    "output_refs": ["object://consistency-reports/01JZCONSIST00000000000001"],
+    "created_at": "2026-07-12T01:15:00Z",
+    "updated_at": "2026-07-12T01:15:00Z"
   },
-  "manuscript_state": {
+  "revision_summary_id": "01JZREVISION0000000000001",
+  "revision_summary": {
     "schema_version": 1,
-    "manuscript_state_id": "manuscript-state:01JZPROJECT000000000000001",
-    "project_id": "01JZPROJECT000000000000001",
+    "revision_summary_id": "01JZREVISION0000000000001",
+    "workspace_id": "01JZWORKSPACE0000000000001",
     "writing_run_id": "01JZWRITING00000000000001",
-    "current_story_state": {
-      "summary": "第 1 章《乌坦城风起》已进入 manuscript，三年之约正式进入主线。",
-      "accepted_chapter_ref": "object://manuscripts/01JZWRITING00000000000001/chapters/1",
-      "quality_gate_status": "passed"
-    },
-    "character_dynamic_state": [
-      {
-        "character_name": "萧炎",
-        "state_summary": "从公开羞辱中立下三年之约，主线动机被明确激活。"
-      }
-    ],
-    "relationship_state": [
-      {
-        "subject": "萧炎",
-        "object": "三年之约",
-        "state_summary": "人物目标从承压转为正面回应，冲突升级为长期承诺。"
-      }
-    ],
-    "hook_state": [
-      {
-        "hook_key": "core_conflict",
-        "status": "active",
-        "summary": "天赋跌落后的家族压力与三年之约仍是当前核心挂钩。"
-      }
-    ],
-    "prior_summary_pack": [
-      {
-        "summary_index": 1,
-        "summary": "议事堂压抑氛围与家族压力被建立。"
-      },
-      {
-        "summary_index": 2,
-        "summary": "纳兰家退婚消息引爆公开冲突。"
-      },
-      {
-        "summary_index": 3,
-        "summary": "主角在羞辱中立下三年之约。"
-      }
-    ],
-    "updated_at": "2026-07-11T03:12:00Z"
+    "trace_id": "01JZTRC000000000000000003",
+    "status": "requested",
+    "revision_round": 1,
+    "max_revision_rounds": 3,
+    "source_issue_ids": ["01JZCONSISTISSUE000000001"],
+    "change_summary": "要求重写第二节，恢复主角当前境界并补足冲突升级。",
+    "revision_diff_ref": null,
+    "reviewer_note_ref": "object://review-notes/01JZREVISION0000000000001",
+    "input_refs": ["object://consistency-reports/01JZCONSIST00000000000001"],
+    "output_refs": ["object://revision-summaries/01JZREVISION0000000000001"],
+    "created_at": "2026-07-12T01:18:00Z",
+    "updated_at": "2026-07-12T01:18:00Z"
   },
-  "created_at": "2026-07-11T03:02:00Z",
-  "updated_at": "2026-07-11T03:08:00Z"
+  "revision_round": 1,
+  "max_revision_rounds": 3,
+  "created_at": "2026-07-12T01:12:00Z",
+  "updated_at": "2026-07-12T01:18:00Z"
 }

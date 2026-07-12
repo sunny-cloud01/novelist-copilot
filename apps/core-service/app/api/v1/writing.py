@@ -6,10 +6,16 @@ from app.core.envelope import success_envelope
 from app.core.phase_two_store import (
     WORKSPACE_ID,
     accept_chapter,
+    apply_writing_review_action,
     create_writing_run,
+    get_consistency_report,
+    get_prompt_ranking_snapshot,
     get_quality_report,
+    get_revision_summary,
+    get_rule,
     get_writing_run,
     list_feedback_records,
+    list_rules,
     promote_feedback_record,
 )
 
@@ -27,6 +33,17 @@ class CreateWritingRunCommand(BaseModel):
 
 class PromoteFeedbackRecordCommand(BaseModel):
     promotion_status: str
+    output_ref: Optional[str] = None
+
+
+class WritingReviewActionCommand(BaseModel):
+    schema_version: int = 1
+    writing_run_id: str
+    action: str
+    requested_by: str
+    trace_id: str
+    issue_id: Optional[str] = None
+    note: Optional[str] = None
     output_ref: Optional[str] = None
 
 
@@ -97,6 +114,34 @@ def post_accept_chapter(writing_run_id: str, request: Request) -> dict:
     )
 
 
+@router.post("/writing-runs/{writing_run_id}/review-actions")
+def post_writing_review_action(writing_run_id: str, command: WritingReviewActionCommand, request: Request) -> dict:
+    try:
+        result = apply_writing_review_action(
+            writing_run_id,
+            command.model_dump(exclude_none=True),
+            request.state.request_id,
+            request.state.trace_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="writing run not found")
+    if result is False:
+        raise HTTPException(status_code=409, detail="writing review action invalid")
+    return success_envelope(
+        data=result,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
 @router.get("/feedback-records")
 def get_feedback_records(request: Request, targetType: Optional[str] = None, targetId: Optional[str] = None) -> dict:
     result = {
@@ -104,6 +149,21 @@ def get_feedback_records(request: Request, targetType: Optional[str] = None, tar
         "target_type": targetType,
         "target_id": targetId,
     }
+    return success_envelope(
+        data=result,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/rankings/prompt")
+def get_prompt_rankings(request: Request, targetId: Optional[str] = None) -> dict:
+    result = get_prompt_ranking_snapshot(targetId)
+    if not result:
+        raise HTTPException(status_code=404, detail="prompt ranking snapshot not found")
     return success_envelope(
         data=result,
         request_id=request.state.request_id,
@@ -146,6 +206,63 @@ def get_quality_report_detail(quality_report_id: str, request: Request) -> dict:
     result = get_quality_report(quality_report_id)
     if not result:
         raise HTTPException(status_code=404, detail="quality report not found")
+    return success_envelope(
+        data=result,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/consistency-reports/{consistency_report_id}")
+def get_consistency_report_detail(consistency_report_id: str, request: Request) -> dict:
+    result = get_consistency_report(consistency_report_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="consistency report not found")
+    return success_envelope(
+        data=result,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/revision-summaries/{revision_summary_id}")
+def get_revision_summary_detail(revision_summary_id: str, request: Request) -> dict:
+    result = get_revision_summary(revision_summary_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="revision summary not found")
+    return success_envelope(
+        data=result,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/rules")
+def get_rules(request: Request) -> dict:
+    return success_envelope(
+        data={"items": list_rules()},
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/rules/{rule_id}")
+def get_rule_detail(rule_id: str, request: Request) -> dict:
+    result = get_rule(rule_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="rule not found")
     return success_envelope(
         data=result,
         request_id=request.state.request_id,

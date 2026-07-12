@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "rule_id": "rule-01JZPOWER000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "trace_id": "trace-rule-power",
+  "rule_type": "power_system_constraint",
+  "title": "境界不能倒退",
+  "severity": "urgent",
+  "status": "approved",
+  "scope_type": "project",
+  "scope_ref": "project://01JZPROJECT000000000000001",
+  "description": "主角已批准境界状态不能在后续章节无原因倒退。",
+  "condition_summary": "若当前 draft 中能力状态低于已批准状态，则触发阻断。",
+  "auto_block": true,
+  "source_refs": ["object://story-bibles/01JZBIBLE000000000000001"],
+  "evidence_refs": ["evidence://01JZEVIDENCE0000000000901"],
+  "input_refs": ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+  "output_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+  "created_at": "2026-07-12T01:10:00Z"
+}

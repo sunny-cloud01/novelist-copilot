@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/revision-summary.schema.json",
+  "title": "RevisionSummary",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "revision_summary_id",
+    "workspace_id",
+    "writing_run_id",
+    "trace_id",
+    "status",
+    "revision_round",
+    "max_revision_rounds",
+    "source_issue_ids",
+    "change_summary",
+    "input_refs",
+    "output_refs",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "revision_summary_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["queued", "requested", "revised", "requires_review", "blocked", "accepted"] },
+    "revision_round": { "type": "integer", "minimum": 0 },
+    "max_revision_rounds": { "type": "integer", "minimum": 1 },
+    "source_issue_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "change_summary": { "type": "string", "minLength": 1 },
+    "revision_diff_ref": { "type": ["string", "null"] },
+    "reviewer_note_ref": { "type": ["string", "null"] },
+    "input_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

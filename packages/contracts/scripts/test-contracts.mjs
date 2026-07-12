@@ -37,6 +37,14 @@ const ajv = new Ajv2020({ allErrors: true, strict: false, schemas: [
   JSON.parse(fs.readFileSync(path.join(root, "schemas/configuration-snapshot.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/chapter-snapshot.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/manuscript-state.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/consistency-issue.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/rule-profile.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/consistency-report.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/revision-summary.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/ranking-signal.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/ranking-suggestion.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/ranking-snapshot.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/writing-review-action-command.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/writing-run.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/quality-report.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/feedback-record.schema.json"), "utf8")),
@@ -262,6 +270,50 @@ assertInvalid(
 );
 
 assertValid(
+  "https://novelfactory.dev/schemas/rule-profile.schema.json",
+  readFixture("fixtures/rules/valid/rule-profile.json"),
+  "rule-profile",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/rule-profile.schema.json",
+  readFixture("fixtures/rules/invalid/rule-profile-invalid-severity.json"),
+  "rule-profile",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/consistency-report.schema.json",
+  readFixture("fixtures/writing/valid/consistency-report.json"),
+  "consistency-report",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/consistency-report.schema.json",
+  readFixture("fixtures/writing/invalid/consistency-report-invalid-status.json"),
+  "consistency-report",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/revision-summary.schema.json",
+  readFixture("fixtures/writing/valid/revision-summary.json"),
+  "revision-summary",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/revision-summary.schema.json",
+  readFixture("fixtures/writing/invalid/revision-summary-invalid-round.json"),
+  "revision-summary",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/writing-review-action-command.schema.json",
+  readFixture("fixtures/writing/valid/writing-review-action-command.json"),
+  "writing-review-action-command",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/writing-review-action-command.schema.json",
+  readFixture("fixtures/writing/invalid/writing-review-action-command-missing-issue-id.json"),
+  "writing-review-action-command",
+);
+
+assertValid(
   "https://novelfactory.dev/schemas/writing-run.schema.json",
   readFixture("fixtures/writing/valid/writing-run.json"),
   "writing-run",
@@ -284,6 +336,39 @@ assertInvalid(
 );
 
 assertValid(
+  "https://novelfactory.dev/schemas/ranking-signal.schema.json",
+  readFixture("fixtures/writing/valid/ranking-signal.json"),
+  "ranking-signal",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/ranking-signal.schema.json",
+  readFixture("fixtures/writing/invalid/ranking-signal-invalid-score.json"),
+  "ranking-signal",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/ranking-suggestion.schema.json",
+  readFixture("fixtures/writing/valid/ranking-suggestion.json"),
+  "ranking-suggestion",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/ranking-suggestion.schema.json",
+  readFixture("fixtures/writing/invalid/ranking-suggestion-missing-signals.json"),
+  "ranking-suggestion",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/ranking-snapshot.schema.json",
+  readFixture("fixtures/writing/valid/ranking-snapshot.json"),
+  "ranking-snapshot",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/ranking-snapshot.schema.json",
+  readFixture("fixtures/writing/invalid/ranking-snapshot-empty-items.json"),
+  "ranking-snapshot",
+);
+
+assertValid(
   "https://novelfactory.dev/schemas/feedback-record.schema.json",
   readFixture("fixtures/writing/valid/feedback-record.json"),
   "feedback-record",
@@ -295,3 +380,4 @@ assertInvalid(
 );
 
 console.log("contracts test ok");
+

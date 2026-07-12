@@ -29,6 +29,12 @@
     "manuscript_state_id",
     "chapter_snapshot",
     "manuscript_state",
+    "consistency_report_id",
+    "consistency_report",
+    "revision_summary_id",
+    "revision_summary",
+    "revision_round",
+    "max_revision_rounds",
     "created_at"
   ],
   "properties": {
@@ -49,7 +55,7 @@
     "trace_id": { "type": "string", "minLength": 1 },
     "current_stage": {
       "type": "string",
-      "enum": ["queued", "memory_package", "prompt_package", "writer_draft", "critic_review", "humanizer_pass", "quality_gate"]
+      "enum": ["queued", "memory_package", "prompt_package", "writer_draft", "critic_review", "humanizer_pass", "consistency_review", "revision_loop", "quality_gate", "human_review"]
     },
     "writer_model_profile_id": { "type": "string", "minLength": 1 },
     "critic_model_profile_id": { "type": "string", "minLength": 1 },
@@ -103,6 +109,22 @@
         { "$ref": "https://novelfactory.dev/schemas/manuscript-state.schema.json" }
       ]
     },
+    "consistency_report_id": { "type": ["string", "null"], "minLength": 1 },
+    "consistency_report": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "https://novelfactory.dev/schemas/consistency-report.schema.json" }
+      ]
+    },
+    "revision_summary_id": { "type": ["string", "null"], "minLength": 1 },
+    "revision_summary": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "https://novelfactory.dev/schemas/revision-summary.schema.json" }
+      ]
+    },
+    "revision_round": { "type": "integer", "minimum": 0 },
+    "max_revision_rounds": { "type": "integer", "minimum": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": ["string", "null"], "format": "date-time" }
   },

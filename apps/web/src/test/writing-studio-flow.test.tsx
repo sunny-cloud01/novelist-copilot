@@ -17,15 +17,25 @@ function renderWritingStudio() {
 }
 
 describe("writing studio page", () => {
-  it("renders writing studio with Chinese panels and quality data", () => {
+  it("renders writing studio with phase one review surfaces", () => {
     renderWritingStudio();
 
     expect(screen.getByRole("heading", { name: "写作工作台" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "左侧：规划与分节" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "中间：草稿与润色" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "右侧：记忆包与质量" })).toBeInTheDocument();
-    expect(screen.getByText("已拦截")).toBeInTheDocument();
-    expect(screen.getByText("阻断 · 主角情绪转折过快，缺少被压迫感铺垫。")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "已选资源" })).toBeInTheDocument();
+    expect(screen.getByText("退婚立誓 · conflict_escalation")).toBeInTheDocument();
+    expect(screen.getByText("退婚压迫三段式 · suspense 0.74")).toBeInTheDocument();
+    expect(screen.getByText("expression · 公开羞辱后主角反击")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "一致性复核" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "修订摘要" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "规则卡片" })).toBeInTheDocument();
+    expect(screen.getByText(/境界不能倒退/)).toBeInTheDocument();
+    expect(screen.getByText("若当前 draft 中能力状态低于已批准状态，则触发阻断。"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/主角境界被写回斗之气三段/)).toBeInTheDocument();
+    expect(screen.getByText("需先关闭 blocker 并完成修订确认。")).toBeInTheDocument();
   });
 
   it("applies accept section action from writing studio", () => {
@@ -37,16 +47,25 @@ describe("writing studio page", () => {
     expect(screen.getByText("警告 · 金手指暗示可再收敛，避免过早泄露。")).toBeInTheDocument();
   });
 
-  it("applies accept chapter action and unlocks quality gate", () => {
+  it("blocks chapter acceptance before review actions finish", () => {
     renderWritingStudio();
 
     fireEvent.click(screen.getByRole("button", { name: "接受本章" }));
 
-    expect(screen.getAllByText("已通过").length).toBeGreaterThan(0);
-    expect(screen.getByText("记忆包")).toBeInTheDocument();
-    expect(screen.getByText("当前阶段")).toBeInTheDocument();
-    expect(screen.getAllByText("质量门禁").length).toBeGreaterThan(0);
-    expect(screen.getByText("已接受")).toBeInTheDocument();
+    expect(screen.queryByText("已接受")).not.toBeInTheDocument();
+    expect(screen.getByText("需先关闭 blocker 并完成修订确认。")).toBeInTheDocument();
+    expect(screen.getByText("未解决 · object://drafts/01JZSECRUN00000000000002#p2")).toBeInTheDocument();
+  });
+
+  it("accepts chapter after resolve and approve flow", () => {
+    renderWritingStudio();
+
+    fireEvent.click(screen.getByRole("button", { name: "标记问题已解决" }));
+    fireEvent.click(screen.getByRole("button", { name: "批准草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "接受本章" }));
+
+    expect(screen.getByText("当前可接受本章进入 manuscript。")).toBeInTheDocument();
+    expect(screen.getAllByText("已接受").length).toBeGreaterThan(0);
     expect(screen.getByText("章节快照")).toBeInTheDocument();
     expect(screen.getByText("最新故事状态")).toBeInTheDocument();
     expect(screen.getByText("人物与关系更新")).toBeInTheDocument();

@@ -17,6 +17,14 @@ export type WritingReviewAction =
   | "edit_and_accept"
   | "block_generation";
 
+export type WritingHumanReviewAction =
+  | "approve_draft"
+  | "request_revision"
+  | "reject_draft"
+  | "edit_draft"
+  | "mark_issue_resolved"
+  | "create_rule_update_request";
+
 export type AuditAction =
   | "knowledge.approve"
   | "knowledge.reject"
@@ -27,4 +35,8 @@ export type AuditAction =
   | "configuration.agent_model_assignment_updated"
   | "configuration.prompt_version_updated"
   | "feedback.record_promoted"
-  | "writing.accept_chapter";
+  | "feedback.ranking_suggestion_approved"
+  | "writing.accept_chapter"
+  | "writing.request_revision"
+  | "writing.issue_resolved"
+  | "writing.rule_update_requested";

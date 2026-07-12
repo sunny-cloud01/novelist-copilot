@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/writing-review-action-command.schema.json",
+  "title": "WritingReviewActionCommand",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "writing_run_id",
+    "action",
+    "requested_by",
+    "trace_id"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "writing_run_id": { "type": "string", "minLength": 1 },
+    "action": {
+      "type": "string",
+      "enum": [
+        "approve_draft",
+        "request_revision",
+        "reject_draft",
+        "edit_draft",
+        "mark_issue_resolved",
+        "create_rule_update_request"
+      ]
+    },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "issue_id": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] },
+    "output_ref": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": { "const": "mark_issue_resolved" }
+        }
+      },
+      "then": {
+        "required": ["issue_id"]
+      }
+    }
+  ]
+}

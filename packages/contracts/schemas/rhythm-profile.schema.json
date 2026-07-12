@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/rhythm-profile.schema.json",
+  "title": "RhythmProfile",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rhythm_profile_id",
+    "workspace_id",
+    "trace_id",
+    "target_id",
+    "status",
+    "label",
+    "climax_index",
+    "conflict_index",
+    "dialogue_ratio",
+    "description_ratio",
+    "battle_ratio",
+    "information_density",
+    "suspense_index",
+    "reward_count",
+    "emotion_curve",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "rhythm_profile_id": { "type": "string", "minLength": 1 },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["draft", "approved", "archived"] },
+    "label": { "type": "string", "minLength": 1 },
+    "climax_index": { "type": "number", "minimum": 0, "maximum": 1 },
+    "conflict_index": { "type": "number", "minimum": 0, "maximum": 1 },
+    "dialogue_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "description_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "battle_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+    "information_density": { "type": "number", "minimum": 0, "maximum": 1 },
+    "suspense_index": { "type": "number", "minimum": 0, "maximum": 1 },
+    "reward_count": { "type": "integer", "minimum": 0 },
+    "emotion_curve": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["beat", "intensity", "summary"],
+        "properties": {
+          "beat": { "type": "integer", "minimum": 1 },
+          "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "summary": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

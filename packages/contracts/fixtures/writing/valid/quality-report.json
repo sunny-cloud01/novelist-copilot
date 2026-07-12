@@ -3,7 +3,7 @@
   "quality_report_id": "01JZQLTREP000000000000001",
   "workspace_id": "01JZWORKSPACE0000000000001",
   "writing_run_id": "01JZWRITING00000000000001",
-  "status": "blocked",
+  "status": "requires_review",
   "ai_flavor_score": 0.34,
   "mobile_readability_score": 0.82,
   "originality_safety_score": 0.91,
@@ -11,11 +11,17 @@
   "blocking_issues": [
     {
       "issue_id": "01JZQLTISSUE000000000001",
-      "category": "character_consistency",
+      "category": "character_continuity",
+      "severity": "high",
       "summary": "第二节仍需补足压迫递进。",
-      "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p1"
+      "affected_text_ref": "object://drafts/01JZSECRUN00000000000002#p1",
+      "rule_id": "rule-01JZPOWER000000000000001",
+      "resolution_status": "open",
+      "input_refs": ["object://quality-reports/01JZQLTREP000000000000001"],
+      "output_refs": ["object://quality-reports/01JZQLTREP000000000000001/issues/1"],
+      "note": null
     }
   ],
-  "created_at": "2026-07-11T03:08:00Z",
-  "updated_at": "2026-07-11T03:08:00Z"
+  "created_at": "2026-07-12T01:08:00Z",
+  "updated_at": "2026-07-12T01:08:00Z"
 }
