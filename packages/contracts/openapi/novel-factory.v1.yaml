@@ -153,6 +153,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /graph/nodes/{nodeId}:
+    get:
+      operationId: getGraphNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Graph node detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Graph node not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /graph/nodes/{nodeId}/neighbors:
+    get:
+      operationId: getGraphNeighbors
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Graph neighbors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Graph node not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /novel-projects:
     post:
       operationId: createNovelProject
@@ -822,6 +866,10 @@ components:
       $ref: ../schemas/review-action-command.schema.json
     GraphSummary:
       $ref: ../schemas/graph-summary.schema.json
+    GraphNode:
+      $ref: ../schemas/graph-node.schema.json
+    GraphNeighbors:
+      $ref: ../schemas/graph-neighbors.schema.json
     NovelProject:
       $ref: ../schemas/novel-project.schema.json
     Workspace:

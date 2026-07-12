@@ -84,6 +84,14 @@ def get_graph_summary(book_id: Optional[str] = None) -> dict[str, Any]:
     return _STORE.get_graph_summary(book_id)
 
 
+def get_graph_node(node_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_graph_node(node_id)
+
+
+def list_graph_neighbors(node_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.list_graph_neighbors(node_id)
+
+
 def create_novel_project(
     payload: dict[str, Any],
     trace_id: str,

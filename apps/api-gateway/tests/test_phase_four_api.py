@@ -10,10 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def load_app():
     for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
+        if name == "app" or name.startswith("app.") or name == "phase_two_store_gateway":
             sys.modules.pop(name)
     sys.path.insert(0, str(ROOT))
     try:
+        adapter = importlib.import_module("app.core.phase_two_adapter")
+        adapter._STORE.reset_store()
+        adapter._STORE.seed_phase_two_demo_data()
         return importlib.import_module("app.main").app
     finally:
         sys.path.pop(0)

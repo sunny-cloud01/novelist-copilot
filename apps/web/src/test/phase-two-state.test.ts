@@ -34,12 +34,13 @@ describe("phase two state", () => {
     expect(afterSecond.run.currentStage).toBe("knowledge_package_export");
   });
 
-  it("commits knowledge package into graph stage", () => {
-    const committed = commitKnowledgePackage(createInitialPhaseTwoState());
+  it("requeues extraction run when reextract is requested", () => {
+    const next = applyReviewActionToState(createInitialPhaseTwoState(), "01JZOBJ0000000000000000001", "request_reextract");
 
-    expect(committed.run.status).toBe("succeeded");
-    expect(committed.run.currentStage).toBe("knowledge_base_commit");
-    expect(committed.activityLog.at(-1)).toBe("知识包已提交到故事图谱。");
+    expect(next.knowledgeObjects.find((item) => item.objectId === "01JZOBJ0000000000000000001")?.reviewStatus).toBe("reextract_requested");
+    expect(next.run.status).toBe("queued");
+    expect(next.run.currentStage).toBe("source_submission");
+    expect(next.run.lowConfidenceCount).toBe(1);
   });
 
   it("accepts current writing section and clears critic issues", () => {

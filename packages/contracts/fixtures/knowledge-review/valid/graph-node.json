@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "node_id": "01JZNODE000000000000000001",
+  "book_id": "01JZBOOK000000000000000001",
+  "label": "Xiao Yan",
+  "node_type": "character",
+  "canonical_object_id": "01JZOBJ0000000000000000001",
+  "review_status": "pending",
+  "lifecycle_status": "candidate",
+  "confidence": 0.58,
+  "aliases": ["Yan"],
+  "summary": "乌坦城萧家少年，正处于天赋跌落后的低谷期。",
+  "evidence_refs": ["evidence://01JZEVIDENCE0000000000001"]
+}

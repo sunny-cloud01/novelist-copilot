@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from worker.core_store import load_phase_two_store
+
 
 WORKSPACE_ID = "01JZWORKSPACE0000000000001"
 BOOK_ID = "01JZBOOK000000000000000001"
@@ -194,26 +196,47 @@ def build_extraction_fixture(command: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
+    store = load_phase_two_store()
+    run_ref = next(
+        ref for ref in command["input_refs"]
+        if ref.startswith("object://extraction-runs/")
+    )
+    run_id = run_ref.rsplit("/", 1)[-1]
     fixture = build_extraction_fixture(command)
-    return {
-        "schema_version": 1,
-        "task_id": command["task_id"],
-        "status": "requires_review",
-        "output_refs": [
+    metrics = {
+        "pipeline_stages": PIPELINE_STAGES,
+        "current_stage": fixture["run"]["current_stage"],
+        "chapter_count": fixture["run"]["chapter_count"],
+        "scene_count": fixture["run"]["scene_count"],
+        "object_count": fixture["run"]["object_count"],
+        "evidence_count": fixture["run"]["evidence_count"],
+        "low_confidence_count": fixture["run"]["low_confidence_count"],
+        "graph_summary": fixture["graph_summary"],
+        "knowledge_objects": fixture["knowledge_objects"],
+        "errors": fixture["run"]["errors"],
+        "generated_at": utc_now(),
+    }
+    task = store.apply_task_execution_result(
+        command["task_id"],
+        "requires_review",
+        [
             fixture["task"]["output_refs"][0],
             f"object://graph-summaries/{fixture['run']['book_id']}",
             f"object://knowledge-objects/{fixture['run']['run_id']}",
         ],
-        "metrics": {
-            "pipeline_stages": PIPELINE_STAGES,
-            "current_stage": fixture["run"]["current_stage"],
-            "chapter_count": fixture["run"]["chapter_count"],
-            "scene_count": fixture["run"]["scene_count"],
-            "object_count": fixture["run"]["object_count"],
-            "evidence_count": fixture["run"]["evidence_count"],
-            "low_confidence_count": fixture["run"]["low_confidence_count"],
-            "generated_at": utc_now(),
-        },
+        metrics,
+        trace_id=command["trace_id"],
+    )
+    return {
+        "schema_version": 1,
+        "task_id": command["task_id"],
+        "status": "requires_review",
+        "output_refs": task["output_refs"] if task else [
+            fixture["task"]["output_refs"][0],
+            f"object://graph-summaries/{fixture['run']['book_id']}",
+            f"object://knowledge-objects/{fixture['run']['run_id']}",
+        ],
+        "metrics": metrics,
         "errors": [],
         "trace_id": command["trace_id"],
     }

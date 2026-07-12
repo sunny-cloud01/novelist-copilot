@@ -30,8 +30,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: novel-factory
-      MINIO_ROOT_PASSWORD: replace-me
+      MINIO_ROOT_USER: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+      MINIO_ROOT_PASSWORD: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -42,6 +42,122 @@ services:
       retries: 10
     volumes:
       - minio-data:/data
+
+  minio-bootstrap:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+      NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
+      NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export NOVEL_FACTORY_MINIO_ACCESS_KEY=$${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+        export NOVEL_FACTORY_MINIO_SECRET_KEY=$${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
+        export NOVEL_FACTORY_MINIO_BUCKET=$${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+        mc alias set local http://minio:9000 "$$NOVEL_FACTORY_MINIO_ACCESS_KEY" "$$NOVEL_FACTORY_MINIO_SECRET_KEY"
+        mc mb --ignore-existing "local/$$NOVEL_FACTORY_MINIO_BUCKET"
+    restart: "no"
+
+  core-service:
+    build:
+      context: ..
+      dockerfile: apps/core-service/Dockerfile
+    environment:
+      NOVEL_FACTORY_POSTGRES_URL: ${NOVEL_FACTORY_POSTGRES_URL:-postgresql://novel:novel@postgres:5432/novel_factory}
+      NOVEL_FACTORY_REDIS_URL: ${NOVEL_FACTORY_REDIS_URL:-redis://redis:6379/0}
+      NOVEL_FACTORY_MINIO_ENDPOINT: ${NOVEL_FACTORY_MINIO_ENDPOINT:-http://minio:9000}
+      NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+      NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
+      NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+    ports:
+      - "8100:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: apps/api-gateway/Dockerfile
+    environment:
+      NOVEL_FACTORY_POSTGRES_URL: ${NOVEL_FACTORY_POSTGRES_URL:-postgresql://novel:novel@postgres:5432/novel_factory}
+      NOVEL_FACTORY_REDIS_URL: ${NOVEL_FACTORY_REDIS_URL:-redis://redis:6379/0}
+      NOVEL_FACTORY_MINIO_ENDPOINT: ${NOVEL_FACTORY_MINIO_ENDPOINT:-http://minio:9000}
+      NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+      NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
+      NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+      NOVEL_FACTORY_CORE_SERVICE_URL: http://core-service:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      core-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ai-worker:
+    build:
+      context: ..
+      dockerfile: apps/ai-worker/Dockerfile
+    environment:
+      NOVEL_FACTORY_POSTGRES_URL: ${NOVEL_FACTORY_POSTGRES_URL:-postgresql://novel:novel@postgres:5432/novel_factory}
+      NOVEL_FACTORY_REDIS_URL: ${NOVEL_FACTORY_REDIS_URL:-redis://redis:6379/0}
+      NOVEL_FACTORY_MINIO_ENDPOINT: ${NOVEL_FACTORY_MINIO_ENDPOINT:-http://minio:9000}
+      NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
+      NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
+      NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: apps/scheduler/Dockerfile
+    environment:
+      NOVEL_FACTORY_POSTGRES_URL: ${NOVEL_FACTORY_POSTGRES_URL:-postgresql://novel:novel@postgres:5432/novel_factory}
+      NOVEL_FACTORY_REDIS_URL: ${NOVEL_FACTORY_REDIS_URL:-redis://redis:6379/0}
+      NOVEL_FACTORY_SCHEDULER_INTERVAL_SECONDS: ${NOVEL_FACTORY_SCHEDULER_INTERVAL_SECONDS:-5}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:

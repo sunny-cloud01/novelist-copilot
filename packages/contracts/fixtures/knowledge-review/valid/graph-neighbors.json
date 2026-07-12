@@ -1,0 +1,15 @@
+{
+  "node_id": "01JZNODE000000000000000001",
+  "items": [
+    {
+      "edge_id": "01JZEDGE000000000000000001",
+      "relation_type": "mentored_by",
+      "direction": "outgoing",
+      "neighbor_node_id": "01JZNODE000000000000000002",
+      "neighbor_label": "Yao Lao",
+      "neighbor_type": "mentor",
+      "confidence": 0.91,
+      "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"]
+    }
+  ]
+}

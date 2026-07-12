@@ -36,13 +36,29 @@ describe("phase 2 pages", () => {
     expect(await screen.findByText("知识库提交")).toBeInTheDocument();
   });
 
-  it("renders review queue and applies approve action", async () => {
+  it("requeues extraction run from review page", async () => {
     renderRoute("/knowledge/review");
 
-    fireEvent.click(screen.getAllByRole("button", { name: "通过" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "请求重抽" })[0]);
 
-    expect(await screen.findByText("已执行审核动作：通过。" )).toBeInTheDocument();
-    expect(screen.getByText("Xiao Clan（家族）")).toBeInTheDocument();
+    expect(await screen.findByText("已执行审核动作：请求重抽。" )).toBeInTheDocument();
+    expect(screen.getByText("来源提交")).toBeInTheDocument();
+  });
+
+  it("shows graph node detail, neighbors, and evidence", async () => {
+    renderRoute("/graph");
+
+    expect(screen.getByText("节点详情")).toBeInTheDocument();
+    expect(screen.getByText("候选")).toBeInTheDocument();
+    expect(screen.getByText("待处理")).toBeInTheDocument();
+    expect(screen.getByText("乌坦城萧家少年，正处于天赋跌落后的低谷期。")).toBeInTheDocument();
+    expect(screen.getByText("指向Yao Lao · mentored_by · 置信度 0.91")).toBeInTheDocument();
+    expect(screen.getByText("evidence://01JZEVIDENCE0000000000001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Yao Lao（导师）" }));
+
+    expect(await screen.findByText("寄宿戒指中的神秘导师，对主角成长线至关重要。")).toBeInTheDocument();
+    expect(screen.getByText("来自Xiao Yan · mentors · 置信度 0.91")).toBeInTheDocument();
   });
 
   it("keeps unique list keys when activity log repeats entries", async () => {

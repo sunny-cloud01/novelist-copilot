@@ -1,10 +1,23 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import importlib.util
+from pathlib import Path
 from typing import Any, Optional
 import ulid
+
+try:
+    from app.core.persistence import load_snapshot, save_snapshot
+except ModuleNotFoundError:
+    spec = importlib.util.spec_from_file_location("phase_two_persistence", Path(__file__).with_name("persistence.py"))
+    if spec is None or spec.loader is None:
+        raise
+    persistence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(persistence)
+    load_snapshot = persistence.load_snapshot
+    save_snapshot = persistence.save_snapshot
 
 
 USER_ID = "demo-user"
@@ -63,6 +76,8 @@ class CoreStore:
     knowledge_objects: dict[str, dict[str, Any]] = field(default_factory=dict)
     knowledge_by_run: dict[str, list[str]] = field(default_factory=dict)
     graph_summaries: dict[str, dict[str, Any]] = field(default_factory=dict)
+    graph_node_details: dict[str, dict[str, Any]] = field(default_factory=dict)
+    graph_neighbors_by_node: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     novel_projects: dict[str, dict[str, Any]] = field(default_factory=dict)
     story_bibles: dict[str, dict[str, Any]] = field(default_factory=dict)
     chapter_plans: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -71,6 +86,7 @@ class CoreStore:
     section_plans_by_chapter: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     model_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_model_assignments: dict[str, dict[str, Any]] = field(default_factory=dict)
+    provider_accounts: dict[str, dict[str, Any]] = field(default_factory=dict)
     quality_gate_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
     prompt_versions: list[dict[str, Any]] = field(default_factory=list)
     writing_runs: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -98,6 +114,35 @@ class CoreStore:
 STORE = CoreStore()
 
 
+def _persist_store() -> None:
+    save_snapshot(asdict(STORE))
+
+
+def _persisting_mutation(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        _persist_store()
+        return result
+
+    return wrapper
+
+
+def _restore_store_from_snapshot() -> bool:
+    snapshot = load_snapshot()
+    if snapshot is None or not isinstance(snapshot, dict):
+        return False
+    field_names = set(CoreStore.__dataclass_fields__)
+    if not set(snapshot).issubset(field_names):
+        return False
+    try:
+        restored = CoreStore(**snapshot)
+    except TypeError:
+        return False
+    for field_name in CoreStore.__dataclass_fields__:
+        setattr(STORE, field_name, getattr(restored, field_name))
+    return True
+
+
 def reset_store() -> None:
     STORE.users.clear()
     STORE.workspaces.clear()
@@ -108,6 +153,8 @@ def reset_store() -> None:
     STORE.knowledge_objects.clear()
     STORE.knowledge_by_run.clear()
     STORE.graph_summaries.clear()
+    STORE.graph_node_details.clear()
+    STORE.graph_neighbors_by_node.clear()
     STORE.novel_projects.clear()
     STORE.story_bibles.clear()
     STORE.chapter_plans.clear()
@@ -116,6 +163,7 @@ def reset_store() -> None:
     STORE.section_plans_by_chapter.clear()
     STORE.model_profiles.clear()
     STORE.agent_model_assignments.clear()
+    STORE.provider_accounts.clear()
     STORE.quality_gate_profiles.clear()
     STORE.prompt_versions.clear()
     STORE.writing_runs.clear()
@@ -138,6 +186,7 @@ def reset_store() -> None:
     STORE.agent_tasks.clear()
     STORE.task_events_by_task.clear()
     STORE.audit_events.clear()
+    _persist_store()
 
 
 def seed_phase_two_demo_data() -> None:
@@ -229,6 +278,15 @@ def seed_phase_two_demo_data() -> None:
         "supports_structured_output": True,
         "fallback_profile_ids": [],
     }
+    STORE.provider_accounts["provider-account-anthropic-default"] = {
+        "provider_account_id": "provider-account-anthropic-default",
+        "provider_name": "anthropic",
+        "account_label": "Anthropic 默认账号",
+        "secret_ref": "secret://providers/anthropic/default",
+        "status": "active",
+        "created_at": "2026-07-11T00:00:00Z",
+        "updated_at": "2026-07-11T00:10:00Z",
+    }
     for index, role in enumerate(MVP_AGENT_ROLES, start=1):
         output_mode = "structured" if role in {"critic", "review", "feedback"} else "text"
         STORE.agent_model_assignments[f"01JZASSIGN{index:015d}"] = {
@@ -245,9 +303,13 @@ def seed_phase_two_demo_data() -> None:
         }
     STORE.quality_gate_profiles[QUALITY_GATE_PROFILE_ID] = {
         "quality_gate_profile_id": QUALITY_GATE_PROFILE_ID,
+        "workspace_id": _workspace_or_default(),
+        "trace_id": "trace-config-snapshot",
         "label": "默认质量阈值",
         "ai_flavor_threshold": 0.45,
         "originality_safety_threshold": 0.85,
+        "input_refs": ["object://config/default-quality-thresholds"],
+        "output_refs": [f"object://quality-gate-profiles/{QUALITY_GATE_PROFILE_ID}"],
     }
     STORE.prompt_versions.extend(
         [
@@ -383,6 +445,102 @@ def seed_phase_two_demo_data() -> None:
             },
         ],
     }
+    STORE.graph_node_details.update(
+        {
+            "01JZNODE000000000000000001": {
+                "schema_version": 1,
+                "node_id": "01JZNODE000000000000000001",
+                "book_id": GRAPH_BOOK_ID,
+                "label": "Xiao Yan",
+                "node_type": "character",
+                "canonical_object_id": "01JZOBJ0000000000000000001",
+                "review_status": "pending",
+                "lifecycle_status": "candidate",
+                "confidence": 0.58,
+                "aliases": ["Yan"],
+                "summary": "乌坦城萧家少年，正处于天赋跌落后的低谷期。",
+                "evidence_refs": ["evidence://01JZEVIDENCE0000000000001"],
+            },
+            "01JZNODE000000000000000002": {
+                "schema_version": 1,
+                "node_id": "01JZNODE000000000000000002",
+                "book_id": GRAPH_BOOK_ID,
+                "label": "Yao Lao",
+                "node_type": "mentor",
+                "canonical_object_id": "01JZOBJ0000000000000000002",
+                "review_status": "pending",
+                "lifecycle_status": "candidate",
+                "confidence": 0.44,
+                "aliases": ["Old Yao"],
+                "summary": "寄宿戒指中的神秘导师，对主角成长线至关重要。",
+                "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"],
+            },
+            "01JZNODE000000000000000003": {
+                "schema_version": 1,
+                "node_id": "01JZNODE000000000000000003",
+                "book_id": GRAPH_BOOK_ID,
+                "label": "Xiao Clan",
+                "node_type": "clan",
+                "canonical_object_id": "01JZOBJ0000000000000000003",
+                "review_status": "approved",
+                "lifecycle_status": "approved",
+                "confidence": 0.97,
+                "aliases": [],
+                "summary": "乌坦城本地家族势力，也是主角当前承受压力的核心环境。",
+                "evidence_refs": ["evidence://01JZEVIDENCE0000000000003"],
+            },
+        }
+    )
+    STORE.graph_neighbors_by_node.update(
+        {
+            "01JZNODE000000000000000001": [
+                {
+                    "edge_id": "01JZEDGE000000000000000001",
+                    "relation_type": "mentored_by",
+                    "direction": "outgoing",
+                    "neighbor_node_id": "01JZNODE000000000000000002",
+                    "neighbor_label": "Yao Lao",
+                    "neighbor_type": "mentor",
+                    "confidence": 0.91,
+                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"],
+                },
+                {
+                    "edge_id": "01JZEDGE000000000000000002",
+                    "relation_type": "member_of",
+                    "direction": "outgoing",
+                    "neighbor_node_id": "01JZNODE000000000000000003",
+                    "neighbor_label": "Xiao Clan",
+                    "neighbor_type": "clan",
+                    "confidence": 0.96,
+                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000003"],
+                },
+            ],
+            "01JZNODE000000000000000002": [
+                {
+                    "edge_id": "01JZEDGE000000000000000001",
+                    "relation_type": "mentors",
+                    "direction": "incoming",
+                    "neighbor_node_id": "01JZNODE000000000000000001",
+                    "neighbor_label": "Xiao Yan",
+                    "neighbor_type": "character",
+                    "confidence": 0.91,
+                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"],
+                },
+            ],
+            "01JZNODE000000000000000003": [
+                {
+                    "edge_id": "01JZEDGE000000000000000002",
+                    "relation_type": "has_member",
+                    "direction": "incoming",
+                    "neighbor_node_id": "01JZNODE000000000000000001",
+                    "neighbor_label": "Xiao Yan",
+                    "neighbor_type": "character",
+                    "confidence": 0.96,
+                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000003"],
+                },
+            ],
+        }
+    )
 
     project = {
         "schema_version": 1,
@@ -668,58 +826,122 @@ def seed_phase_two_demo_data() -> None:
         {
             "schema_version": 1,
             "provider_call_id": "01JZPCALL0000000000000001",
+            "workspace_id": _workspace_or_default(),
+            "task_id": WRITING_TASK_ID,
+            "writing_run_id": WRITING_RUN_ID,
+            "request_id": "req-writing-run",
+            "trace_id": "01JZTRC000000000000000003",
             "agent_role": "writer",
+            "task_type": "writer_task",
+            "assignment_id": "01JZASSIGN000000000000006",
             "model_profile_id": MODEL_PROFILE_DEFAULT_ID,
             "provider_name": "anthropic",
+            "provider_model_name": "claude-sonnet-5",
+            "provider_account_id": "provider-account-anthropic-default",
+            "prompt_package_id": PROMPT_PACKAGE_ID,
+            "input_refs": [
+                f"object://chapter-plans/{CHAPTER_PLAN_ID}",
+                f"object://memory-packages/{MEMORY_PACKAGE_ID}",
+                f"object://prompt-packages/{PROMPT_PACKAGE_ID}",
+            ],
+            "output_ref": f"object://drafts/{CHAPTER_DRAFT_ID}",
             "prompt_tokens": 1800,
             "completion_tokens": 920,
             "latency_ms": 1430,
             "retry_count": 0,
             "cost_estimate": 0.31,
+            "cost_estimate_status": "estimated",
             "status": "succeeded",
             "error_code": None,
+            "fallback_from_call_id": None,
+            "created_at": "2026-07-11T03:03:00Z",
         },
         {
             "schema_version": 1,
             "provider_call_id": "01JZPCALL0000000000000002",
+            "workspace_id": _workspace_or_default(),
+            "task_id": WRITING_TASK_ID,
+            "writing_run_id": WRITING_RUN_ID,
+            "request_id": "req-writing-run",
+            "trace_id": "01JZTRC000000000000000003",
             "agent_role": "critic",
+            "task_type": "critic_task",
+            "assignment_id": "01JZASSIGN000000000000007",
             "model_profile_id": MODEL_PROFILE_DEFAULT_ID,
             "provider_name": "anthropic",
+            "provider_model_name": "claude-sonnet-5",
+            "provider_account_id": "provider-account-anthropic-default",
+            "prompt_package_id": PROMPT_PACKAGE_ID,
+            "input_refs": [f"object://writing-runs/{WRITING_RUN_ID}"],
+            "output_ref": None,
             "prompt_tokens": 1400,
             "completion_tokens": 0,
             "latency_ms": 490,
             "retry_count": 1,
             "cost_estimate": 0.11,
+            "cost_estimate_status": "estimated",
             "status": "failed",
             "error_code": "structured_output_validation_failed",
+            "fallback_from_call_id": None,
+            "created_at": "2026-07-11T03:04:00Z",
         },
         {
             "schema_version": 1,
             "provider_call_id": "01JZPCALL0000000000000003",
+            "workspace_id": _workspace_or_default(),
+            "task_id": WRITING_TASK_ID,
+            "writing_run_id": WRITING_RUN_ID,
+            "request_id": "req-writing-run",
+            "trace_id": "01JZTRC000000000000000003",
             "agent_role": "critic",
+            "task_type": "critic_task",
+            "assignment_id": "01JZASSIGN000000000000007",
             "model_profile_id": MODEL_PROFILE_STRUCTURED_FALLBACK_ID,
             "provider_name": "anthropic",
+            "provider_model_name": "claude-haiku-4-5-20251001",
+            "provider_account_id": "provider-account-anthropic-default",
+            "prompt_package_id": PROMPT_PACKAGE_ID,
+            "input_refs": [f"object://writing-runs/{WRITING_RUN_ID}"],
+            "output_ref": "object://consistency-reports/01JZCONSIST00000000000001",
             "prompt_tokens": 1400,
             "completion_tokens": 540,
             "latency_ms": 980,
             "retry_count": 1,
             "cost_estimate": 0.22,
+            "cost_estimate_status": "estimated",
             "status": "succeeded",
             "error_code": None,
+            "fallback_from_call_id": "01JZPCALL0000000000000002",
+            "created_at": "2026-07-11T03:05:00Z",
         },
         {
             "schema_version": 1,
             "provider_call_id": "01JZPCALL0000000000000004",
+            "workspace_id": _workspace_or_default(),
+            "task_id": WRITING_TASK_ID,
+            "writing_run_id": WRITING_RUN_ID,
+            "request_id": "req-writing-run",
+            "trace_id": "01JZTRC000000000000000003",
             "agent_role": "humanizer",
+            "task_type": "humanizer_task",
+            "assignment_id": "01JZASSIGN000000000000008",
             "model_profile_id": MODEL_PROFILE_DEFAULT_ID,
             "provider_name": "anthropic",
+            "provider_model_name": "claude-sonnet-5",
+            "provider_account_id": "provider-account-anthropic-default",
+            "prompt_package_id": PROMPT_PACKAGE_ID,
+            "input_refs": [f"object://writing-runs/{WRITING_RUN_ID}"],
+            "output_ref": f"object://writing-runs/{WRITING_RUN_ID}",
             "prompt_tokens": 1780,
             "completion_tokens": 850,
             "latency_ms": 1210,
             "retry_count": 0,
             "cost_estimate": 0.33,
+            "cost_estimate_status": "estimated",
             "status": "succeeded",
             "error_code": None,
+            "fallback_from_call_id": None,
+            "created_at": "2026-07-11T03:06:00Z",
         },
     ]
     STORE.section_runs_by_writing[WRITING_RUN_ID] = [
@@ -1344,6 +1566,7 @@ def list_audit_events(workspace_id: Optional[str] = None) -> list[dict[str, Any]
     return sorted(items, key=lambda item: item["created_at"])
 
 
+@_persisting_mutation
 def create_workspace(payload: dict[str, Any]) -> dict[str, Any]:
     workspace_id = payload.get("slug") or str(ulid.new())
     now = utc_now()
@@ -1555,10 +1778,13 @@ def _normalize_seed_records() -> None:
                 event["event_type"] = "review_required"
 
 
-seed_phase_two_demo_data()
-_normalize_seed_records()
+if not _restore_store_from_snapshot():
+    seed_phase_two_demo_data()
+    _normalize_seed_records()
+    _persist_store()
 
 
+@_persisting_mutation
 def create_book(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
     book_id = str(ulid.new())
     now = utc_now()
@@ -1576,6 +1802,7 @@ def create_book(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
     }
     STORE.books[book_id] = book
     STORE.chapters_by_book[book_id] = []
+    _persist_store()
     return book
 
 
@@ -1587,6 +1814,7 @@ def list_book_chapters(book_id: str) -> list[dict[str, Any]]:
     return STORE.chapters_by_book.get(book_id, [])
 
 
+@_persisting_mutation
 def create_extraction_run(
     book_id: str,
     trace_id: str,
@@ -1682,6 +1910,7 @@ def list_knowledge_objects_for_run(run_id: str) -> list[dict[str, Any]]:
     return [STORE.knowledge_objects[object_id] for object_id in STORE.knowledge_by_run.get(run_id, [])]
 
 
+@_persisting_mutation
 def apply_review_action(
     object_id: str,
     action: str,
@@ -1724,7 +1953,28 @@ def apply_review_action(
                 and STORE.knowledge_objects[current_id]["review_status"] == "pending"
             ]
             run["low_confidence_count"] = len(pending)
-            if run["status"] == "requires_review" and not pending:
+            if action == "request_reextract":
+                run["status"] = "queued"
+                run["current_stage"] = "source_submission"
+                run["finished_at"] = None
+                run["errors"] = []
+                run["task"]["status"] = "queued"
+                run["task"]["progress"] = 0
+                run["task"]["started_at"] = None
+                run["task"]["finished_at"] = None
+                run["task"]["latency_ms"] = None
+                run["task"]["error_code"] = None
+                _append_task_event(
+                    run["task"],
+                    "requeued",
+                    "Knowledge re-extraction requested.",
+                    run["task"]["status"],
+                    request_id,
+                    trace_id,
+                    context["actor_id"],
+                    payload_json={"run_id": run["run_id"], "object_id": object_id, "low_confidence_count": len(pending)},
+                )
+            elif run["status"] == "requires_review" and not pending:
                 run["status"] = "succeeded"
                 run["current_stage"] = "knowledge_package_export"
                 run["task"]["status"] = "succeeded"
@@ -1770,6 +2020,7 @@ def apply_review_action(
     return obj
 
 
+@_persisting_mutation
 def commit_knowledge_package(run_id: str) -> Optional[dict[str, Any]]:
     run = STORE.extraction_runs.get(run_id)
     if not run:
@@ -1798,6 +2049,23 @@ def get_graph_summary(book_id: Optional[str] = None) -> dict[str, Any]:
     })
 
 
+def get_graph_node(node_id: str) -> Optional[dict[str, Any]]:
+    node = STORE.graph_node_details.get(node_id)
+    if not node:
+        return None
+    return deepcopy(node)
+
+
+def list_graph_neighbors(node_id: str) -> Optional[dict[str, Any]]:
+    node = STORE.graph_node_details.get(node_id)
+    if not node:
+        return None
+    return {
+        "node_id": node_id,
+        "items": deepcopy(STORE.graph_neighbors_by_node.get(node_id, [])),
+    }
+
+
 def list_chapter_plans_for_project(project_id: str) -> list[dict[str, Any]]:
     return sorted(
         [plan for plan in STORE.chapter_plans.values() if plan["project_id"] == project_id],
@@ -1812,6 +2080,8 @@ def _sorted_store_items(values: list[dict[str, Any]], key: str) -> list[dict[str
 def get_configuration_snapshot() -> dict[str, Any]:
     return {
         "default_model_profile_id": DEFAULT_MODEL_PROFILE_ID,
+        "workspace_id": default_workspace_id(),
+        "trace_id": "trace-config-snapshot",
         "model_profiles": _sorted_store_items(list(STORE.model_profiles.values()), "model_profile_id"),
         "agent_model_assignments": _sorted_store_items(list(STORE.agent_model_assignments.values()), "assignment_id"),
         "quality_gate_profiles": _sorted_store_items(list(STORE.quality_gate_profiles.values()), "quality_gate_profile_id"),
@@ -1819,6 +2089,7 @@ def get_configuration_snapshot() -> dict[str, Any]:
     }
 
 
+@_persisting_mutation
 def set_model_profile_enabled(
     model_profile_id: str,
     enabled: bool,
@@ -1853,6 +2124,7 @@ def set_model_profile_enabled(
     }
 
 
+@_persisting_mutation
 def update_quality_gate_profile(
     quality_gate_profile_id: str,
     ai_flavor_threshold: float,
@@ -1892,6 +2164,7 @@ def update_quality_gate_profile(
     }
 
 
+@_persisting_mutation
 def update_agent_model_assignment(
     assignment_id: str,
     model_profile_id: str,
@@ -1939,6 +2212,7 @@ def update_agent_model_assignment(
     }
 
 
+@_persisting_mutation
 def update_prompt_version(
     agent_role: str,
     template_ref: str,
@@ -1995,11 +2269,19 @@ def _build_provider_call(
     writing_run_id: Optional[str] = None,
     request_id: str = "system-request",
     trace_id: str = "system-trace",
+    task_type: str = "chapter_generation",
+    assignment_id: Optional[str] = None,
+    prompt_package_id: Optional[str] = None,
+    input_refs: Optional[list[str]] = None,
+    output_ref: Optional[str] = None,
+    fallback_from_call_id: Optional[str] = None,
 ) -> dict[str, Any]:
     metrics = ROLE_CALL_METRICS.get(agent_role, {"prompt_tokens": 1000, "completion_tokens": 300, "latency_ms": 800, "cost_estimate": 0.1})
     completion_tokens = metrics["completion_tokens"] if status == "succeeded" else 0
     cost_estimate = metrics["cost_estimate"] if status == "succeeded" else round(metrics["cost_estimate"] / 2, 2)
     latency_ms = metrics["latency_ms"] if status == "succeeded" else max(200, metrics["latency_ms"] // 2)
+    profile = STORE.model_profiles.get(model_profile_id)
+    provider_account = next((item for item in STORE.provider_accounts.values() if item["provider_name"] == provider_name and item["status"] == "active"), None)
     return {
         "schema_version": 1,
         "provider_call_id": str(ulid.new()),
@@ -2009,15 +2291,25 @@ def _build_provider_call(
         "request_id": request_id,
         "trace_id": trace_id,
         "agent_role": agent_role,
+        "task_type": task_type,
+        "assignment_id": assignment_id,
         "model_profile_id": model_profile_id,
         "provider_name": provider_name,
+        "provider_model_name": profile["provider_model_name"] if profile else model_profile_id,
+        "provider_account_id": provider_account["provider_account_id"] if provider_account else None,
+        "prompt_package_id": prompt_package_id,
+        "input_refs": deepcopy(input_refs or []),
+        "output_ref": output_ref,
         "prompt_tokens": metrics["prompt_tokens"],
         "completion_tokens": completion_tokens,
         "latency_ms": latency_ms,
         "retry_count": retry_count,
         "cost_estimate": cost_estimate,
+        "cost_estimate_status": "estimated",
         "status": status,
         "error_code": error_code,
+        "fallback_from_call_id": fallback_from_call_id,
+        "created_at": utc_now(),
     }
 
 
@@ -2054,6 +2346,9 @@ def resolve_model_profile(
                     "failed",
                     retry_count,
                     "structured_output_validation_failed",
+                    task_type=assignment["task_type"] if assignment else f"{agent_role}_task",
+                    assignment_id=assignment["assignment_id"] if assignment else None,
+                    fallback_from_call_id=provider_calls[-1]["provider_call_id"] if provider_calls else None,
                 )
             )
             continue
@@ -2114,6 +2409,7 @@ def _sync_writing_run_phase_one_state(writing_run: dict[str, Any]) -> None:
         writing_run["max_revision_rounds"] = revision_summary["max_revision_rounds"]
 
 
+@_persisting_mutation
 def create_novel_project(
     payload: dict[str, Any],
     trace_id: str,
@@ -2165,6 +2461,7 @@ def create_novel_project(
     }
     STORE.novel_projects[project_id] = project
     STORE.story_bibles[story_bible_id] = story_bible
+    _persist_store()
     return {
         "project": project,
         "story_bible": story_bible,
@@ -2187,6 +2484,7 @@ def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
     }
 
 
+@_persisting_mutation
 def create_chapter_plan(
     payload: dict[str, Any],
     trace_id: str,
@@ -2293,6 +2591,7 @@ def list_section_plans(chapter_plan_id: str) -> Optional[dict[str, Any]]:
     }
 
 
+@_persisting_mutation
 def create_section_plans(
     chapter_plan_id: str,
     section_count: int,
@@ -2407,6 +2706,7 @@ def create_section_plans(
     }
 
 
+@_persisting_mutation
 def create_writing_run(
     payload: dict[str, Any],
     trace_id: str,
@@ -2432,6 +2732,8 @@ def create_writing_run(
     prompt_package_id = str(ulid.new())
     quality_report_id = str(ulid.new())
     chapter_draft_id = str(ulid.new())
+    consistency_report_id = str(ulid.new())
+    revision_summary_id = str(ulid.new())
     now = utc_now()
 
     section_plans = STORE.section_plans_by_chapter.get(chapter_plan_id, [])
@@ -2448,6 +2750,16 @@ def create_writing_run(
     if not writer_resolution["selected_profile"] or not critic_resolution["selected_profile"] or not humanizer_resolution["selected_profile"]:
         return None
 
+    writer_input_refs = [
+        f"object://chapter-plans/{chapter_plan_id}",
+        f"object://memory-packages/{memory_package_id}",
+        f"object://prompt-packages/{prompt_package_id}",
+    ]
+    critic_input_refs = [f"object://writing-runs/{writing_run_id}"]
+    humanizer_input_refs = [f"object://writing-runs/{writing_run_id}"]
+    writer_assignment = writer_resolution["assignment"]
+    critic_assignment = critic_resolution["assignment"]
+    humanizer_assignment = humanizer_resolution["assignment"]
     provider_calls = [
         *writer_resolution["provider_calls"],
         _build_provider_call(
@@ -2461,6 +2773,12 @@ def create_writing_run(
             writing_run_id=writing_run_id,
             request_id=request_id,
             trace_id=trace_id,
+            task_type=writer_assignment["task_type"] if writer_assignment else "writer_task",
+            assignment_id=writer_assignment["assignment_id"] if writer_assignment else None,
+            prompt_package_id=prompt_package_id,
+            input_refs=writer_input_refs,
+            output_ref=f"object://drafts/{chapter_draft_id}",
+            fallback_from_call_id=writer_resolution["provider_calls"][-1]["provider_call_id"] if writer_resolution["provider_calls"] else None,
         ),
         *critic_resolution["provider_calls"],
         _build_provider_call(
@@ -2474,6 +2792,12 @@ def create_writing_run(
             writing_run_id=writing_run_id,
             request_id=request_id,
             trace_id=trace_id,
+            task_type=critic_assignment["task_type"] if critic_assignment else "critic_task",
+            assignment_id=critic_assignment["assignment_id"] if critic_assignment else None,
+            prompt_package_id=prompt_package_id,
+            input_refs=critic_input_refs,
+            output_ref=f"object://consistency-reports/{consistency_report_id}",
+            fallback_from_call_id=critic_resolution["provider_calls"][-1]["provider_call_id"] if critic_resolution["provider_calls"] else None,
         ),
         *humanizer_resolution["provider_calls"],
         _build_provider_call(
@@ -2487,6 +2811,12 @@ def create_writing_run(
             writing_run_id=writing_run_id,
             request_id=request_id,
             trace_id=trace_id,
+            task_type=humanizer_assignment["task_type"] if humanizer_assignment else "humanizer_task",
+            assignment_id=humanizer_assignment["assignment_id"] if humanizer_assignment else None,
+            prompt_package_id=prompt_package_id,
+            input_refs=humanizer_input_refs,
+            output_ref=f"object://writing-runs/{writing_run_id}",
+            fallback_from_call_id=humanizer_resolution["provider_calls"][-1]["provider_call_id"] if humanizer_resolution["provider_calls"] else None,
         ),
     ]
     retry_count = max(
@@ -2566,11 +2896,7 @@ def create_writing_run(
         task_id=task_id,
         task_type="create_writing_run",
         workspace_id=context["workspace_id"],
-        input_refs=[
-            f"object://chapter-plans/{chapter_plan_id}",
-            f"object://memory-packages/{memory_package_id}",
-            f"object://prompt-packages/{prompt_package_id}",
-        ],
+        input_refs=writer_input_refs,
         output_refs=[f"object://writing-runs/{writing_run_id}"],
         status="queued",
         progress=0,
@@ -2712,6 +3038,7 @@ def get_prompt_ranking_snapshot(target_id: Optional[str] = None) -> Optional[dic
     return deepcopy(snapshot)
 
 
+@_persisting_mutation
 def promote_feedback_record(
     feedback_record_id: str,
     promotion_status: str,
@@ -2748,6 +3075,7 @@ def promote_feedback_record(
     return record
 
 
+@_persisting_mutation
 def create_agent_task(
     payload: dict[str, Any],
     request_id: str = "system-task",
@@ -2816,7 +3144,261 @@ def get_agent_task(task_id: str) -> Optional[dict[str, Any]]:
     }
 
 
-def _build_chapter_snapshot(writing_run: dict[str, Any], section_runs: list[dict[str, Any]], chapter_plan: Optional[dict[str, Any]], accepted_chapter_ref: str, created_at: str) -> dict[str, Any]:
+@_persisting_mutation
+def list_runtime_tasks(status: Optional[str] = None) -> list[dict[str, Any]]:
+    tasks = [
+        *[run["task"] for run in STORE.extraction_runs.values() if run.get("task")],
+        *STORE.chapter_plan_tasks.values(),
+        *STORE.section_plan_tasks.values(),
+        *STORE.writing_run_tasks.values(),
+        *STORE.agent_tasks.values(),
+    ]
+    if status:
+        tasks = [task for task in tasks if task["status"] == status]
+    return sorted((deepcopy(task) for task in tasks), key=lambda item: (item["created_at"], item["task_id"]))
+
+
+def _find_task_record(task_id: str) -> tuple[Optional[dict[str, Any]], Optional[str], Optional[str]]:
+    for run_id, run in STORE.extraction_runs.items():
+        task = run.get("task")
+        if task and task["task_id"] == task_id:
+            return task, "extraction_run", run_id
+    for chapter_plan_id, task in STORE.chapter_plan_tasks.items():
+        if task["task_id"] == task_id:
+            return task, "chapter_plan", chapter_plan_id
+    for chapter_plan_id, task in STORE.section_plan_tasks.items():
+        if task["task_id"] == task_id:
+            return task, "section_plan", chapter_plan_id
+    for writing_run_id, task in STORE.writing_run_tasks.items():
+        if task["task_id"] == task_id:
+            return task, "writing_run", writing_run_id
+    task = STORE.agent_tasks.get(task_id)
+    if task:
+        return task, "agent_task", task_id
+    return None, None, None
+
+
+@_persisting_mutation
+def mark_task_dispatched(
+    task_id: str,
+    request_id: str = "system-dispatch",
+    trace_id: str = "system-trace",
+    actor_id: str = "scheduler",
+) -> Optional[dict[str, Any]]:
+    task, task_kind, entity_id = _find_task_record(task_id)
+    if not task:
+        return None
+    now = utc_now()
+    task["status"] = "in_progress"
+    task["progress"] = max(task.get("progress", 0), 10)
+    task["started_at"] = task.get("started_at") or now
+    task["error_code"] = None
+    _append_task_event(
+        task,
+        "dispatched",
+        f"{task['task_type']} dispatched to worker.",
+        task["status"],
+        request_id,
+        trace_id,
+        actor_id,
+        agent_role="scheduler",
+        payload_json={"task_kind": task_kind, "entity_id": entity_id},
+        created_at=now,
+    )
+    return deepcopy(task)
+
+
+@_persisting_mutation
+def apply_task_execution_result(
+    task_id: str,
+    status: str,
+    output_refs: list[str],
+    metrics: dict[str, Any],
+    trace_id: str,
+    request_id: str = "system-worker",
+    actor_id: str = "ai-worker",
+) -> Optional[dict[str, Any]]:
+    task, task_kind, entity_id = _find_task_record(task_id)
+    if not task or not task_kind or not entity_id:
+        return None
+    now = utc_now()
+    task["status"] = status
+    task["output_refs"] = output_refs
+    task["progress"] = 100 if status in {"succeeded", "requires_review"} else max(task.get("progress", 0), 85)
+    task["finished_at"] = now if status in {"succeeded", "requires_review", "blocked", "failed"} else task.get("finished_at")
+    task["latency_ms"] = metrics.get("latency_ms", 1000)
+    task["error_code"] = metrics.get("error_code")
+
+    if task_kind == "extraction_run":
+        run = STORE.extraction_runs.get(entity_id)
+        graph_summary = metrics.get("graph_summary")
+        knowledge_objects = metrics.get("knowledge_objects")
+        if run:
+            run["status"] = status
+            run["current_stage"] = metrics.get("current_stage", run["current_stage"])
+            run["chapter_count"] = metrics.get("chapter_count", run["chapter_count"])
+            run["scene_count"] = metrics.get("scene_count", run["scene_count"])
+            run["object_count"] = metrics.get("object_count", run["object_count"])
+            run["evidence_count"] = metrics.get("evidence_count", run["evidence_count"])
+            run["low_confidence_count"] = metrics.get("low_confidence_count", run["low_confidence_count"])
+            run["errors"] = deepcopy(metrics.get("errors", run["errors"]))
+            run["started_at"] = task.get("started_at") or run.get("started_at")
+            run["finished_at"] = task.get("finished_at")
+            if knowledge_objects is not None:
+                STORE.knowledge_by_run[entity_id] = []
+                for item in knowledge_objects:
+                    STORE.knowledge_objects[item["object_id"]] = deepcopy(item)
+                    STORE.knowledge_by_run[entity_id].append(item["object_id"])
+            if graph_summary is not None:
+                STORE.graph_summaries[run["book_id"]] = deepcopy(graph_summary)
+    elif task_kind == "chapter_plan":
+        chapter_plan = STORE.chapter_plans.get(entity_id)
+        if chapter_plan:
+            chapter_plan["status"] = status
+            chapter_plan["updated_at"] = now
+            chapter_plan["payload"] = {
+                **chapter_plan.get("payload", {}),
+                "planning_stages": metrics.get("planning_stages", []),
+                "current_stage": metrics.get("current_stage"),
+                "summary": chapter_plan.get("payload", {}).get("summary") or f"第 {chapter_plan['chapter_index']} 章规划已生成。",
+            }
+    elif task_kind == "section_plan":
+        chapter_plan = STORE.chapter_plans.get(entity_id)
+        items = STORE.section_plans_by_chapter.get(entity_id, [])
+        if chapter_plan:
+            chapter_plan["status"] = "requires_review" if items else status
+            chapter_plan["updated_at"] = now
+        for item in items:
+            item["updated_at"] = now
+    elif task_kind == "writing_run":
+        writing_run = STORE.writing_runs.get(entity_id)
+        quality_report = STORE.quality_reports.get(writing_run["quality_report_id"]) if writing_run else None
+        consistency_report = STORE.consistency_reports.get(writing_run.get("consistency_report_id", "")) if writing_run else None
+        revision_summary = STORE.revision_summaries.get(writing_run.get("revision_summary_id", "")) if writing_run else None
+        memory_package = STORE.memory_packages.get(writing_run["memory_package_id"]) if writing_run else None
+        prompt_package = STORE.prompt_packages.get(writing_run["prompt_package_id"]) if writing_run else None
+        quality_payload = metrics.get("quality_report")
+        consistency_payload = metrics.get("consistency_report")
+        revision_payload = metrics.get("revision_summary")
+        memory_payload = metrics.get("memory_package")
+        prompt_payload = metrics.get("prompt_package")
+        section_run_updates = metrics.get("section_runs")
+        provider_calls = metrics.get("provider_calls")
+        feedback_records = metrics.get("feedback_records", [])
+        if writing_run:
+            writing_run["status"] = status
+            writing_run["current_stage"] = metrics.get("current_stage", writing_run["current_stage"])
+            writing_run["assembled_chapter"] = metrics.get("assembled_chapter", writing_run["assembled_chapter"])
+            if "model_cost" in metrics:
+                writing_run["model_cost"] = deepcopy(metrics["model_cost"])
+            writing_run["updated_at"] = now
+        if memory_package and memory_payload:
+            memory_package["summary"] = memory_payload.get("summary", memory_package["summary"])
+            memory_package["source_refs"] = deepcopy(memory_payload.get("source_refs", memory_package.get("source_refs", [])))
+            memory_package["updated_at"] = now
+        if prompt_package and prompt_payload:
+            prompt_package["summary"] = prompt_payload.get("summary", prompt_package["summary"])
+            prompt_package["template_refs"] = deepcopy(prompt_payload.get("template_refs", prompt_package.get("template_refs", [])))
+            prompt_package["updated_at"] = now
+        if provider_calls is not None and writing_run:
+            STORE.provider_calls_by_writing[entity_id] = deepcopy(provider_calls)
+        if quality_report:
+            if quality_payload:
+                quality_report["status"] = quality_payload.get("status", quality_report["status"])
+                quality_report["human_review_required"] = quality_payload.get("human_review_required", quality_report["human_review_required"])
+                quality_report["blocking_issues"] = deepcopy(quality_payload.get("blocking_issues", quality_report["blocking_issues"]))
+                quality_report["ai_flavor_score"] = quality_payload.get("ai_flavor_score", quality_report["ai_flavor_score"])
+                quality_report["mobile_readability_score"] = quality_payload.get("mobile_readability_score", quality_report["mobile_readability_score"])
+                quality_report["originality_safety_score"] = quality_payload.get("originality_safety_score", quality_report["originality_safety_score"])
+            else:
+                quality_report["status"] = "requires_review" if status == "requires_review" else status
+                quality_report["human_review_required"] = status == "requires_review"
+                quality_report["blocking_issues"] = metrics.get("blocking_issues", quality_report["blocking_issues"])
+                quality_report["ai_flavor_score"] = metrics.get("ai_flavor_score", quality_report["ai_flavor_score"])
+                quality_report["mobile_readability_score"] = metrics.get("mobile_readability_score", quality_report["mobile_readability_score"])
+                quality_report["originality_safety_score"] = metrics.get("originality_safety_score", quality_report["originality_safety_score"])
+            quality_report["updated_at"] = now
+        if consistency_report:
+            if consistency_payload:
+                issues = deepcopy(consistency_payload.get("issues", consistency_report.get("issues", [])))
+                consistency_report["status"] = consistency_payload.get("status", consistency_report["status"])
+                consistency_report["issue_count"] = consistency_payload.get("issue_count", len(issues))
+                consistency_report["blocking_issue_count"] = consistency_payload.get(
+                    "blocking_issue_count",
+                    len([item for item in issues if item.get("resolution_status") == "open"]),
+                )
+                consistency_report["checked_domains"] = deepcopy(
+                    consistency_payload.get("checked_domains", consistency_report.get("checked_domains", []))
+                )
+                consistency_report["issues"] = issues
+                consistency_report["input_refs"] = deepcopy(consistency_payload.get("input_refs", consistency_report.get("input_refs", [])))
+                consistency_report["output_refs"] = deepcopy(consistency_payload.get("output_refs", consistency_report.get("output_refs", [])))
+            else:
+                consistency_report["status"] = "blocked" if metrics.get("blocking_issue_count", 0) else "passed"
+                consistency_report["issue_count"] = metrics.get("issue_count", consistency_report["issue_count"])
+                consistency_report["blocking_issue_count"] = metrics.get("blocking_issue_count", consistency_report["blocking_issue_count"])
+            consistency_report["updated_at"] = now
+        if revision_summary:
+            if revision_payload:
+                revision_summary["status"] = revision_payload.get("status", revision_summary["status"])
+                revision_summary["revision_round"] = revision_payload.get("revision_round", revision_summary["revision_round"])
+                revision_summary["max_revision_rounds"] = revision_payload.get("max_revision_rounds", revision_summary["max_revision_rounds"])
+                revision_summary["source_issue_ids"] = deepcopy(revision_payload.get("source_issue_ids", revision_summary.get("source_issue_ids", [])))
+                revision_summary["change_summary"] = revision_payload.get("change_summary", revision_summary["change_summary"])
+                revision_summary["revision_diff_ref"] = revision_payload.get("revision_diff_ref", revision_summary.get("revision_diff_ref"))
+                revision_summary["reviewer_note_ref"] = revision_payload.get("reviewer_note_ref", revision_summary.get("reviewer_note_ref"))
+                revision_summary["input_refs"] = deepcopy(revision_payload.get("input_refs", revision_summary.get("input_refs", [])))
+                revision_summary["output_refs"] = deepcopy(revision_payload.get("output_refs", revision_summary.get("output_refs", [])))
+            else:
+                revision_summary["status"] = "requested" if metrics.get("blocking_issue_count", 0) else "accepted"
+                revision_summary["change_summary"] = metrics.get("revision_summary", revision_summary["change_summary"])
+            revision_summary["updated_at"] = now
+        current_section_runs = STORE.section_runs_by_writing.get(entity_id, [])
+        if section_run_updates:
+            by_id = {item["section_run_id"]: item for item in current_section_runs}
+            for item in section_run_updates:
+                section_run = by_id.get(item["section_run_id"])
+                if not section_run:
+                    continue
+                for field in ("status", "writer_output", "critic_issues", "humanized_text", "beat_status", "draft_object_ref", "critic_report_ref", "humanized_object_ref", "model_profile_id"):
+                    if field in item:
+                        section_run[field] = deepcopy(item[field])
+                section_run["updated_at"] = now
+        else:
+            for section_run in current_section_runs:
+                section_run["status"] = "humanized"
+                section_run["writer_output"] = metrics.get("assembled_chapter", section_run["writer_output"] or "已生成段落。")
+                section_run["humanized_text"] = metrics.get("assembled_chapter", section_run["humanized_text"] or "已润色段落。")
+                section_run["updated_at"] = now
+        for feedback_record in feedback_records:
+            STORE.feedback_records[feedback_record["feedback_record_id"]] = deepcopy(feedback_record)
+        if writing_run:
+            _sync_writing_run_phase_one_state(writing_run)
+
+    event_type = "review_required" if status == "requires_review" else status
+    _append_task_event(
+        task,
+        event_type,
+        f"{task['task_type']} finished with status {status}.",
+        task["status"],
+        request_id,
+        trace_id,
+        actor_id,
+        agent_role="ai-worker",
+        payload_json={"metrics": metrics, "output_refs": output_refs, "task_kind": task_kind, "entity_id": entity_id},
+        error_code=metrics.get("error_code"),
+        created_at=now,
+    )
+    return deepcopy(task)
+
+
+def _build_chapter_snapshot(
+    writing_run: dict[str, Any],
+    section_runs: list[dict[str, Any]],
+    chapter_plan: Optional[dict[str, Any]],
+    accepted_chapter_ref: str,
+    created_at: str,
+) -> dict[str, Any]:
     chapter_snapshot_id = writing_run.get("chapter_snapshot_id") or f"chapter-snapshot:{writing_run['writing_run_id']}"
     chapter_payload = chapter_plan.get("payload", {}) if chapter_plan else {}
     return {
@@ -2893,6 +3475,7 @@ def _acceptance_ready(writing_run: dict[str, Any], quality_report: Optional[dict
     return has_feedback and has_section_outputs and consistency_clear and quality_clear and review_clear and revision_clear
 
 
+@_persisting_mutation
 def accept_chapter(
     writing_run_id: str,
     trace_id: str,
@@ -3149,6 +3732,7 @@ def get_pattern(pattern_id: str) -> Optional[dict[str, Any]]:
     return deepcopy(pattern) if pattern else None
 
 
+@_persisting_mutation
 def create_pattern(
     payload: dict[str, Any],
     request_id: str = "system-pattern",
@@ -3210,6 +3794,7 @@ def get_rhythm_profile(rhythm_profile_id: str) -> Optional[dict[str, Any]]:
     return deepcopy(profile) if profile else None
 
 
+@_persisting_mutation
 def create_rhythm_profile(
     payload: dict[str, Any],
     request_id: str = "system-rhythm",
@@ -3260,6 +3845,7 @@ def get_asset(asset_id: str) -> Optional[dict[str, Any]]:
     return deepcopy(asset) if asset else None
 
 
+@_persisting_mutation
 def create_asset(
     payload: dict[str, Any],
     request_id: str = "system-asset",
@@ -3300,6 +3886,7 @@ def get_rule(rule_id: str) -> Optional[dict[str, Any]]:
     return STORE.rules.get(rule_id)
 
 
+@_persisting_mutation
 def apply_writing_review_action(
     writing_run_id: str,
     payload: dict[str, Any],

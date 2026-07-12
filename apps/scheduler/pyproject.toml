@@ -6,6 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "novel-factory-scheduler"
 version = "0.1.0"
 requires-python = ">=3.9"
+dependencies = [
+  "dramatiq[redis]>=1.17,<2.0",
+  "redis>=5,<6",
+  "psycopg[binary]>=3.2,<4.0"
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,3 +1,4 @@
+from worker.core_store import load_phase_two_store
 from worker.extraction import (
     BOOK_ID,
     PIPELINE_STAGES,
@@ -25,9 +26,13 @@ def test_build_extraction_fixture_matches_phase_two_shape() -> None:
 
 
 def test_run_extract_knowledge_returns_requires_review_result() -> None:
+    store = load_phase_two_store()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
     command = build_extract_knowledge_command(trace_id="trace-worker")
 
     result = run_extract_knowledge(command)
+    report = store.get_extraction_report(RUN_ID)
 
     assert result["task_id"] == TASK_ID
     assert result["status"] == "requires_review"
@@ -35,6 +40,9 @@ def test_run_extract_knowledge_returns_requires_review_result() -> None:
     assert result["metrics"]["current_stage"] == "quality_review"
     assert result["metrics"]["low_confidence_count"] == 2
     assert result["output_refs"][0] == f"object://extraction-runs/{RUN_ID}"
+    assert report["run"]["status"] == "requires_review"
+    assert report["run"]["book_id"] == BOOK_ID
+    assert len(report["low_confidence_items"]) == 2
 
 
 def test_extract_knowledge_actor_name_is_stable() -> None:

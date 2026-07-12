@@ -57,6 +57,32 @@ export type GraphNodeState = {
   nodeId: string;
   label: string;
   nodeType: string;
+  evidenceRefs: string[];
+};
+
+export type GraphNodeDetailState = {
+  nodeId: string;
+  bookId: string;
+  label: string;
+  nodeType: string;
+  canonicalObjectId: string;
+  reviewStatus: string;
+  lifecycleStatus: string;
+  confidence: number;
+  aliases: string[];
+  summary: string;
+  evidenceRefs: string[];
+};
+
+export type GraphNeighborState = {
+  edgeId: string;
+  relationType: string;
+  direction: "incoming" | "outgoing";
+  neighborNodeId: string;
+  neighborLabel: string;
+  neighborType: string;
+  confidence: number;
+  evidenceRefs: string[];
 };
 
 export type NovelProjectState = {
@@ -586,6 +612,8 @@ export type PhaseTwoState = {
   run: ExtractionRunState;
   knowledgeObjects: KnowledgeObject[];
   graphNodes: GraphNodeState[];
+  graphNodeDetails: Record<string, GraphNodeDetailState>;
+  graphNeighborsByNode: Record<string, GraphNeighborState[]>;
   projects: NovelProjectState[];
   storyBibles: StoryBibleState[];
   chapterPlans: ChapterPlanState[];
@@ -776,10 +804,114 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
       },
     ],
     graphNodes: [
-      { nodeId: "01JZNODE000000000000000001", label: "Xiao Yan", nodeType: "character" },
-      { nodeId: "01JZNODE000000000000000002", label: "Yao Lao", nodeType: "mentor" },
-      { nodeId: "01JZNODE000000000000000003", label: "Xiao Clan", nodeType: "clan" },
+      {
+        nodeId: "01JZNODE000000000000000001",
+        label: "Xiao Yan",
+        nodeType: "character",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000001"],
+      },
+      {
+        nodeId: "01JZNODE000000000000000002",
+        label: "Yao Lao",
+        nodeType: "mentor",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000002"],
+      },
+      {
+        nodeId: "01JZNODE000000000000000003",
+        label: "Xiao Clan",
+        nodeType: "clan",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000003"],
+      },
     ],
+    graphNodeDetails: {
+      "01JZNODE000000000000000001": {
+        nodeId: "01JZNODE000000000000000001",
+        bookId: DEMO_BOOK_ID,
+        label: "Xiao Yan",
+        nodeType: "character",
+        canonicalObjectId: "01JZOBJ0000000000000000001",
+        reviewStatus: "pending",
+        lifecycleStatus: "candidate",
+        confidence: 0.58,
+        aliases: ["Yan"],
+        summary: "乌坦城萧家少年，正处于天赋跌落后的低谷期。",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000001"],
+      },
+      "01JZNODE000000000000000002": {
+        nodeId: "01JZNODE000000000000000002",
+        bookId: DEMO_BOOK_ID,
+        label: "Yao Lao",
+        nodeType: "mentor",
+        canonicalObjectId: "01JZOBJ0000000000000000002",
+        reviewStatus: "pending",
+        lifecycleStatus: "candidate",
+        confidence: 0.44,
+        aliases: ["Old Yao"],
+        summary: "寄宿戒指中的神秘导师，对主角成长线至关重要。",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000002"],
+      },
+      "01JZNODE000000000000000003": {
+        nodeId: "01JZNODE000000000000000003",
+        bookId: DEMO_BOOK_ID,
+        label: "Xiao Clan",
+        nodeType: "clan",
+        canonicalObjectId: "01JZOBJ0000000000000000003",
+        reviewStatus: "approved",
+        lifecycleStatus: "approved",
+        confidence: 0.97,
+        aliases: [],
+        summary: "乌坦城本地家族势力，也是主角当前承受压力的核心环境。",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000003"],
+      },
+    },
+    graphNeighborsByNode: {
+      "01JZNODE000000000000000001": [
+        {
+          edgeId: "01JZEDGE000000000000000001",
+          relationType: "mentored_by",
+          direction: "outgoing",
+          neighborNodeId: "01JZNODE000000000000000002",
+          neighborLabel: "Yao Lao",
+          neighborType: "mentor",
+          confidence: 0.91,
+          evidenceRefs: ["evidence://01JZEVIDENCE0000000000002"],
+        },
+        {
+          edgeId: "01JZEDGE000000000000000002",
+          relationType: "member_of",
+          direction: "outgoing",
+          neighborNodeId: "01JZNODE000000000000000003",
+          neighborLabel: "Xiao Clan",
+          neighborType: "clan",
+          confidence: 0.96,
+          evidenceRefs: ["evidence://01JZEVIDENCE0000000000003"],
+        },
+      ],
+      "01JZNODE000000000000000002": [
+        {
+          edgeId: "01JZEDGE000000000000000001",
+          relationType: "mentors",
+          direction: "incoming",
+          neighborNodeId: "01JZNODE000000000000000001",
+          neighborLabel: "Xiao Yan",
+          neighborType: "character",
+          confidence: 0.91,
+          evidenceRefs: ["evidence://01JZEVIDENCE0000000000002"],
+        },
+      ],
+      "01JZNODE000000000000000003": [
+        {
+          edgeId: "01JZEDGE000000000000000002",
+          relationType: "has_member",
+          direction: "incoming",
+          neighborNodeId: "01JZNODE000000000000000001",
+          neighborLabel: "Xiao Yan",
+          neighborType: "character",
+          confidence: 0.96,
+          evidenceRefs: ["evidence://01JZEVIDENCE0000000000003"],
+        },
+      ],
+    },
     projects: [
       {
         projectId: DEMO_PROJECT_ID,
@@ -1525,14 +1657,20 @@ export function applyReviewActionToState(
   });
 
   const pending = deriveLowConfidenceItems(knowledgeObjects);
+  const runStatus = action === "request_reextract" ? "queued" : pending.length === 0 ? "succeeded" : state.run.status;
+  const runStage = action === "request_reextract"
+    ? "source_submission"
+    : pending.length === 0
+      ? "knowledge_package_export"
+      : state.run.currentStage;
   return {
     ...state,
     knowledgeObjects,
     run: {
       ...state.run,
       lowConfidenceCount: pending.length,
-      status: pending.length === 0 ? "succeeded" : state.run.status,
-      currentStage: pending.length === 0 ? "knowledge_package_export" : state.run.currentStage,
+      status: runStatus,
+      currentStage: runStage,
     },
     activityLog: [...state.activityLog, `已执行审核动作：${reviewActionLabels[action]}。`],
   };

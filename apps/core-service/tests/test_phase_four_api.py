@@ -14,6 +14,9 @@ def load_app():
             sys.modules.pop(name)
     sys.path.insert(0, str(ROOT))
     try:
+        store = importlib.import_module("app.core.phase_two_store")
+        store.reset_store()
+        store.seed_phase_two_demo_data()
         return importlib.import_module("app.main").app
     finally:
         sys.path.pop(0)
@@ -69,6 +72,8 @@ def test_get_configuration_snapshot_and_toggle_model_profile() -> None:
     assert snapshot_response.status_code == 200
     snapshot = snapshot_response.json()["data"]
     assert snapshot["default_model_profile_id"] == "model_profile_default"
+    assert snapshot["workspace_id"] == "demo-workspace"
+    assert snapshot["trace_id"] == "trace-config-snapshot"
     assert any(item["agent_role"] == "writer" and item["enabled"] for item in snapshot["agent_model_assignments"])
     assert any(item["agent_role"] == "feedback" and item["enabled"] for item in snapshot["agent_model_assignments"])
     assert disable_response.status_code == 200
@@ -135,6 +140,9 @@ def test_create_writing_run_returns_seeded_quality_and_provider_calls() -> None:
     assert len(payload["data"]["section_runs"]) == 3
     assert payload["data"]["quality_report"]["status"] == "queued"
     assert len(payload["data"]["provider_calls"]) == 4
+    assert payload["data"]["provider_calls"][0]["provider_model_name"] == "claude-sonnet-5"
+    assert payload["data"]["provider_calls"][0]["provider_account_id"] == "provider-account-anthropic-default"
+    assert payload["data"]["provider_calls"][0]["output_ref"].startswith("object://drafts/")
     assert payload["data"]["provider_calls"][1]["error_code"] == "structured_output_validation_failed"
 
 

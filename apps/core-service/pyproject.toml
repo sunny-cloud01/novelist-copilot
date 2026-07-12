@@ -11,7 +11,8 @@ dependencies = [
   "uvicorn[standard]>=0.30,<1.0",
   "pydantic>=2.8,<3.0",
   "ulid-py>=1.1,<2.0",
-  "httpx>=0.28,<1.0"
+  "httpx>=0.28,<1.0",
+  "psycopg[binary]>=3.2,<4.0"
 ]
 
 [tool.setuptools.packages.find]

@@ -50,6 +50,21 @@ def test_smoke_script_runs_root_lint_and_test_checks() -> None:
     assert "pnpm test" in script
 
 
+def test_package1_dev_scripts_exist() -> None:
+    bootstrap = Path("scripts/dev/bootstrap-package1.sh").read_text()
+    assert "docker compose -f infra/docker-compose.yml up -d --build" in bootstrap
+    assert "core-service" in bootstrap
+    assert "scheduler" in bootstrap
+
+    reset_script = Path("scripts/dev/reset-package1-state.py").read_text()
+    assert "store.reset_store()" in reset_script
+    assert "store.seed_phase_two_demo_data()" in reset_script
+
+    verify = Path("scripts/dev/verify-package1.sh").read_text()
+    assert "docker compose -f infra/docker-compose.yml config" in verify
+    assert "apps/core-service/tests/test_persistence.py" in verify
+
+
 def test_ci_workflow_exists_and_runs_minimum_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text()
     assert "pnpm lint" in workflow

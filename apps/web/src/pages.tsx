@@ -41,6 +41,10 @@ const statusLabels: Record<string, string> = {
   requested: "已请求",
   open: "未解决",
   resolved: "已解决",
+  candidate: "候选",
+  merged: "已合并",
+  reextract_requested: "已请求重抽",
+  in_progress: "处理中",
 };
 
 const stageLabels: Record<string, string> = {
@@ -383,6 +387,17 @@ export function KnowledgeReviewPage() {
         <h2>知识审核</h2>
         <p>对候选对象执行通过、驳回、合并别名或请求重抽。</p>
       </div>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>抽取运行状态</h3>
+        <dl>
+          <dt>状态</dt>
+          <dd>{labelOf(statusLabels, state.run.status)}</dd>
+          <dt>当前阶段</dt>
+          <dd>{labelOf(stageLabels, state.run.currentStage)}</dd>
+          <dt>低置信对象数</dt>
+          <dd>{state.run.lowConfidenceCount}</dd>
+        </dl>
+      </section>
       <ul style={{ display: "grid", gap: 16, padding: 0, listStyle: "none" }}>
         {lowConfidenceItems.map((item) => (
           <li key={item.objectId} style={{ border: "1px solid #d4d4d8", padding: 16 }}>
@@ -420,16 +435,73 @@ export function KnowledgeReviewPage() {
 
 export function GraphPage() {
   const { state } = usePhaseTwo();
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(state.graphNodes[0]?.nodeId ?? "");
+  const selectedNode = selectedNodeId ? state.graphNodeDetails[selectedNodeId] : undefined;
+  const neighbors = selectedNodeId ? state.graphNeighborsByNode[selectedNodeId] ?? [] : [];
 
   return (
-    <section>
-      <h2>故事图谱查看器</h2>
-      <p>查看节点、关系与快照细节。</p>
-      <ul>
-        {state.graphNodes.map((node) => (
-          <li key={node.nodeId}>{node.label}（{labelOf(objectTypeLabels, node.nodeType)}）</li>
-        ))}
-      </ul>
+    <section style={{ display: "grid", gap: 16 }}>
+      <div>
+        <h2>故事图谱查看器</h2>
+        <p>查看节点、关系与快照细节。</p>
+      </div>
+      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+        <h3>图谱节点</h3>
+        <ul style={{ display: "grid", gap: 12, padding: 0, listStyle: "none" }}>
+          {state.graphNodes.map((node) => (
+            <li key={node.nodeId} style={{ border: "1px solid #e4e4e7", padding: 12 }}>
+              <button type="button" onClick={() => setSelectedNodeId(node.nodeId)}>
+                {node.label}（{labelOf(objectTypeLabels, node.nodeType)}）
+              </button>
+              <p>证据 {node.evidenceRefs.length} 条</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {selectedNode ? (
+        <>
+          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+            <h3>节点详情</h3>
+            <dl>
+              <dt>名称</dt>
+              <dd>{selectedNode.label}</dd>
+              <dt>类型</dt>
+              <dd>{labelOf(objectTypeLabels, selectedNode.nodeType)}</dd>
+              <dt>审核状态</dt>
+              <dd>{labelOf(statusLabels, selectedNode.reviewStatus)}</dd>
+              <dt>生命周期</dt>
+              <dd>{labelOf(statusLabels, selectedNode.lifecycleStatus)}</dd>
+              <dt>置信度</dt>
+              <dd>{selectedNode.confidence}</dd>
+              <dt>别名</dt>
+              <dd>{selectedNode.aliases.join("、") || "无"}</dd>
+              <dt>对象引用</dt>
+              <dd>{selectedNode.canonicalObjectId}</dd>
+            </dl>
+            <p>{selectedNode.summary}</p>
+          </section>
+          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+            <h3>关系查看</h3>
+            {neighbors.length === 0 ? <p>当前节点暂无关系。</p> : null}
+            <ul>
+              {neighbors.map((neighbor) => (
+                <li key={neighbor.edgeId}>
+                  {neighbor.direction === "outgoing" ? "指向" : "来自"}
+                  {neighbor.neighborLabel} · {neighbor.relationType} · 置信度 {neighbor.confidence}
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+            <h3>Source evidence</h3>
+            <ul>
+              {selectedNode.evidenceRefs.map((ref) => (
+                <li key={ref}>{ref}</li>
+              ))}
+            </ul>
+          </section>
+        </>
+      ) : null}
     </section>
   );
 }

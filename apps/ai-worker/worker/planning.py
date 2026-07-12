@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from worker.core_store import load_phase_two_store
+
 
 WORKSPACE_ID = "01JZWORKSPACE0000000000001"
 PROJECT_ID = "01JZPROJECT000000000000001"
@@ -233,37 +235,65 @@ def build_section_plan_fixture(command: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_create_chapter_plan(command: dict[str, Any]) -> dict[str, Any]:
-    fixture = build_chapter_plan_fixture(command)
+    store = load_phase_two_store()
+    chapter_plan_id = command["chapter_plan_id"]
+    chapter_plan = store.STORE.chapter_plans.get(chapter_plan_id)
+    metrics = {
+        "planning_stages": PLANNING_STAGES,
+        "current_stage": "quality_review",
+        "chapter_index": command["chapter_index"],
+        "target_word_count": command["target_word_count"],
+        "generated_at": utc_now(),
+    }
+    if chapter_plan:
+        chapter_plan["payload"] = {
+            **chapter_plan.get("payload", {}),
+            "title": chapter_plan.get("payload", {}).get("title") or f"第{command['chapter_index']}章规划",
+            "summary": chapter_plan.get("payload", {}).get("summary") or f"第 {command['chapter_index']} 章完成故事推进规划。",
+            "planning_stages": PLANNING_STAGES,
+            "current_stage": "quality_review",
+        }
+    task = store.apply_task_execution_result(
+        command["task_id"],
+        "requires_review",
+        [f"object://chapter-plans/{chapter_plan_id}"],
+        metrics,
+        trace_id=command["trace_id"],
+    )
     return {
         "schema_version": 1,
         "task_id": command["task_id"],
         "status": "requires_review",
-        "output_refs": fixture["task"]["output_refs"],
-        "metrics": {
-            "planning_stages": PLANNING_STAGES,
-            "current_stage": "quality_review",
-            "chapter_index": fixture["chapter_plan"]["chapter_index"],
-            "target_word_count": fixture["chapter_plan"]["target_word_count"],
-            "generated_at": utc_now(),
-        },
+        "output_refs": task["output_refs"] if task else [f"object://chapter-plans/{chapter_plan_id}"],
+        "metrics": metrics,
         "errors": [],
         "trace_id": command["trace_id"],
     }
 
 
 def run_create_section_plans(command: dict[str, Any]) -> dict[str, Any]:
-    fixture = build_section_plan_fixture(command)
+    store = load_phase_two_store()
+    chapter_plan_id = command["chapter_plan_id"]
+    items = store.STORE.section_plans_by_chapter.get(chapter_plan_id, [])
+    metrics = {
+        "planning_stages": PLANNING_STAGES,
+        "current_stage": "quality_review",
+        "section_count": len(items),
+        "generated_at": utc_now(),
+    }
+    task = store.apply_task_execution_result(
+        command["task_id"],
+        "succeeded",
+        [f"object://section-plans/{item['section_plan_id']}" for item in items],
+        metrics,
+        trace_id=command["trace_id"],
+    )
     return {
         "schema_version": 1,
         "task_id": command["task_id"],
         "status": "succeeded",
-        "output_refs": fixture["task"]["output_refs"],
-        "metrics": {
-            "planning_stages": PLANNING_STAGES,
-            "current_stage": "quality_review",
-            "section_count": len(fixture["items"]),
-            "generated_at": utc_now(),
-        },
+        "output_refs": task["output_refs"] if task else [f"object://section-plans/{item['section_plan_id']}" for item in items],
+        "metrics": metrics,
         "errors": [],
         "trace_id": command["trace_id"],
     }

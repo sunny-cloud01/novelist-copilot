@@ -12,15 +12,25 @@
     "request_id",
     "trace_id",
     "agent_role",
+    "task_type",
+    "assignment_id",
     "model_profile_id",
     "provider_name",
+    "provider_model_name",
+    "provider_account_id",
+    "prompt_package_id",
+    "input_refs",
+    "output_ref",
     "prompt_tokens",
     "completion_tokens",
     "latency_ms",
     "retry_count",
     "cost_estimate",
+    "cost_estimate_status",
     "status",
-    "error_code"
+    "error_code",
+    "fallback_from_call_id",
+    "created_at"
   ],
   "properties": {
     "schema_version": { "type": "integer", "minimum": 1 },
@@ -31,15 +41,28 @@
     "request_id": { "type": "string", "minLength": 1 },
     "trace_id": { "type": "string", "minLength": 1 },
     "agent_role": { "type": "string", "minLength": 1 },
+    "task_type": { "type": "string", "minLength": 1 },
+    "assignment_id": { "type": ["string", "null"], "minLength": 1 },
     "model_profile_id": { "type": "string", "minLength": 1 },
     "provider_name": { "type": "string", "minLength": 1 },
+    "provider_model_name": { "type": "string", "minLength": 1 },
+    "provider_account_id": { "type": ["string", "null"], "minLength": 1 },
+    "prompt_package_id": { "type": ["string", "null"], "minLength": 1 },
+    "input_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output_ref": { "type": ["string", "null"], "minLength": 1 },
     "prompt_tokens": { "type": "integer", "minimum": 0 },
     "completion_tokens": { "type": "integer", "minimum": 0 },
     "latency_ms": { "type": "integer", "minimum": 0 },
     "retry_count": { "type": "integer", "minimum": 0 },
     "cost_estimate": { "type": "number", "minimum": 0 },
+    "cost_estimate_status": { "type": "string", "enum": ["estimated", "missing_price_config"] },
     "status": { "type": "string", "enum": ["succeeded", "failed", "retrying"] },
-    "error_code": { "type": ["string", "null"] }
+    "error_code": { "type": ["string", "null"] },
+    "fallback_from_call_id": { "type": ["string", "null"], "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" }
   },
   "additionalProperties": false
 }

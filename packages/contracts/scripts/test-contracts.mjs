@@ -24,6 +24,8 @@ const ajv = new Ajv2020({ allErrors: true, strict: false, schemas: [
   JSON.parse(fs.readFileSync(path.join(root, "schemas/knowledge-object.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/review-action-command.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/graph-summary.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/graph-node.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/graph-neighbors.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/novel-project.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/workspace.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/workspace-member.schema.json"), "utf8")),
@@ -113,6 +115,26 @@ assertValid(
   "https://novelfactory.dev/schemas/knowledge-object.schema.json",
   readFixture("fixtures/knowledge-review/valid/knowledge-object.json"),
   "knowledge-object",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/graph-node.schema.json",
+  readFixture("fixtures/knowledge-review/valid/graph-node.json"),
+  "graph-node",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/graph-node.schema.json",
+  readFixture("fixtures/knowledge-review/invalid/graph-node-invalid-confidence.json"),
+  "graph-node",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/graph-neighbors.schema.json",
+  readFixture("fixtures/knowledge-review/valid/graph-neighbors.json"),
+  "graph-neighbors",
+);
+assertInvalid(
+  "https://novelfactory.dev/schemas/graph-neighbors.schema.json",
+  readFixture("fixtures/knowledge-review/invalid/graph-neighbors-invalid-direction.json"),
+  "graph-neighbors",
 );
 
 assertValid(

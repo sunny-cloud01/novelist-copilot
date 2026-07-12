@@ -22,6 +22,37 @@ export type ApiErrorEnvelope = {
   meta: Partial<RequestMeta>;
 };
 
+export type GraphNode = {
+  schema_version: number;
+  node_id: string;
+  book_id: string;
+  label: string;
+  node_type: string;
+  canonical_object_id: string;
+  review_status: string;
+  lifecycle_status: string;
+  confidence: number;
+  aliases: string[];
+  summary: string;
+  evidence_refs: string[];
+};
+
+export type GraphNeighbor = {
+  edge_id: string;
+  relation_type: string;
+  direction: "incoming" | "outgoing";
+  neighbor_node_id: string;
+  neighbor_label: string;
+  neighbor_type: string;
+  confidence: number;
+  evidence_refs: string[];
+};
+
+export type GraphNeighbors = {
+  node_id: string;
+  items: GraphNeighbor[];
+};
+
 export type RankingType = "prompt" | "pattern" | "knowledge" | "rhythm" | "asset";
 
 export type RankingTargetType = "prompt_version" | "pattern" | "knowledge_object" | "rhythm_profile" | "asset";

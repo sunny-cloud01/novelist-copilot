@@ -23,7 +23,11 @@ def test_core_service_health_uses_api_envelope() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["data"] == {"service": "core-service", "status": "ok"}
+    assert payload["data"]["service"] == "core-service"
+    assert payload["data"]["status"] == "ok"
+    assert payload["data"]["runtime"]["postgres_url"].startswith("postgresql://")
+    assert payload["data"]["runtime"]["redis_url"].startswith("redis://")
+    assert payload["data"]["runtime"]["minio_bucket"] == "novel-factory-dev"
     assert payload["errors"] == []
     assert payload["meta"]["request_id"]
     assert payload["meta"]["trace_id"]

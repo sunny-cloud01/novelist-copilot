@@ -1,3 +1,4 @@
+from worker.core_store import load_phase_two_store
 from worker.main import create_chapter_plan, create_section_plans, extract_knowledge, noop_task
 from worker.planning import (
     CHAPTER_PLAN_ID,
@@ -14,6 +15,10 @@ from worker.planning import (
 )
 
 
+def load_phase_two_store_module():
+    return load_phase_two_store()
+
+
 def test_build_chapter_plan_fixture_matches_contract_shape() -> None:
     command = build_create_chapter_plan_command()
 
@@ -26,14 +31,35 @@ def test_build_chapter_plan_fixture_matches_contract_shape() -> None:
 
 
 def test_run_create_chapter_plan_returns_requires_review_result() -> None:
-    command = build_create_chapter_plan_command(trace_id="trace-plan-worker")
+    store = load_phase_two_store_module()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    created = store.create_chapter_plan(
+        {"project_id": PROJECT_ID, "chapter_index": 9, "target_word_count": 4200, "payload": {}},
+        trace_id="trace-plan-worker",
+    )
+    assert created is not None
+    command = {
+        **build_create_chapter_plan_command(
+            project_id=PROJECT_ID,
+            chapter_plan_id=created["chapter_plan"]["chapter_plan_id"],
+            task_id=created["task"]["task_id"],
+            trace_id="trace-plan-worker",
+        ),
+        "chapter_index": 9,
+        "target_word_count": 4200,
+    }
 
     result = run_create_chapter_plan(command)
+    refreshed = load_phase_two_store_module().get_chapter_plan(created["chapter_plan"]["chapter_plan_id"])
 
-    assert result["task_id"] == CHAPTER_PLAN_TASK_ID
+    assert result["task_id"] == created["task"]["task_id"]
     assert result["status"] == "requires_review"
     assert result["trace_id"] == "trace-plan-worker"
     assert result["metrics"]["current_stage"] == "quality_review"
+    assert refreshed["task"]["status"] == "requires_review"
+    assert refreshed["chapter_plan"]["payload"]["current_stage"] == "quality_review"
+    assert refreshed["events"][-1]["event_type"] == "review_required"
 
 
 def test_build_section_plan_fixture_matches_contract_shape() -> None:
@@ -48,14 +74,35 @@ def test_build_section_plan_fixture_matches_contract_shape() -> None:
 
 
 def test_run_create_section_plans_returns_succeeded_result() -> None:
-    command = build_create_section_plans_command(trace_id="trace-section-worker")
+    store = load_phase_two_store_module()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    created_plan = store.create_chapter_plan(
+        {"project_id": PROJECT_ID, "chapter_index": 3, "target_word_count": 2800, "payload": {}},
+        trace_id="trace-section-worker-plan",
+    )
+    assert created_plan is not None
+    created_sections = store.create_section_plans(
+        created_plan["chapter_plan"]["chapter_plan_id"],
+        section_count=3,
+        trace_id="trace-section-worker",
+    )
+    assert created_sections is not None
+    command = build_create_section_plans_command(
+        chapter_plan_id=created_plan["chapter_plan"]["chapter_plan_id"],
+        task_id=created_sections["task"]["task_id"],
+        trace_id="trace-section-worker",
+    )
 
     result = run_create_section_plans(command)
+    refreshed = load_phase_two_store_module().list_section_plans(created_plan["chapter_plan"]["chapter_plan_id"])
 
-    assert result["task_id"] == SECTION_PLAN_TASK_ID
+    assert result["task_id"] == created_sections["task"]["task_id"]
     assert result["status"] == "succeeded"
     assert result["trace_id"] == "trace-section-worker"
     assert result["metrics"]["section_count"] == 3
+    assert refreshed["task"]["status"] == "succeeded"
+    assert refreshed["events"][-1]["event_type"] == "succeeded"
 
 
 def test_planning_actor_names_are_stable() -> None:
