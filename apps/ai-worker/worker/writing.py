@@ -303,18 +303,20 @@ def _prompt_template_refs(store: Any) -> list[str]:
 
 def _build_memory_package_payload(store: Any, writing_run: dict[str, Any], chapter_plan: dict[str, Any], section_plans: list[dict[str, Any]]) -> dict[str, Any]:
     project = store.STORE.novel_projects[writing_run["project_id"]]
+    allowed_refs = project.get("allowed_knowledge_source_refs", [])
     source_refs = [
         f"object://story-bibles/{project['story_bible_id']}",
         f"object://chapter-plans/{writing_run['chapter_plan_id']}",
         *[f"object://section-plans/{item['section_plan_id']}" for item in section_plans],
+        *allowed_refs,
     ]
-    first_graph_summary_id = next(iter(store.STORE.graph_summaries), None)
-    if first_graph_summary_id:
-        source_refs.append(f"object://graph-summaries/{first_graph_summary_id}")
+    knowledge = store.build_knowledge_context(allowed_refs)
     chapter_title = chapter_plan.get("payload", {}).get("title") or f"第{chapter_plan['chapter_index']}章"
+    summary_suffix = f"，已载入 {len(knowledge['objects'])} 个知识对象" if knowledge["objects"] else ""
     return {
-        "summary": f"已汇总 {chapter_title} 的故事圣经、章节目标、分节 beats 与图谱证据。",
+        "summary": f"已汇总 {chapter_title} 的故事圣经、章节目标、分节 beats{summary_suffix}。",
         "source_refs": source_refs,
+        "knowledge_context": knowledge["context_text"],
     }
 
 
@@ -368,6 +370,7 @@ def run_create_writing_run(command: dict[str, Any]) -> dict[str, Any]:
             section_plans=section_plans,
             section_runs=section_runs,
             prompt_package=prompt_package,
+            knowledge_context=memory_package.get("knowledge_context", ""),
         )
     except ProviderExecutionError as exc:
         metrics = {"error_code": exc.error_code, "generated_at": now}
