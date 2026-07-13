@@ -4172,12 +4172,15 @@ def _deterministic_enhance_story_bible(current_payload: dict[str, Any]) -> dict[
     enhanced = deepcopy(current_payload) if isinstance(current_payload, dict) else {}
     protagonist = enhanced.get("protagonist", "主角")
     world_rules = list(enhanced.get("world_rules", []))
-    new_rule = f"{protagonist}每次突破都需付出真实代价，力量提升与风险同步。"
+    # 用现有条数派生递增规则，保证每次再生都产生真实变化（非幂等 no-op）
+    round_index = len(world_rules) + 1
+    new_rule = f"{protagonist}在第{round_index}层设定中，每次突破都需付出与之相称的真实代价。"
     if new_rule not in world_rules:
         world_rules.append(new_rule)
     enhanced["world_rules"] = world_rules
     promises = list(enhanced.get("narrative_promises", []))
-    new_promise = f"前三章内确立{protagonist}的核心动机与首个转折。"
+    promise_index = len(promises) + 1
+    new_promise = f"第{promise_index}轮承诺：进一步夯实{protagonist}的核心动机与下一处转折。"
     if new_promise not in promises:
         promises.append(new_promise)
     enhanced["narrative_promises"] = promises
