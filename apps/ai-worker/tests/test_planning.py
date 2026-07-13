@@ -20,7 +20,7 @@ def load_phase_two_store_module():
 
 
 def dispatch_task(store, task_id: str, trace_id: str) -> str:
-    task = store.mark_task_dispatched(task_id, trace_id=trace_id, dispatched_at="2026-07-12T00:00:00+00:00")
+    task = store.mark_task_dispatched(task_id, trace_id=trace_id)
     assert task is not None
     assert task["current_dispatch_token"] is not None
     return task["current_dispatch_token"]
@@ -80,11 +80,10 @@ def test_run_create_chapter_plan_keeps_running_on_stale_dispatch_token() -> None
         trace_id="trace-plan-stale",
     )
     first_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-plan-stale")
-    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-plan-stale", retry_at="2026-07-12T00:01:00+00:00")
+    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-plan-stale")
     fresh_token = store.mark_task_dispatched(
         created["task"]["task_id"],
         trace_id="trace-plan-stale",
-        dispatched_at="2026-07-12T00:02:00+00:00",
     )["current_dispatch_token"]
     command = {
         **build_create_chapter_plan_command(
@@ -177,11 +176,10 @@ def test_run_create_section_plans_keeps_running_on_stale_dispatch_token() -> Non
     task["started_at"] = None
     task["finished_at"] = None
     first_token = dispatch_task(store, created_sections["task"]["task_id"], trace_id="trace-section-stale")
-    store.schedule_task_retry(created_sections["task"]["task_id"], "lease_expired", trace_id="trace-section-stale", retry_at="2026-07-12T00:01:00+00:00")
+    store.schedule_task_retry(created_sections["task"]["task_id"], "lease_expired", trace_id="trace-section-stale")
     fresh_token = store.mark_task_dispatched(
         created_sections["task"]["task_id"],
         trace_id="trace-section-stale",
-        dispatched_at="2026-07-12T00:02:00+00:00",
     )["current_dispatch_token"]
     command = build_create_section_plans_command(
         chapter_plan_id=created_plan["chapter_plan"]["chapter_plan_id"],
