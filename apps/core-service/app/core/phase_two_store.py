@@ -5138,33 +5138,6 @@ def mark_task_dispatched(
     return deepcopy(task)
 
 
-def _merge_book_scoped_map(
-    target: dict[str, dict[str, Any]],
-    incoming: dict[str, dict[str, Any]],
-    book_id: str,
-) -> None:
-    """Replace only the current book's entries in an id-keyed map, keep other books'."""
-    stale = [key for key, item in target.items() if item.get("book_id") == book_id]
-    for key in stale:
-        target.pop(key, None)
-    target.update(incoming)
-
-
-def _merge_book_scoped_lists(
-    target: dict[str, list[dict[str, Any]]],
-    incoming: dict[str, list[dict[str, Any]]],
-    book_id: str,
-) -> None:
-    """Replace only the current book's buckets in a bucketed map, keep other books'."""
-    stale = [
-        key for key, items in target.items()
-        if any(item.get("book_id") == book_id for item in items)
-    ]
-    for key in stale:
-        target.pop(key, None)
-    target.update(incoming)
-
-
 @_persisting_mutation
 def apply_task_execution_result(
     task_id: str,
@@ -5230,33 +5203,17 @@ def apply_task_execution_result(
                     STORE.evidence_by_run[entity_id].append(evidence_id)
                     STORE.evidence_by_book[run["book_id"]].append(evidence_id)
             deep_analysis = metrics.get("deep_analysis", {})
-            book_id = run["book_id"]
-            # Merge per book so extracting another book does not wipe this book's
-            # deep-analysis data (and vice versa). All item payloads carry book_id.
-            if "scenes_by_chapter" in deep_analysis:
-                _merge_book_scoped_lists(
-                    STORE.source_scenes_by_chapter,
-                    deepcopy(deep_analysis["scenes_by_chapter"]),
-                    book_id,
-                )
-            if "events_by_scene" in deep_analysis:
-                _merge_book_scoped_lists(
-                    STORE.events_by_scene,
-                    deepcopy(deep_analysis["events_by_scene"]),
-                    book_id,
-                )
+            STORE.source_scenes_by_chapter = deepcopy(deep_analysis.get("scenes_by_chapter", STORE.source_scenes_by_chapter))
+            STORE.events_by_scene = deepcopy(deep_analysis.get("events_by_scene", STORE.events_by_scene))
             for field_name in ("conflicts", "hooks", "rewards", "climaxes", "relationship_edges"):
                 if field_name in deep_analysis:
-                    _merge_book_scoped_map(
-                        getattr(STORE, field_name),
-                        deepcopy(deep_analysis[field_name]),
-                        book_id,
-                    )
+                    setattr(STORE, field_name, deepcopy(deep_analysis[field_name]))
             if graph_summary is not None:
                 STORE.graph_summaries[run["book_id"]] = deepcopy(graph_summary)
             node_details = metrics.get("graph_node_details")
             neighbors_map = metrics.get("graph_neighbors_by_node")
             if node_details is not None:
+                book_id = run["book_id"]
                 stale_nodes = [
                     node_id for node_id, node in STORE.graph_node_details.items()
                     if node.get("book_id") == book_id
