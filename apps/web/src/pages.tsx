@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { resolveApiBaseUrl } from "./lib/api-base";
+
 import {
   DEMO_BOOK_ID,
   DEMO_RUN_ID,
@@ -359,7 +361,7 @@ export function KnowledgeReviewPage() {
 
 export function GraphPage() {
   const { state } = usePhaseTwo();
-  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
   const [selectedNodeId, setSelectedNodeId] = useState<string>(apiClient ? "" : state.graphNodes[0]?.nodeId ?? "");
   const [query, setQuery] = useState("");
@@ -658,7 +660,7 @@ function parseMultilineList(value: string) {
 export function ProjectHomePage() {
   const { projectId } = useParams();
   const { state } = usePhaseTwo();
-  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
   const fallbackProject = state.projects.find((item) => item.projectId === projectId) ?? state.projects[0];
   const fallbackStoryBible = state.storyBibles.find((item) => item.storyBibleId === fallbackProject?.storyBibleId);

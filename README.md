@@ -162,3 +162,9 @@ pytest tests/test_build_docs.py tests/test_repo_layout.py -q
 ```
 
 Later scaffold tasks add pnpm workspace apps and infra commands after those paths exist.
+
+### LLM 拆书模式
+
+- 配置 `NOVELIST_LLM_BASE_URL` + `NOVELIST_LLM_API_KEY`（DeepSeek 兼容）后，上传书走真实 LLM 实体/场景抽取。
+- 不配置则走确定性 fallback：仍按上传书正文派生实体与图谱，不会返回内置 demo 数据。
+- 前端 dev 默认连 `http://localhost:8080` 网关；用 `VITE_NOVEL_FACTORY_API_BASE_URL` 覆盖。

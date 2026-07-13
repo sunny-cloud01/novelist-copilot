@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { createNovelFactoryApiClient } from "../../lib/api-client";
+import { resolveApiBaseUrl } from "../../lib/api-base";
 
 type KnowledgeSource = {
   source_ref: string;
@@ -15,7 +16,7 @@ type KnowledgeSource = {
 
 export function StoryBibleWizardPage() {
   const navigate = useNavigate();
-  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
