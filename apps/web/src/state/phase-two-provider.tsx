@@ -26,7 +26,7 @@ export type PhaseTwoContextValue = {
   applyWritingReviewAction: (writingRunId: string, sectionRunId: string, action: WritingReviewAction) => void;
   toggleModelProfile: (modelProfileId: string, enabled: boolean) => void;
   updateQualityGateProfile: (qualityGateProfileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) => void;
-  updateAgentAssignment: (assignmentId: string, modelProfileId: string) => void;
+  updateAgentAssignment: (assignmentId: string, modelProfileId: string, maxRetry: number, maxCost: number, enabled: boolean) => void;
   updatePromptVersion: (agentRole: string, templateRef: string) => void;
   promoteStrategySuggestion: (suggestionId: string) => void;
   commitRun: () => void;
@@ -93,9 +93,9 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
           );
         }
       },
-      updateAgentAssignment: (assignmentId, modelProfileId) => {
+      updateAgentAssignment: (assignmentId, modelProfileId, maxRetry, maxCost, enabled) => {
         if (apiClient) {
-          apiClient.updateAgentAssignment(assignmentId, modelProfileId).then((result) => {
+          apiClient.updateAgentAssignment(assignmentId, { modelProfileId, maxRetry, maxCost, enabled }).then((result) => {
             const normalized = normalizeConfigurationSnapshot(result);
             if (normalized) {
               setState((current) => ({ ...current, configurationSnapshot: normalized }));

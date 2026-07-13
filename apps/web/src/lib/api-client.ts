@@ -151,8 +151,16 @@ export class NovelFactoryApiClient {
     return this.post(`/v1/model-profiles/${modelProfileId}/${action}`, {});
   }
 
-  async updateAgentAssignment(assignmentId: string, modelProfileId: string) {
-    return this.post(`/v1/agent-model-assignments/${assignmentId}`, { model_profile_id: modelProfileId });
+  async updateAgentAssignment(
+    assignmentId: string,
+    { modelProfileId, maxRetry, maxCost, enabled }: { modelProfileId: string; maxRetry: number; maxCost: number; enabled: boolean },
+  ) {
+    return this.post(`/v1/agent-model-assignments/${assignmentId}`, {
+      model_profile_id: modelProfileId,
+      max_retry: maxRetry,
+      max_cost: maxCost,
+      enabled,
+    });
   }
 
   async updateQualityGateProfile(profileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) {

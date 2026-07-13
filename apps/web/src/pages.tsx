@@ -1681,7 +1681,7 @@ export function ConfigurationPage() {
             <li key={assignment.assignmentId}>
               {assignment.agentRole} · {assignment.outputMode} · {assignment.modelProfileId} · max_retry {assignment.maxRetry} · max_cost {assignment.maxCost}
               {assignment.agentRole === "writer" ? (
-                <button type="button" style={{ marginLeft: 8 }} onClick={() => updateAgentAssignment(assignment.assignmentId, STRUCTURED_FALLBACK_MODEL_PROFILE_ID)}>
+                <button type="button" style={{ marginLeft: 8 }} onClick={() => updateAgentAssignment(assignment.assignmentId, STRUCTURED_FALLBACK_MODEL_PROFILE_ID, assignment.maxRetry, assignment.maxCost, assignment.enabled)}>
                   改用 fallback
                 </button>
               ) : null}

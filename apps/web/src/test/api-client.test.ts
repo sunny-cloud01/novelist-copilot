@@ -81,10 +81,10 @@ describe("NovelFactoryApiClient", () => {
   it("posts updateAgentAssignment with correct URL and body", async () => {
     const fetcher = vi.fn().mockResolvedValue(jsonResponse({ configuration_snapshot: { model_profiles: [] } }));
     const client = createNovelFactoryApiClient({ baseUrl: "http://api.local", fetcher });
-    await client.updateAgentAssignment("assign-1", "mp-2");
+    await client.updateAgentAssignment("assign-1", { modelProfileId: "mp-2", maxRetry: 2, maxCost: 1.5, enabled: true });
     expect(fetcher).toHaveBeenCalledWith("http://api.local/v1/agent-model-assignments/assign-1", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ model_profile_id: "mp-2" }),
+      body: JSON.stringify({ model_profile_id: "mp-2", max_retry: 2, max_cost: 1.5, enabled: true }),
     }));
   });
 
