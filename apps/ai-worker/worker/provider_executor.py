@@ -218,6 +218,7 @@ def execute_writing_provider_pipeline(
 
     section_run_updates: list[dict[str, Any]] = []
     humanized_sections: list[str] = []
+    humanized_results: list[dict[str, Any]] = []
     for index, (section_run, section_plan, draft) in enumerate(zip(section_runs, section_plans, drafts), start=1):
         critic_issues = [
             {
@@ -238,6 +239,7 @@ def execute_writing_provider_pipeline(
             model_profile=humanizer_profile,
             knowledge_context=knowledge_context,
         )
+        humanized_results.append(humanized)
         beat_status = [
             {
                 **beat,
@@ -261,6 +263,23 @@ def execute_writing_provider_pipeline(
             }
         )
         humanized_sections.append(humanized["humanized_text"])
+
+    COST_PER_1K = 0.002
+
+    def _apply_metrics(call: dict[str, Any], pt: int, ct: int, lat: int) -> None:
+        call["prompt_tokens"] = pt
+        call["completion_tokens"] = ct
+        call["latency_ms"] = lat
+        call["cost_estimate"] = round((pt + ct) / 1000 * COST_PER_1K, 4)
+        call["cost_estimate_status"] = "measured"
+
+    writer_metrics = {"pt": sum(d.get("prompt_tokens", 0) for d in drafts), "ct": sum(d.get("completion_tokens", 0) for d in drafts), "lat": max((d.get("latency_ms", 0) for d in drafts), default=0)}
+    humanizer_metrics = {"pt": sum(h.get("prompt_tokens", 0) for h in humanized_results), "ct": sum(h.get("completion_tokens", 0) for h in humanized_results), "lat": max((h.get("latency_ms", 0) for h in humanized_results), default=0)}
+    for call in provider_calls:
+        if call.get("agent_role") == "writer" and call.get("status") == "succeeded":
+            _apply_metrics(call, writer_metrics["pt"], writer_metrics["ct"], writer_metrics["lat"])
+        elif call.get("agent_role") == "humanizer" and call.get("status") == "succeeded":
+            _apply_metrics(call, humanizer_metrics["pt"], humanizer_metrics["ct"], humanizer_metrics["lat"])
 
     return {
         "provider_calls": provider_calls,

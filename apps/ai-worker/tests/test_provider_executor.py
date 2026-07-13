@@ -78,3 +78,37 @@ def test_chat_reads_profile_specific_env(monkeypatch):
     # _chat 现在返回 dict（Task 2 会用 usage；此步先确认 text 可取）
     text = result["text"] if isinstance(result, dict) else result
     assert text == "ok"
+
+
+def test_pipeline_writes_real_metrics_to_provider_calls(monkeypatch):
+    import worker.provider_executor as pe
+    from worker.provider_executor import AnthropicWritingAdapter
+    # mock _chat 返回真实 usage
+    monkeypatch.setattr(AnthropicWritingAdapter, "_chat", lambda self, **k: {"text": "正文", "prompt_tokens": 111, "completion_tokens": 47, "latency_ms": 321})
+
+    class FakeStore:
+        class STORE:
+            provider_calls_by_writing = {"WR1": [
+                {"provider_call_id": "c-w", "agent_role": "writer", "model_profile_id": "p", "status": "succeeded", "prompt_tokens": 1800, "completion_tokens": 920, "latency_ms": 1430, "cost_estimate": 0.31, "cost_estimate_status": "estimated", "retry_count": 0},
+                {"provider_call_id": "c-c", "agent_role": "critic", "model_profile_id": "p", "status": "succeeded", "prompt_tokens": 1400, "completion_tokens": 540, "latency_ms": 980, "cost_estimate": 0.22, "cost_estimate_status": "estimated", "retry_count": 0},
+                {"provider_call_id": "c-h", "agent_role": "humanizer", "model_profile_id": "p", "status": "succeeded", "prompt_tokens": 1780, "completion_tokens": 850, "latency_ms": 1210, "cost_estimate": 0.33, "cost_estimate_status": "estimated", "retry_count": 0},
+            ]}
+            model_profiles = {"p": {"provider_name": "anthropic", "provider_model_name": "m"}}
+        def _build_model_cost(self, calls, retry):
+            return {"input_tokens": sum(c["prompt_tokens"] for c in calls), "output_tokens": sum(c["completion_tokens"] for c in calls), "estimated_total_cost": sum(c["cost_estimate"] for c in calls), "retry_count": retry}
+
+    store = FakeStore()
+    writing_run = {"writing_run_id": "WR1", "consistency_report_id": "CR1"}
+    chapter_plan = {"payload": {"summary": "s"}}
+    section_plans = [{"section_plan_id": "SP1", "payload": {"scene_goal": "g", "beats": [{"index": 1, "summary": "b"}]}}]
+    section_runs = [{"section_run_id": "SR1", "draft_object_ref": "object://d1", "critic_report_ref": "cr", "humanized_object_ref": "hr", "beat_status": [{"index": 1}]}]
+    result = pe.execute_writing_provider_pipeline(
+        store=store, writing_run=writing_run, chapter_plan=chapter_plan,
+        section_plans=section_plans, section_runs=section_runs, prompt_package={"template_refs": []},
+        knowledge_context="",
+    )
+    writer_call = next(c for c in result["provider_calls"] if c["agent_role"] == "writer")
+    assert writer_call["prompt_tokens"] == 111
+    assert writer_call["completion_tokens"] == 47
+    assert writer_call["latency_ms"] == 321
+    assert writer_call["cost_estimate_status"] == "measured"
