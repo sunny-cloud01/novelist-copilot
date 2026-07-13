@@ -327,6 +327,29 @@ def _build_prompt_package_payload(store: Any) -> dict[str, Any]:
     }
 
 
+def _compute_quality_scores(section_runs: list[dict[str, Any]], blocking_issue_count: int) -> dict[str, Any]:
+    texts = [sr.get("humanized_text") or sr.get("writer_output") or "" for sr in section_runs]
+    joined = "".join(texts)
+    total_chars = len(joined) or 1
+    unique_chars = len(set(joined))
+    diversity = unique_chars / total_chars  # 重复越多越低
+    # ai_flavor：内容多样性驱动，blocking 时封顶
+    base_flavor = min(0.95, 0.35 + diversity * 0.6)
+    ai_flavor_score = round(min(base_flavor, 0.45) if blocking_issue_count else base_flavor, 2)
+    # mobile_readability：按平均句长（句号/逗号分段）
+    segments = [seg for seg in joined.replace("。", "，").split("，") if seg.strip()]
+    avg_len = (sum(len(s) for s in segments) / len(segments)) if segments else 0
+    readability = 0.9 - min(0.4, abs(avg_len - 18) * 0.02)  # 句长约18字最佳
+    mobile_readability_score = round(max(0.5, min(0.95, readability)), 2)
+    # originality：多样性 + 无阻断
+    originality_safety_score = round(min(0.95, 0.6 + diversity * 0.35), 2)
+    return {
+        "ai_flavor_score": ai_flavor_score,
+        "mobile_readability_score": mobile_readability_score,
+        "originality_safety_score": originality_safety_score,
+    }
+
+
 def run_create_writing_run(command: dict[str, Any]) -> dict[str, Any]:
     store = load_phase_two_store()
     writing_run_id = command["writing_run_id"]
@@ -412,9 +435,10 @@ def run_create_writing_run(command: dict[str, Any]) -> dict[str, Any]:
     current_stage = "consistency_review" if blocking_issue_count else "quality_gate"
     status = "requires_review" if blocking_issue_count else "succeeded"
     quality_status = "blocked" if blocking_issue_count else "passed"
-    ai_flavor_score = 0.34 if blocking_issue_count else 0.52
-    mobile_readability_score = round(min(0.95, 0.74 + len(section_runs) * 0.03), 2)
-    originality_safety_score = 0.91
+    _quality_scores = _compute_quality_scores(section_runs, blocking_issue_count)
+    ai_flavor_score = _quality_scores["ai_flavor_score"]
+    mobile_readability_score = _quality_scores["mobile_readability_score"]
+    originality_safety_score = _quality_scores["originality_safety_score"]
     revision_change_summary = (
         "要求重写第二节，恢复主角当前境界并补足冲突升级。"
         if blocking_issue_count

@@ -30,3 +30,18 @@ def test_memory_package_empty_knowledge_safe():
     chapter_plan = {"chapter_index": 1, "payload": {"title": "开端"}}
     payload = _build_memory_package_payload(store, writing_run, chapter_plan, [{"section_plan_id": "SP1"}])
     assert payload["knowledge_context"] == ""
+
+
+from worker.writing import _compute_quality_scores
+
+
+def test_quality_scores_vary_with_content():
+    rich = [{"humanized_text": "他缓步走入议事堂，众人目光聚焦，空气仿佛凝固。少年抬眼，语气平静。"}]
+    poor = [{"humanized_text": "好好好好好好好好好好好好好好好好"}]
+    s_rich = _compute_quality_scores(rich, 0)
+    s_poor = _compute_quality_scores(poor, 0)
+    assert 0.0 <= s_rich["ai_flavor_score"] <= 1.0
+    assert 0.0 <= s_poor["ai_flavor_score"] <= 1.0
+    # 高重复文本 ai_flavor 更差
+    assert s_poor["ai_flavor_score"] < s_rich["ai_flavor_score"]
+    assert s_rich["ai_flavor_score"] != 0.52
