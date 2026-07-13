@@ -344,4 +344,9 @@ def test_commit_knowledge_package_assembles_real_package():
     assert "objects" in package
     assert "relationships" in package
     assert "scenes" in package
+    assert "source_book" in package
+    assert "chapters" in package
     assert package["metadata"]["run_id"] == run_id
+    # objects must be non-empty: seed data has 3 objects (2 candidate + 1 approved)
+    assert len(package["objects"]) >= 1, "knowledge package objects must not be empty"
+    assert package["metadata"]["object_count"] == len(package["objects"])

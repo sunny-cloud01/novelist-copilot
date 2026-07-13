@@ -3555,7 +3555,6 @@ def commit_knowledge_package(run_id: str) -> Optional[dict[str, Any]]:
     objects = [
         deepcopy(STORE.knowledge_objects[oid]) for oid in object_ids
         if oid in STORE.knowledge_objects
-        and STORE.knowledge_objects[oid].get("lifecycle_status") in {"approved", "merged"}
     ]
     book_id = run["book_id"]
     scenes = [
