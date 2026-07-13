@@ -17,6 +17,7 @@ import {
 } from "../components/phase-two-state";
 import { resolveApiBaseUrl } from "../lib/api-base";
 import { createNovelFactoryApiClient } from "../lib/api-client";
+import { normalizeConfigurationSnapshot } from "../lib/normalize-config-snapshot";
 
 export type PhaseTwoContextValue = {
   state: PhaseTwoState;
@@ -56,9 +57,10 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
       },
       toggleModelProfile: (modelProfileId, enabled) => {
         if (apiClient) {
-          apiClient.setModelProfileEnabled(modelProfileId, enabled).then((snapshot) => {
-            if (snapshot && typeof snapshot === "object" && "modelProfiles" in snapshot) {
-              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+          apiClient.setModelProfileEnabled(modelProfileId, enabled).then((result) => {
+            const normalized = normalizeConfigurationSnapshot(result);
+            if (normalized) {
+              setState((current) => ({ ...current, configurationSnapshot: normalized }));
             } else {
               setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
             }
@@ -71,9 +73,10 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
       },
       updateQualityGateProfile: (qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold) => {
         if (apiClient) {
-          apiClient.updateQualityGateProfile(qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold).then((snapshot) => {
-            if (snapshot && typeof snapshot === "object" && "qualityGateProfiles" in snapshot) {
-              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+          apiClient.updateQualityGateProfile(qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold).then((result) => {
+            const normalized = normalizeConfigurationSnapshot(result);
+            if (normalized) {
+              setState((current) => ({ ...current, configurationSnapshot: normalized }));
             } else {
               setState((current) =>
                 updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
@@ -92,9 +95,10 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
       },
       updateAgentAssignment: (assignmentId, modelProfileId) => {
         if (apiClient) {
-          apiClient.updateAgentAssignment(assignmentId, modelProfileId).then((snapshot) => {
-            if (snapshot && typeof snapshot === "object" && "agentModelAssignments" in snapshot) {
-              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+          apiClient.updateAgentAssignment(assignmentId, modelProfileId).then((result) => {
+            const normalized = normalizeConfigurationSnapshot(result);
+            if (normalized) {
+              setState((current) => ({ ...current, configurationSnapshot: normalized }));
             } else {
               setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
             }

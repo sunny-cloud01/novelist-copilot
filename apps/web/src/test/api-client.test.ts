@@ -78,6 +78,26 @@ describe("NovelFactoryApiClient", () => {
     }));
   });
 
+  it("posts updateAgentAssignment with correct URL and body", async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ configuration_snapshot: { model_profiles: [] } }));
+    const client = createNovelFactoryApiClient({ baseUrl: "http://api.local", fetcher });
+    await client.updateAgentAssignment("assign-1", "mp-2");
+    expect(fetcher).toHaveBeenCalledWith("http://api.local/v1/agent-model-assignments/assign-1", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ model_profile_id: "mp-2" }),
+    }));
+  });
+
+  it("posts updateQualityGateProfile with correct URL and body", async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ configuration_snapshot: { model_profiles: [] } }));
+    const client = createNovelFactoryApiClient({ baseUrl: "http://api.local", fetcher });
+    await client.updateQualityGateProfile("qgp-1", 0.5, 0.9);
+    expect(fetcher).toHaveBeenCalledWith("http://api.local/v1/quality-gate-profiles/qgp-1", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ ai_flavor_threshold: 0.5, originality_safety_threshold: 0.9 }),
+    }));
+  });
+
   it("builds graph search and evidence requests", async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ count: 1, items: [{ node_id: "node-1" }] }))
