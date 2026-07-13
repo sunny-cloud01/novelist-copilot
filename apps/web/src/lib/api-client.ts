@@ -146,6 +146,22 @@ export class NovelFactoryApiClient {
     return this.get(`/v1/graph/nodes/${nodeId}/neighbors`);
   }
 
+  async setModelProfileEnabled(modelProfileId: string, enabled: boolean) {
+    const action = enabled ? "enable" : "disable";
+    return this.post(`/v1/model-profiles/${modelProfileId}/${action}`, {});
+  }
+
+  async updateAgentAssignment(assignmentId: string, modelProfileId: string) {
+    return this.post(`/v1/agent-model-assignments/${assignmentId}`, { model_profile_id: modelProfileId });
+  }
+
+  async updateQualityGateProfile(profileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) {
+    return this.post(`/v1/quality-gate-profiles/${profileId}`, {
+      ai_flavor_threshold: aiFlavorThreshold,
+      originality_safety_threshold: originalitySafetyThreshold,
+    });
+  }
+
   private async get<T = unknown>(path: string): Promise<T> {
     const response = await this.fetcher(`${this.baseUrl}${path}`);
     return this.parseResponse<T>(response);

@@ -68,6 +68,16 @@ describe("NovelFactoryApiClient", () => {
       body: JSON.stringify({ action: "confirm", summary: "确认候选版本。" }),
     });
   });
+  it("posts configuration mutations", async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({ configuration_snapshot: { modelProfiles: [] } }));
+    const client = createNovelFactoryApiClient({ baseUrl: "http://api.local", fetcher });
+    await client.setModelProfileEnabled("mp-1", false);
+    expect(fetcher).toHaveBeenCalledWith("http://api.local/v1/model-profiles/mp-1/disable", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({}),
+    }));
+  });
+
   it("builds graph search and evidence requests", async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ count: 1, items: [{ node_id: "node-1" }] }))

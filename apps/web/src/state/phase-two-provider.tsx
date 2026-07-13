@@ -15,6 +15,8 @@ import {
   updatePromptVersionInState,
   updateQualityGateProfileInState,
 } from "../components/phase-two-state";
+import { resolveApiBaseUrl } from "../lib/api-base";
+import { createNovelFactoryApiClient } from "../lib/api-client";
 
 export type PhaseTwoContextValue = {
   state: PhaseTwoState;
@@ -33,6 +35,8 @@ const PhaseTwoContext = createContext<PhaseTwoContextValue | null>(null);
 
 export function PhaseTwoProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PhaseTwoState>(createInitialPhaseTwoState);
+  const apiBaseUrl = resolveApiBaseUrl();
+  const apiClient = apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null;
 
   const value = useMemo<PhaseTwoContextValue>(
     () => ({
@@ -51,15 +55,55 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
         setState((current) => applyWritingReviewActionToState(current, writingRunId, sectionRunId, action));
       },
       toggleModelProfile: (modelProfileId, enabled) => {
-        setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
+        if (apiClient) {
+          apiClient.setModelProfileEnabled(modelProfileId, enabled).then((snapshot) => {
+            if (snapshot && typeof snapshot === "object" && "modelProfiles" in snapshot) {
+              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+            } else {
+              setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
+            }
+          }).catch(() => {
+            setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
+          });
+        } else {
+          setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
+        }
       },
       updateQualityGateProfile: (qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold) => {
-        setState((current) =>
-          updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
-        );
+        if (apiClient) {
+          apiClient.updateQualityGateProfile(qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold).then((snapshot) => {
+            if (snapshot && typeof snapshot === "object" && "qualityGateProfiles" in snapshot) {
+              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+            } else {
+              setState((current) =>
+                updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
+              );
+            }
+          }).catch(() => {
+            setState((current) =>
+              updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
+            );
+          });
+        } else {
+          setState((current) =>
+            updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
+          );
+        }
       },
       updateAgentAssignment: (assignmentId, modelProfileId) => {
-        setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
+        if (apiClient) {
+          apiClient.updateAgentAssignment(assignmentId, modelProfileId).then((snapshot) => {
+            if (snapshot && typeof snapshot === "object" && "agentModelAssignments" in snapshot) {
+              setState((current) => ({ ...current, configuration: { ...current.configuration, ...snapshot } }));
+            } else {
+              setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
+            }
+          }).catch(() => {
+            setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
+          });
+        } else {
+          setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
+        }
       },
       updatePromptVersion: (agentRole, templateRef) => {
         setState((current) => updatePromptVersionInState(current, agentRole, templateRef));
@@ -71,6 +115,7 @@ export function PhaseTwoProvider({ children }: { children: ReactNode }) {
         setState((current) => commitKnowledgePackage(current));
       },
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [state],
   );
 
