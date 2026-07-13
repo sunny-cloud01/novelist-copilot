@@ -1,0 +1,12 @@
+{
+  "source_ref": "object://source-books/01JZBOOK000000000000000001",
+  "label": "Battle Through the Heavens",
+  "book_id": "01JZBOOK000000000000000001",
+  "run_id": "01JZRUN0000000000000000001",
+  "source_type": "reference_novel",
+  "status": "committed",
+  "knowledge_object_count": 3,
+  "evidence_count": 3,
+  "graph_summary_ref": "object://graph-summaries/01JZBOOK000000000000000001",
+  "updated_at": "2026-07-12T02:00:00Z"
+}

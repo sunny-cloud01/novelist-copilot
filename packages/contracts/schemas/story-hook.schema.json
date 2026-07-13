@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/story-hook.schema.json",
+  "title": "StoryHook",
+  "type": "object",
+  "required": ["schema_version", "hook_id", "book_id", "chapter_id", "hook_type", "open_question", "introduced_at", "expected_resolution_range", "evidence_refs"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": ["string", "null"], "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "payload": { "type": "object", "additionalProperties": true },
+    "hook_id": { "type": "string", "minLength": 1 },
+    "hook_type": { "type": "string", "minLength": 1 },
+    "open_question": { "type": "string", "minLength": 1 },
+    "introduced_at": { "type": "string", "minLength": 1 },
+    "expected_resolution_range": { "type": "string", "minLength": 1 },
+    "linked_conflict_id": { "type": ["string", "null"], "minLength": 1 },
+    "linked_event_id": { "type": ["string", "null"], "minLength": 1 }
+  },
+  "additionalProperties": false
+}

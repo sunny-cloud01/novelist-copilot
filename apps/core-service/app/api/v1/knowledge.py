@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.envelope import success_envelope
-from app.core.phase_two_store import RUN_ID, apply_review_action, list_knowledge_objects_for_run
+from app.core.phase_two_store import RUN_ID, apply_review_action, list_knowledge_objects_for_run, list_knowledge_sources
 
 router = APIRouter()
 
@@ -15,6 +15,18 @@ class ReviewActionCommand(BaseModel):
     action: str
     target_object_id: Optional[str] = None
     note: Optional[str] = None
+
+
+@router.get("/knowledge-sources")
+def get_knowledge_sources(request: Request, workspace_id: Optional[str] = None, status: str = "committed") -> dict:
+    return success_envelope(
+        data={"items": list_knowledge_sources(workspace_id or request.state.workspace_id, status)},
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
 
 
 @router.get("/knowledge-objects")

@@ -21,6 +21,13 @@
     "title": { "type": "string", "minLength": 1 },
     "author_name": { "type": "string", "minLength": 1 },
     "source_type": { "type": "string", "minLength": 1 },
+    "platform": { "type": ["string", "null"], "minLength": 1 },
+    "genre": { "type": ["string", "null"], "minLength": 1 },
+    "usage_boundary": { "type": ["string", "null"], "minLength": 1 },
+    "source_content_ref": { "type": ["string", "null"], "minLength": 1 },
+    "content_checksum": { "type": ["string", "null"], "minLength": 1 },
+    "content_byte_size": { "type": ["integer", "null"], "minimum": 0 },
+    "chapter_count": { "type": ["integer", "null"], "minimum": 0 },
     "import_status": {
       "type": "string",
       "enum": ["uploaded", "analyzing", "ready", "failed"]

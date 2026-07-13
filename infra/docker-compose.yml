@@ -61,7 +61,14 @@ services:
         export NOVEL_FACTORY_MINIO_BUCKET=$${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
         mc alias set local http://minio:9000 "$$NOVEL_FACTORY_MINIO_ACCESS_KEY" "$$NOVEL_FACTORY_MINIO_SECRET_KEY"
         mc mb --ignore-existing "local/$$NOVEL_FACTORY_MINIO_BUCKET"
-    restart: "no"
+        touch /tmp/bootstrap-ready
+        tail -f /dev/null
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/bootstrap-ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   core-service:
     build:
@@ -74,6 +81,11 @@ services:
       NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
       NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
       NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+      NOVELIST_LLM_BASE_URL: ${NOVELIST_LLM_BASE_URL:-}
+      NOVELIST_LLM_API_KEY: ${NOVELIST_LLM_API_KEY:-}
+      NOVELIST_LLM_PROVIDER: ${NOVELIST_LLM_PROVIDER:-anthropic}
+      NOVELIST_LLM_MODEL: ${NOVELIST_LLM_MODEL:-claude-sonnet-5}
+      NOVELIST_LLM_STRUCTURED_MODEL: ${NOVELIST_LLM_STRUCTURED_MODEL:-claude-haiku-4-5-20251001}
     ports:
       - "8100:8000"
     depends_on:
@@ -84,7 +96,7 @@ services:
       minio:
         condition: service_healthy
       minio-bootstrap:
-        condition: service_completed_successfully
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -108,9 +120,14 @@ services:
       NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
       NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
       NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+      NOVELIST_LLM_BASE_URL: ${NOVELIST_LLM_BASE_URL:-}
+      NOVELIST_LLM_API_KEY: ${NOVELIST_LLM_API_KEY:-}
+      NOVELIST_LLM_PROVIDER: ${NOVELIST_LLM_PROVIDER:-anthropic}
+      NOVELIST_LLM_MODEL: ${NOVELIST_LLM_MODEL:-claude-sonnet-5}
+      NOVELIST_LLM_STRUCTURED_MODEL: ${NOVELIST_LLM_STRUCTURED_MODEL:-claude-haiku-4-5-20251001}
       NOVEL_FACTORY_CORE_SERVICE_URL: http://core-service:8000
     ports:
-      - "8000:8000"
+      - "${NOVEL_FACTORY_API_GATEWAY_PORT:-8002}:8000"
     depends_on:
       core-service:
         condition: service_healthy
@@ -137,13 +154,18 @@ services:
       NOVEL_FACTORY_MINIO_ACCESS_KEY: ${NOVEL_FACTORY_MINIO_ACCESS_KEY:-novel-factory}
       NOVEL_FACTORY_MINIO_SECRET_KEY: ${NOVEL_FACTORY_MINIO_SECRET_KEY:-replace-me}
       NOVEL_FACTORY_MINIO_BUCKET: ${NOVEL_FACTORY_MINIO_BUCKET:-novel-factory-dev}
+      NOVELIST_LLM_BASE_URL: ${NOVELIST_LLM_BASE_URL:-}
+      NOVELIST_LLM_API_KEY: ${NOVELIST_LLM_API_KEY:-}
+      NOVELIST_LLM_PROVIDER: ${NOVELIST_LLM_PROVIDER:-anthropic}
+      NOVELIST_LLM_MODEL: ${NOVELIST_LLM_MODEL:-claude-sonnet-5}
+      NOVELIST_LLM_STRUCTURED_MODEL: ${NOVELIST_LLM_STRUCTURED_MODEL:-claude-haiku-4-5-20251001}
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
       minio-bootstrap:
-        condition: service_completed_successfully
+        condition: service_healthy
 
   scheduler:
     build:

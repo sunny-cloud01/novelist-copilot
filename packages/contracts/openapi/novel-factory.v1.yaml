@@ -63,6 +63,110 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /books/{bookId}/content:
+    get:
+      operationId: getBookSourceContent
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book source content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Source content not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /books/{bookId}/evidence:
+    get:
+      operationId: listBookEvidence
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book evidence list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /books/{bookId}/analysis:
+    get:
+      operationId: getBookAnalysis
+      parameters:
+        - in: path
+          name: bookId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book analysis report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /evidence/{evidenceId}:
+    get:
+      operationId: getEvidence
+      parameters:
+        - in: path
+          name: evidenceId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evidence detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+        '404':
+          description: Evidence not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /knowledge-sources:
+    get:
+      operationId: listKnowledgeSources
+      parameters:
+        - in: query
+          name: workspace_id
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [ready, committed, analyzing, failed, all]
+      responses:
+        '200':
+          description: Knowledge sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
   /extraction-runs:
     post:
       operationId: createExtractionRun
@@ -858,6 +962,28 @@ components:
       $ref: ../schemas/source-book.schema.json
     SourceChapter:
       $ref: ../schemas/source-chapter.schema.json
+    SourceContent:
+      $ref: ../schemas/source-content.schema.json
+    Evidence:
+      $ref: ../schemas/evidence.schema.json
+    BookAnalysisReport:
+      $ref: ../schemas/book-analysis-report.schema.json
+    SourceScene:
+      $ref: ../schemas/source-scene.schema.json
+    StoryEvent:
+      $ref: ../schemas/story-event.schema.json
+    StoryConflict:
+      $ref: ../schemas/story-conflict.schema.json
+    StoryHook:
+      $ref: ../schemas/story-hook.schema.json
+    StoryReward:
+      $ref: ../schemas/story-reward.schema.json
+    StoryClimax:
+      $ref: ../schemas/story-climax.schema.json
+    RelationshipEdge:
+      $ref: ../schemas/relationship-edge.schema.json
+    KnowledgeSourceSummary:
+      $ref: ../schemas/knowledge-source-summary.schema.json
     ExtractionRun:
       $ref: ../schemas/extraction-run.schema.json
     KnowledgeObject:

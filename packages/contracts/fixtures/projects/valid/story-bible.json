@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "story_bible_id": "01JZBIBLE0000000000000001",
+  "workspace_id": "01JZWORKSPACE0000000000001",
+  "project_id": "01JZPROJECT000000000000001",
+  "version": 2,
+  "status": "pending_review",
+  "payload": {
+    "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+    "protagonist": "萧炎",
+    "core_conflict": "天赋跌落后的家族压力与三年之约。",
+    "style_target": "克制、证据充分、节奏稳步升级。",
+    "forbidden_similarities": "不直接复刻原作人物名、金手指机制和关键桥段。",
+    "world_rules": [
+      "所有突破都必须付出明确代价。",
+      "家族与宗门冲突都要落到资源争夺上。"
+    ],
+    "narrative_promises": [
+      "前三章完成主角受辱、立誓、获得第一条破局线索。",
+      "每卷都兑现一次阶段性胜利。"
+    ]
+  },
+  "confirmed_payload": {
+    "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+    "protagonist": "萧炎",
+    "core_conflict": "天赋跌落后的家族压力与三年之约。",
+    "style_target": "克制、证据充分。",
+    "forbidden_similarities": "不直接复刻原作人物名和关键桥段。",
+    "world_rules": [
+      "所有突破都必须付出明确代价。"
+    ],
+    "narrative_promises": [
+      "前三章完成主角受辱与立誓。"
+    ]
+  },
+  "diff": {
+    "from_version": 1,
+    "to_version": 2,
+    "changed_fields": [
+      "style_target",
+      "forbidden_similarities",
+      "world_rules",
+      "narrative_promises"
+    ],
+    "changes": [
+      {
+        "field": "style_target",
+        "before": "克制、证据充分。",
+        "after": "克制、证据充分、节奏稳步升级。"
+      },
+      {
+        "field": "forbidden_similarities",
+        "before": "不直接复刻原作人物名和关键桥段。",
+        "after": "不直接复刻原作人物名、金手指机制和关键桥段。"
+      },
+      {
+        "field": "world_rules",
+        "before": ["所有突破都必须付出明确代价。"],
+        "after": ["所有突破都必须付出明确代价。", "家族与宗门冲突都要落到资源争夺上。"]
+      },
+      {
+        "field": "narrative_promises",
+        "before": ["前三章完成主角受辱与立誓。"],
+        "after": ["前三章完成主角受辱、立誓、获得第一条破局线索。", "每卷都兑现一次阶段性胜利。"]
+      }
+    ],
+    "summary": "补强原创边界、世界规则和章节兑现承诺。"
+  },
+  "history": [
+    {
+      "version": 1,
+      "status": "approved",
+      "change_type": "create",
+      "payload": {
+        "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+        "protagonist": "萧炎",
+        "core_conflict": "天赋跌落后的家族压力与三年之约。",
+        "style_target": "克制、证据充分。",
+        "forbidden_similarities": "不直接复刻原作人物名和关键桥段。",
+        "world_rules": ["所有突破都必须付出明确代价。"],
+        "narrative_promises": ["前三章完成主角受辱与立誓。"]
+      },
+      "changed_fields": ["premise", "protagonist", "core_conflict", "style_target", "forbidden_similarities", "world_rules", "narrative_promises"],
+      "summary": "建立首版故事圣经。",
+      "note": null,
+      "trace_id": "01JZTRC000000000000000002",
+      "actor_id": "demo-user",
+      "created_at": "2026-07-11T02:00:00Z"
+    },
+    {
+      "version": 2,
+      "status": "pending_review",
+      "change_type": "regenerate",
+      "payload": {
+        "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+        "protagonist": "萧炎",
+        "core_conflict": "天赋跌落后的家族压力与三年之约。",
+        "style_target": "克制、证据充分、节奏稳步升级。",
+        "forbidden_similarities": "不直接复刻原作人物名、金手指机制和关键桥段。",
+        "world_rules": ["所有突破都必须付出明确代价。", "家族与宗门冲突都要落到资源争夺上。"],
+        "narrative_promises": ["前三章完成主角受辱、立誓、获得第一条破局线索。", "每卷都兑现一次阶段性胜利。"]
+      },
+      "changed_fields": ["style_target", "forbidden_similarities", "world_rules", "narrative_promises"],
+      "summary": "补强原创边界、世界规则和章节兑现承诺。",
+      "note": "提高项目级原创边界。",
+      "trace_id": "01JZTRC000000000000000003",
+      "actor_id": "demo-user",
+      "created_at": "2026-07-11T02:05:00Z"
+    }
+  ],
+  "trace_id": "01JZTRC000000000000000003",
+  "approved_at": "2026-07-11T02:00:00Z",
+  "approved_by": "demo-user",
+  "created_at": "2026-07-11T02:00:00Z",
+  "updated_at": "2026-07-11T02:05:00Z"
+}

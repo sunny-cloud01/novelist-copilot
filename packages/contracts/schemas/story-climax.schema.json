@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/story-climax.schema.json",
+  "title": "StoryClimax",
+  "type": "object",
+  "required": ["schema_version", "climax_id", "book_id", "scope_type", "scope_id", "intensity", "aftermath", "evidence_refs"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": ["string", "null"], "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "payload": { "type": "object", "additionalProperties": true },
+    "climax_id": { "type": "string", "minLength": 1 },
+    "scope_type": { "type": "string", "enum": ["chapter", "scene", "volume", "book"] },
+    "scope_id": { "type": "string", "minLength": 1 },
+    "event_id": { "type": ["string", "null"], "minLength": 1 },
+    "conflict_id": { "type": ["string", "null"], "minLength": 1 },
+    "reward_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "hook_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "aftermath": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

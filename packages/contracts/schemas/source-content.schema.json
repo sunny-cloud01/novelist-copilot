@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/source-content.schema.json",
+  "title": "SourceContent",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_content_id",
+    "book_id",
+    "object_ref",
+    "mime_type",
+    "checksum",
+    "byte_size",
+    "content",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "source_content_id": { "type": "string", "minLength": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "object_ref": { "type": "string", "minLength": 1 },
+    "mime_type": { "type": "string", "minLength": 1 },
+    "checksum": { "type": "string", "minLength": 1 },
+    "byte_size": { "type": "integer", "minimum": 0 },
+    "content": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/story-reward.schema.json",
+  "title": "StoryReward",
+  "type": "object",
+  "required": ["schema_version", "reward_id", "book_id", "chapter_id", "reward_type", "reader_effect", "intensity", "evidence_refs"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": ["string", "null"], "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "payload": { "type": "object", "additionalProperties": true },
+    "reward_id": { "type": "string", "minLength": 1 },
+    "reward_type": { "type": "string", "minLength": 1 },
+    "trigger_event_id": { "type": ["string", "null"], "minLength": 1 },
+    "beneficiary_character_id": { "type": ["string", "null"], "minLength": 1 },
+    "reader_effect": { "type": "string", "minLength": 1 },
+    "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+    "payoff_target": { "type": ["string", "null"], "minLength": 1 }
+  },
+  "additionalProperties": false
+}

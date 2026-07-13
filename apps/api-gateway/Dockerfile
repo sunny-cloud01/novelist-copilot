@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /workspace
 COPY apps/api-gateway /workspace/apps/api-gateway
+COPY apps/core-service /workspace/apps/core-service
 RUN pip install --no-cache-dir -e /workspace/apps/api-gateway
 
 WORKDIR /workspace/apps/api-gateway

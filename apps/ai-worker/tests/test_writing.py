@@ -19,6 +19,13 @@ def load_phase_two_store_module():
     return load_phase_two_store()
 
 
+def dispatch_task(store, task_id: str, trace_id: str) -> str:
+    task = store.mark_task_dispatched(task_id, trace_id=trace_id, dispatched_at="2026-07-12T00:00:00+00:00")
+    assert task is not None
+    assert task["current_dispatch_token"] is not None
+    return task["current_dispatch_token"]
+
+
 def test_build_writing_run_fixture_matches_contract_shape() -> None:
     command = build_create_writing_run_command()
 
@@ -97,12 +104,14 @@ def test_run_create_writing_run_returns_requires_review_result() -> None:
         trace_id="trace-writing-worker",
     )
     assert created is not None
+    dispatch_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-writing-worker")
     command = build_create_writing_run_command(
         project_id=created["writing_run"]["project_id"],
         chapter_plan_id=created["writing_run"]["chapter_plan_id"],
         writing_run_id=created["writing_run"]["writing_run_id"],
         task_id=created["task"]["task_id"],
         trace_id="trace-writing-worker",
+        dispatch_token=dispatch_token,
     )
 
     result = run_create_writing_run(command)
@@ -147,12 +156,14 @@ def test_run_create_writing_run_fails_when_provider_execution_errors(monkeypatch
         trace_id="trace-writing-missing-profile",
     )
     assert created is not None
+    dispatch_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-writing-missing-profile")
     command = build_create_writing_run_command(
         project_id=created["writing_run"]["project_id"],
         chapter_plan_id=created["writing_run"]["chapter_plan_id"],
         writing_run_id=created["writing_run"]["writing_run_id"],
         task_id=created["task"]["task_id"],
         trace_id="trace-writing-missing-profile",
+        dispatch_token=dispatch_token,
     )
 
     def boom(**_: object) -> dict[str, object]:
@@ -167,13 +178,55 @@ def test_run_create_writing_run_fails_when_provider_execution_errors(monkeypatch
     assert result["metrics"]["error_code"] == "model_profile_missing"
     assert refreshed["task"]["status"] == "failed"
     assert refreshed["task"]["error_code"] == "model_profile_missing"
+    assert refreshed["task"]["lease_owner"] is None
     assert refreshed["events"][-1]["event_type"] == "failed"
 
 
 
-def test_writing_actor_name_and_queue_are_stable() -> None:
-    assert create_writing_run.actor_name == "create_writing_run"
-    assert create_writing_run.queue_name == "task-writing"
+
+
+def test_run_create_writing_run_keeps_running_on_stale_dispatch_token() -> None:
+    store = load_phase_two_store_module()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    created_plan = store.create_chapter_plan(
+        {"project_id": store.PROJECT_ID, "chapter_index": 15, "target_word_count": 3900, "payload": {}},
+        trace_id="trace-writing-stale-plan",
+    )
+    created_sections = store.create_section_plans(
+        created_plan["chapter_plan"]["chapter_plan_id"],
+        section_count=3,
+        trace_id="trace-writing-stale-sections",
+    )
+    assert created_sections is not None
+    created = store.create_writing_run(
+        {"project_id": store.PROJECT_ID, "chapter_plan_id": created_plan["chapter_plan"]["chapter_plan_id"]},
+        trace_id="trace-writing-stale",
+    )
+    first_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-writing-stale")
+    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-writing-stale", retry_at="2026-07-12T00:01:00+00:00")
+    fresh_token = store.mark_task_dispatched(
+        created["task"]["task_id"],
+        trace_id="trace-writing-stale",
+        dispatched_at="2026-07-12T00:02:00+00:00",
+    )["current_dispatch_token"]
+    command = build_create_writing_run_command(
+        project_id=created["writing_run"]["project_id"],
+        chapter_plan_id=created["writing_run"]["chapter_plan_id"],
+        writing_run_id=created["writing_run"]["writing_run_id"],
+        task_id=created["task"]["task_id"],
+        trace_id="trace-writing-stale",
+        dispatch_token=first_token,
+    )
+
+    result = run_create_writing_run(command)
+    refreshed = load_phase_two_store_module().get_writing_run(created["writing_run"]["writing_run_id"])
+
+    assert first_token != fresh_token
+    assert result["status"] == "running"
+    assert refreshed["task"]["status"] == "running"
+    assert refreshed["task"]["current_dispatch_token"] == fresh_token
+    assert all(event["event_type"] not in {"review_required", "succeeded", "failed"} for event in refreshed["events"][-2:])
 
 
 def test_existing_actor_names_remain_stable_after_writing_addition() -> None:

@@ -104,6 +104,35 @@ export type StoryBibleState = {
   premise: string;
   protagonist: string;
   coreConflict: string;
+  styleTarget: string;
+  forbiddenSimilarities: string;
+  worldRules: string[];
+  narrativePromises: string[];
+  confirmedPayload?: {
+    premise?: string;
+    protagonist?: string;
+    core_conflict?: string;
+    style_target?: string;
+    forbidden_similarities?: string;
+    world_rules?: string[];
+    narrative_promises?: string[];
+  } | null;
+  diff: {
+    fromVersion?: number | null;
+    toVersion?: number;
+    summary?: string;
+    changedFields?: string[];
+  } | null;
+  history: Array<{
+    version: number;
+    status: string;
+    changeType: string;
+    summary?: string;
+    note?: string | null;
+    createdAt?: string;
+  }>;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
   traceId: string;
 };
 
@@ -603,6 +632,59 @@ export type WritingRunState = {
   selectedAssetIds: string[];
 };
 
+export type EvidenceState = {
+  evidenceId: string;
+  bookId: string;
+  chapterId: string;
+  chapterIndex: number;
+  textRange: string;
+  excerpt: string;
+  sourceObjectRefs: string[];
+  confidence: number;
+  traceId: string;
+};
+
+export type ChapterAnalysisState = {
+  chapterId: string;
+  chapterIndex: number;
+  title: string;
+  sceneCount: number;
+  eventCount: number;
+  conflictIndex: number;
+  suspenseIndex: number;
+  rewardCount: number;
+  evidenceCoverage: number;
+  needsAttentionCount: number;
+};
+
+export type BookAnalysisSummaryState = {
+  bookId: string;
+  runId: string;
+  status: string;
+  currentStage: string;
+  chapterCount: number;
+  sceneCount: number;
+  knowledgeObjectCount: number;
+  evidenceCount: number;
+  patternCount: number;
+  rhythmProfileCount: number;
+  assetCount: number;
+  ruleCount: number;
+  needsAttentionCount: number;
+  canCommitKnowledge: boolean;
+};
+
+export type AnalysisExceptionState = {
+  exceptionId: string;
+  type: string;
+  severity: string;
+  title: string;
+  summary: string;
+  targetRef: string;
+  evidenceRefs: string[];
+  recommendedAction: string;
+};
+
 export type PhaseTwoState = {
   workspace: WorkspaceState;
   workspaceMembers: WorkspaceMemberState[];
@@ -610,6 +692,10 @@ export type PhaseTwoState = {
   book: SourceBookState;
   chapters: SourceChapterState[];
   run: ExtractionRunState;
+  evidences: EvidenceState[];
+  chapterAnalysis: ChapterAnalysisState[];
+  bookAnalysisSummary: BookAnalysisSummaryState;
+  analysisExceptions: AnalysisExceptionState[];
   knowledgeObjects: KnowledgeObject[];
   graphNodes: GraphNodeState[];
   graphNodeDetails: Record<string, GraphNodeDetailState>;
@@ -774,6 +860,105 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
       lowConfidenceCount: 2,
       errors: [],
     },
+    evidences: [
+      {
+        evidenceId: "evidence://01JZEVIDENCE0000000000001",
+        bookId: DEMO_BOOK_ID,
+        chapterId: "01JZCHAPTER0000000000001",
+        chapterIndex: 1,
+        textRange: "c1:p12-p14",
+        excerpt: "萧炎沉默地站在大厅中央，所有目光都落在他身上，少年把羞辱压进喉间。",
+        sourceObjectRefs: ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+        confidence: 0.82,
+        traceId: "01JZTRC000000000000000001",
+      },
+      {
+        evidenceId: "evidence://01JZEVIDENCE0000000000002",
+        bookId: DEMO_BOOK_ID,
+        chapterId: "01JZCHAPTER0000000000002",
+        chapterIndex: 2,
+        textRange: "c2:p4-p8",
+        excerpt: "戒指中传来苍老的低笑，药老第一次点破少年体内异变的根源。",
+        sourceObjectRefs: ["object://knowledge-objects/01JZOBJ0000000000000000002"],
+        confidence: 0.76,
+        traceId: "01JZTRC000000000000000001",
+      },
+      {
+        evidenceId: "evidence://01JZEVIDENCE0000000000003",
+        bookId: DEMO_BOOK_ID,
+        chapterId: "01JZCHAPTER0000000000001",
+        chapterIndex: 1,
+        textRange: "c1:p1-p3",
+        excerpt: "乌坦城萧家大厅气氛压抑，族人窃语让家族压力成为本章底色。",
+        sourceObjectRefs: ["object://knowledge-objects/01JZOBJ0000000000000000003"],
+        confidence: 0.91,
+        traceId: "01JZTRC000000000000000001",
+      },
+    ],
+    chapterAnalysis: [
+      {
+        chapterId: "01JZCHAPTER0000000000001",
+        chapterIndex: 1,
+        title: "The Fallen Genius",
+        sceneCount: 3,
+        eventCount: 5,
+        conflictIndex: 0.78,
+        suspenseIndex: 0.62,
+        rewardCount: 1,
+        evidenceCoverage: 0.86,
+        needsAttentionCount: 1,
+      },
+      {
+        chapterId: "01JZCHAPTER0000000000002",
+        chapterIndex: 2,
+        title: "Yao Lao Appears",
+        sceneCount: 3,
+        eventCount: 4,
+        conflictIndex: 0.66,
+        suspenseIndex: 0.82,
+        rewardCount: 2,
+        evidenceCoverage: 0.74,
+        needsAttentionCount: 1,
+      },
+    ],
+    bookAnalysisSummary: {
+      bookId: DEMO_BOOK_ID,
+      runId: DEMO_RUN_ID,
+      status: "requires_review",
+      currentStage: "quality_review",
+      chapterCount: 2,
+      sceneCount: 6,
+      knowledgeObjectCount: 3,
+      evidenceCount: 3,
+      patternCount: 1,
+      rhythmProfileCount: 1,
+      assetCount: 1,
+      ruleCount: 1,
+      needsAttentionCount: 2,
+      canCommitKnowledge: true,
+    },
+    analysisExceptions: [
+      {
+        exceptionId: "analysis-exception-low-confidence-xiao-yan",
+        type: "low_confidence_object",
+        severity: "warning",
+        title: "角色身份置信度偏低",
+        summary: "Xiao Yan 的别名与章节证据需要确认后再进入知识包。",
+        targetRef: "object://knowledge-objects/01JZOBJ0000000000000000001",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000001"],
+        recommendedAction: "approve_or_merge_alias",
+      },
+      {
+        exceptionId: "analysis-exception-low-confidence-yao-lao",
+        type: "low_confidence_object",
+        severity: "warning",
+        title: "导师对象需要确认",
+        summary: "Yao Lao 首次出现证据充分，但命名归一化仍需人工确认。",
+        targetRef: "object://knowledge-objects/01JZOBJ0000000000000000002",
+        evidenceRefs: ["evidence://01JZEVIDENCE0000000000002"],
+        recommendedAction: "approve_or_reextract",
+      },
+    ],
     knowledgeObjects: [
       {
         objectId: "01JZOBJ0000000000000000001",
@@ -936,6 +1121,38 @@ export function createInitialPhaseTwoState(): PhaseTwoState {
         premise: "少年背负退婚耻辱后，踏上逆袭与成长之路。",
         protagonist: "萧炎",
         coreConflict: "天赋跌落后的家族压力与三年之约。",
+        styleTarget: "压强递进、成长兑现、情绪克制。",
+        forbiddenSimilarities: "不复刻原作金手指机制与关键名场面。",
+        worldRules: ["每次突破都需真实代价。"],
+        narrativePromises: ["前三章完成受压、立誓、破局线索。"],
+        confirmedPayload: {
+          premise: "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+          protagonist: "萧炎",
+          core_conflict: "天赋跌落后的家族压力与三年之约。",
+          style_target: "压强递进、成长兑现、情绪克制。",
+          forbidden_similarities: "不复刻原作金手指机制与关键名场面。",
+          world_rules: ["每次突破都需真实代价。"],
+          narrative_promises: ["前三章完成受压、立誓、破局线索。"],
+        },
+        diff: null,
+        history: [
+          {
+            version: 1,
+            status: "approved",
+            changeType: "create",
+            summary: "创建初始故事圣经。",
+            createdAt: "2026-07-10T10:00:00Z",
+          },
+          {
+            version: 1,
+            status: "approved",
+            changeType: "confirm",
+            summary: "确认项目故事圣经。",
+            createdAt: "2026-07-10T10:05:00Z",
+          },
+        ],
+        approvedAt: "2026-07-10T10:05:00Z",
+        approvedBy: "demo-user",
         traceId: "01JZTRC000000000000000002",
       },
     ],
@@ -1628,6 +1845,28 @@ export function deriveLowConfidenceItems(items: KnowledgeObject[]): KnowledgeObj
   return items.filter((item) => item.confidence < 0.8 && item.reviewStatus === "pending");
 }
 
+export function findEvidenceByRef(state: PhaseTwoState, evidenceRef: string): EvidenceState | undefined {
+  const normalizedId = evidenceRef.replace(/^evidence:\/\//, "");
+  return state.evidences.find((item) => item.evidenceId.replace(/^evidence:\/\//, "") === normalizedId);
+}
+
+export function getBookAnalysisSummary(state: PhaseTwoState, bookId: string): BookAnalysisSummaryState | undefined {
+  return state.bookAnalysisSummary.bookId === bookId ? state.bookAnalysisSummary : undefined;
+}
+
+export function deriveAnalysisExceptions(state: PhaseTwoState): AnalysisExceptionState[] {
+  return deriveLowConfidenceItems(state.knowledgeObjects).map((item) => ({
+    exceptionId: `analysis-exception-${item.objectId}`,
+    type: "low_confidence_object",
+    severity: "warning",
+    title: `${item.canonicalName} 需要确认`,
+    summary: `${item.canonicalName} 的置信度为 ${item.confidence}，需要确认后再进入知识包。`,
+    targetRef: `object://knowledge-objects/${item.objectId}`,
+    evidenceRefs: state.graphNodes.find((node) => node.label === item.canonicalName)?.evidenceRefs ?? [],
+    recommendedAction: "approve_or_reextract",
+  }));
+}
+
 export function applyReviewActionToState(
   state: PhaseTwoState,
   objectId: string,
@@ -1663,7 +1902,7 @@ export function applyReviewActionToState(
     : pending.length === 0
       ? "knowledge_package_export"
       : state.run.currentStage;
-  return {
+  const nextState = {
     ...state,
     knowledgeObjects,
     run: {
@@ -1672,7 +1911,19 @@ export function applyReviewActionToState(
       status: runStatus,
       currentStage: runStage,
     },
+    bookAnalysisSummary: {
+      ...state.bookAnalysisSummary,
+      status: runStatus,
+      currentStage: runStage,
+      needsAttentionCount: pending.length,
+      canCommitKnowledge: action !== "request_reextract",
+    },
     activityLog: [...state.activityLog, `已执行审核动作：${reviewActionLabels[action]}。`],
+  };
+
+  return {
+    ...nextState,
+    analysisExceptions: deriveAnalysisExceptions(nextState),
   };
 }
 
@@ -1683,6 +1934,12 @@ export function commitKnowledgePackage(state: PhaseTwoState): PhaseTwoState {
       ...state.run,
       status: "succeeded",
       currentStage: "knowledge_base_commit",
+    },
+    bookAnalysisSummary: {
+      ...state.bookAnalysisSummary,
+      status: "succeeded",
+      currentStage: "knowledge_base_commit",
+      canCommitKnowledge: false,
     },
     activityLog: [...state.activityLog, "知识包已提交到故事图谱。"],
   };

@@ -1,10 +1,10 @@
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.envelope import success_envelope
-from app.core.phase_two_store import WORKSPACE_ID, create_novel_project, get_novel_project
+from app.core.phase_two_store import WORKSPACE_ID, apply_story_bible_action, create_novel_project, get_novel_project, get_story_bible
 
 router = APIRouter()
 
@@ -16,6 +16,13 @@ class CreateNovelProjectCommand(BaseModel):
     quality_gate_profile_id: Optional[str] = None
     allowed_knowledge_source_refs: Optional[list[str]] = None
     story_bible_payload: Optional[dict] = None
+
+
+class StoryBibleActionCommand(BaseModel):
+    action: str
+    story_bible_payload: Optional[dict[str, Any]] = None
+    summary: Optional[str] = None
+    note: Optional[str] = None
 
 
 @router.post("/novel-projects", status_code=202)
@@ -31,6 +38,8 @@ def post_novel_project(command: CreateNovelProjectCommand, request: Request) -> 
         )
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return success_envelope(
         data=project,
         request_id=request.state.request_id,
@@ -48,6 +57,50 @@ def get_novel_project_detail(project_id: str, request: Request) -> dict:
         raise HTTPException(status_code=404, detail="novel project not found")
     return success_envelope(
         data=project,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/story-bibles/{story_bible_id}")
+def get_story_bible_detail(story_bible_id: str, request: Request) -> dict:
+    story_bible = get_story_bible(story_bible_id)
+    if not story_bible:
+        raise HTTPException(status_code=404, detail="story bible not found")
+    return success_envelope(
+        data=story_bible,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.post("/story-bibles/{story_bible_id}/review-actions")
+def post_story_bible_action(story_bible_id: str, command: StoryBibleActionCommand, request: Request) -> dict:
+    try:
+        story_bible = apply_story_bible_action(
+            story_bible_id,
+            command.action,
+            request.state.request_id,
+            request.state.trace_id,
+            request.state.actor_id,
+            request.state.actor_role,
+            request.state.workspace_id,
+            command.model_dump(exclude_none=True),
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not story_bible:
+        raise HTTPException(status_code=404, detail="story bible not found")
+    return success_envelope(
+        data=story_bible,
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
         workspace_id=request.state.workspace_id,

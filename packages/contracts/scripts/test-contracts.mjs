@@ -20,6 +20,17 @@ const ajv = new Ajv2020({ allErrors: true, strict: false, schemas: [
   JSON.parse(fs.readFileSync(path.join(root, "schemas/worker-result.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/source-book.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/source-chapter.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/source-content.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/evidence.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/book-analysis-report.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/source-scene.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-event.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-conflict.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-hook.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-reward.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/story-climax.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/relationship-edge.schema.json"), "utf8")),
+  JSON.parse(fs.readFileSync(path.join(root, "schemas/knowledge-source-summary.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/extraction-run.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/knowledge-object.schema.json"), "utf8")),
   JSON.parse(fs.readFileSync(path.join(root, "schemas/review-action-command.schema.json"), "utf8")),
@@ -101,6 +112,68 @@ assertInvalid(
 );
 
 assertValid(
+  "https://novelfactory.dev/schemas/source-content.schema.json",
+  readFixture("fixtures/books/valid/source-content.json"),
+  "source-content",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/source-chapter.schema.json",
+  readFixture("fixtures/books/valid/source-chapter.json"),
+  "source-chapter",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/evidence.schema.json",
+  readFixture("fixtures/knowledge-review/valid/evidence.json"),
+  "evidence",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/book-analysis-report.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json"),
+  "book-analysis-report",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/source-scene.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").scenes[0],
+  "source-scene",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/story-event.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").events[0],
+  "story-event",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/story-conflict.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").conflicts[0],
+  "story-conflict",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/story-hook.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").hooks[0],
+  "story-hook",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/story-reward.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").rewards[0],
+  "story-reward",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/story-climax.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").climaxes[0],
+  "story-climax",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/relationship-edge.schema.json",
+  readFixture("fixtures/books/valid/book-analysis-report.json").relationships[0],
+  "relationship-edge",
+);
+assertValid(
+  "https://novelfactory.dev/schemas/knowledge-source-summary.schema.json",
+  readFixture("fixtures/projects/valid/knowledge-source-summary.json"),
+  "knowledge-source-summary",
+);
+
+assertValid(
   "https://novelfactory.dev/schemas/extraction-run.schema.json",
   readFixture("fixtures/extraction-runs/valid/extraction-run.json"),
   "extraction-run",
@@ -157,6 +230,12 @@ assertInvalid(
   "https://novelfactory.dev/schemas/novel-project.schema.json",
   readFixture("fixtures/projects/invalid/novel-project-missing-title.json"),
   "novel-project",
+);
+
+assertValid(
+  "https://novelfactory.dev/schemas/story-bible.schema.json",
+  readFixture("fixtures/projects/valid/story-bible.json"),
+  "story-bible",
 );
 
 assertValid(

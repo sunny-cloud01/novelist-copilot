@@ -19,6 +19,8 @@ def load_phase_two_store() -> ModuleType:
 
 
 _STORE = load_phase_two_store()
+if not _STORE.STORE.books:
+    _STORE.seed_phase_two_demo_data()
 WORKSPACE_ID = _STORE.WORKSPACE_ID
 BOOK_ID = _STORE.BOOK_ID
 RUN_ID = _STORE.RUN_ID
@@ -38,6 +40,22 @@ def get_book(book_id: str) -> Optional[dict[str, Any]]:
 
 def list_book_chapters(book_id: str) -> list[dict[str, Any]]:
     return _STORE.list_book_chapters(book_id)
+
+
+def get_book_source_content(book_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_book_source_content(book_id)
+
+
+def list_evidence_for_book(book_id: str) -> list[dict[str, Any]]:
+    return _STORE.list_evidence_for_book(book_id)
+
+
+def get_evidence(evidence_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_evidence(evidence_id)
+
+
+def get_book_analysis(book_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_book_analysis(book_id)
 
 
 def create_extraction_run(
@@ -63,6 +81,10 @@ def list_knowledge_objects_for_run(run_id: str) -> list[dict[str, Any]]:
     return _STORE.list_knowledge_objects_for_run(run_id)
 
 
+def list_knowledge_sources(workspace_id: Optional[str] = None, status: str = "committed") -> list[dict[str, Any]]:
+    return _STORE.list_knowledge_sources(workspace_id, status)
+
+
 def apply_review_action(
     object_id: str,
     action: str,
@@ -82,6 +104,10 @@ def commit_knowledge_package(run_id: str) -> Optional[dict[str, Any]]:
 
 def get_graph_summary(book_id: Optional[str] = None) -> dict[str, Any]:
     return _STORE.get_graph_summary(book_id)
+
+
+def search_graph_nodes(book_id: Optional[str] = None, query: str = "", node_type: Optional[str] = None) -> dict[str, Any]:
+    return _STORE.search_graph_nodes(book_id, query, node_type)
 
 
 def get_graph_node(node_id: str) -> Optional[dict[str, Any]]:
@@ -117,6 +143,23 @@ def get_workspace_home(workspace_id: str) -> Optional[dict[str, Any]]:
 
 def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
     return _STORE.get_novel_project(project_id)
+
+
+def get_story_bible(story_bible_id: str) -> Optional[dict[str, Any]]:
+    return _STORE.get_story_bible(story_bible_id)
+
+
+def apply_story_bible_action(
+    story_bible_id: str,
+    action: str,
+    request_id: str = "system-story-bible",
+    trace_id: str = "system-trace",
+    actor_id: str = _STORE.USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+    payload: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    return _STORE.apply_story_bible_action(story_bible_id, action, request_id, trace_id, actor_id, actor_role, workspace_id, payload)
 
 
 def create_chapter_plan(

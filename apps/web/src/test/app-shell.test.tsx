@@ -34,8 +34,45 @@ describe("AppShell", () => {
     );
 
     expect(screen.getByRole("heading", { name: "写作工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "工作台首页" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "反馈看板" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "配置中心" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Home/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Reports/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Settings/ })).toBeInTheDocument();
+  });
+
+  it("renders productized creator navigation", async () => {
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/workspaces/demo-workspace"],
+    });
+
+    render(
+      <PhaseTwoProvider>
+        <RouterProvider router={router} />
+      </PhaseTwoProvider>,
+    );
+
+    for (const label of ["Home", "Sources", "Knowledge", "Projects", "Writing", "Review", "Reports", "Settings"]) {
+      expect(screen.getByRole("link", { name: new RegExp(label) })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("link", { name: /Reports/ })).toHaveAttribute("href", "/reports");
+    expect(screen.getByRole("link", { name: /Settings/ })).toHaveAttribute("href", "/settings");
+    expect(screen.getByText("少输入，自动运行，只在异常和关键确认处打断。")).toBeInTheDocument();
+  });
+
+  it("renders productized knowledge review and reports routes", async () => {
+    for (const [route, heading] of [
+      ["/knowledge", "可复用知识资产"],
+      ["/review", "只处理必须打断的事项"],
+      ["/reports", "成本、质量与反馈报告"],
+    ]) {
+      const router = createMemoryRouter(routes, { initialEntries: [route] });
+
+      render(
+        <PhaseTwoProvider>
+          <RouterProvider router={router} />
+        </PhaseTwoProvider>,
+      );
+
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
   });
 });

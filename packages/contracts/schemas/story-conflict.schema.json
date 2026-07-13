@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/story-conflict.schema.json",
+  "title": "StoryConflict",
+  "type": "object",
+  "required": ["schema_version", "conflict_id", "book_id", "chapter_id", "parties", "objective", "pressure", "escalation_level", "resolution_state", "evidence_refs"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "book_id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": ["string", "null"], "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "payload": { "type": "object", "additionalProperties": true },
+    "conflict_id": { "type": "string", "minLength": 1 },
+    "parties": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+    "objective": { "type": "string", "minLength": 1 },
+    "pressure": { "type": "string", "minLength": 1 },
+    "escalation_level": { "type": "integer", "minimum": 0 },
+    "resolution_state": { "type": "string", "enum": ["open", "escalated", "resolved", "deferred"] },
+    "trigger_event_id": { "type": ["string", "null"], "minLength": 1 }
+  },
+  "additionalProperties": false
+}

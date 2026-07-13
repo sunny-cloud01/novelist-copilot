@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "book": {
+    "schema_version": 1,
+    "book_id": "01JZBOOK000000000000000001",
+    "workspace_id": "01JZWORKSPACE0000000000001",
+    "title": "Battle Through the Heavens",
+    "author_name": "Tian Can Tu Dou",
+    "source_type": "reference_novel",
+    "platform": "起点中文网",
+    "genre": "玄幻升级流",
+    "usage_boundary": "仅供结构学习，不直接复写原文。",
+    "source_content_ref": "object://source-contents/01JZSOURCECONTENT000000001",
+    "content_checksum": "sha256:abc123",
+    "content_byte_size": 48,
+    "chapter_count": 1,
+    "import_status": "ready",
+    "trace_id": "01JZTRC000000000000000001",
+    "created_at": "2026-07-11T00:00:00Z",
+    "updated_at": "2026-07-11T00:10:00Z"
+  },
+  "run": null,
+  "chapters": [
+    {
+      "schema_version": 1,
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_index": 1,
+      "title": "乌坦城风起",
+      "segmentation_status": "segmented",
+      "text_object_ref": "object://source-chapters/01JZCHAPTER0000000000001",
+      "text_range": "c1:p1-p3",
+      "raw_text": "第一章 乌坦城风起\n萧炎沉默地站在大厅中央。",
+      "text_excerpt": "萧炎沉默地站在大厅中央。",
+      "created_at": "2026-07-12T02:00:00Z",
+      "updated_at": "2026-07-12T02:00:00Z"
+    }
+  ],
+  "summary": {
+    "book_id": "01JZBOOK000000000000000001",
+    "run_id": null,
+    "status": "ready",
+    "current_stage": "source_submission",
+    "chapter_count": 1,
+    "scene_count": 1,
+    "knowledge_object_count": 0,
+    "evidence_count": 1,
+    "pattern_count": 0,
+    "rhythm_profile_count": 0,
+    "asset_count": 0,
+    "rule_count": 0,
+    "needs_attention_count": 0,
+    "can_commit_knowledge": false,
+    "event_count": 1,
+    "conflict_count": 1,
+    "hook_count": 1,
+    "reward_count": 1,
+    "climax_count": 1,
+    "relationship_count": 1
+  },
+  "exceptions": [],
+  "evidence_samples": [
+    {
+      "schema_version": 1,
+      "evidence_id": "01JZEVIDENCE0000000000001",
+      "evidence_ref": "evidence://01JZEVIDENCE0000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "chapter_index": 1,
+      "text_range": "c1:p1-p2",
+      "excerpt": "萧炎沉默地站在大厅中央。",
+      "source_object_refs": [
+        "object://knowledge-objects/01JZOBJ0000000000000000001"
+      ],
+      "source_content_ref": "object://source-contents/01JZSOURCECONTENT000000001",
+      "confidence": 0.82,
+      "trace_id": "01JZTRC000000000000000001"
+    }
+  ],
+  "knowledge_objects": [],
+  "scenes": [
+    {
+      "schema_version": 1,
+      "scene_id": "01JZSCENE000000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_index": 1,
+      "title": "大厅受辱",
+      "text_range": "c1:p1-p2",
+      "segmentation_status": "segmented",
+      "segmentation_confidence": 0.88,
+      "summary": "主角在公开场合承受压力。",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "payload": {}
+    }
+  ],
+  "events": [
+    {
+      "schema_version": 1,
+      "event_id": "01JZEVENT00000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_id": "01JZSCENE000000000000001",
+      "event_index": 1,
+      "event_type": "public_pressure",
+      "cause": "家族压力聚集",
+      "action": "主角沉默承受羞辱",
+      "result": "冲突压力加重",
+      "consequence": "后续立誓动机形成",
+      "participants": [
+        "object://knowledge-objects/01JZOBJ0000000000000000001"
+      ],
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "confidence": 0.81,
+      "payload": {}
+    }
+  ],
+  "conflicts": [
+    {
+      "schema_version": 1,
+      "conflict_id": "01JZCONFLICT000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_id": "01JZSCENE000000000000001",
+      "parties": [
+        "Xiao Yan",
+        "Xiao Clan pressure"
+      ],
+      "objective": "保住尊严并寻找逆转路径",
+      "pressure": "公开场合的羞辱和期待落差",
+      "escalation_level": 3,
+      "resolution_state": "open",
+      "trigger_event_id": "01JZEVENT00000000000001",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "confidence": 0.78,
+      "payload": {}
+    }
+  ],
+  "hooks": [
+    {
+      "schema_version": 1,
+      "hook_id": "01JZHOOK000000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_id": "01JZSCENE000000000000001",
+      "hook_type": "growth_question",
+      "open_question": "主角如何从低谷重新崛起？",
+      "introduced_at": "chapter:1",
+      "expected_resolution_range": "future_chapters",
+      "linked_conflict_id": "01JZCONFLICT000000000001",
+      "linked_event_id": "01JZEVENT00000000000001",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "confidence": 0.8,
+      "payload": {}
+    }
+  ],
+  "rewards": [
+    {
+      "schema_version": 1,
+      "reward_id": "01JZREWARD0000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_id": "01JZSCENE000000000000001",
+      "reward_type": "anticipation",
+      "trigger_event_id": "01JZEVENT00000000000001",
+      "beneficiary_character_id": "object://knowledge-objects/01JZOBJ0000000000000000001",
+      "reader_effect": "压抑后期待反击",
+      "intensity": 0.72,
+      "payoff_target": "future_reversal",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "confidence": 0.77,
+      "payload": {}
+    }
+  ],
+  "climaxes": [
+    {
+      "schema_version": 1,
+      "climax_id": "01JZCLIMAX000000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "chapter_id": "01JZCHAPTER0000000000001",
+      "scene_id": "01JZSCENE000000000000001",
+      "scope_type": "chapter",
+      "scope_id": "01JZCHAPTER0000000000001",
+      "event_id": "01JZEVENT00000000000001",
+      "conflict_id": "01JZCONFLICT000000000001",
+      "reward_refs": [
+        "01JZREWARD0000000000001"
+      ],
+      "hook_refs": [
+        "01JZHOOK000000000000001"
+      ],
+      "intensity": 0.86,
+      "aftermath": "读者期待主角后续反击。",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "confidence": 0.79,
+      "payload": {}
+    }
+  ],
+  "relationships": [
+    {
+      "schema_version": 1,
+      "edge_id": "01JZRELATION00000000001",
+      "book_id": "01JZBOOK000000000000000001",
+      "source_id": "object://knowledge-objects/01JZOBJ0000000000000000001",
+      "relation_type": "pressured_by",
+      "target_id": "object://knowledge-objects/01JZOBJ0000000000000000003",
+      "confidence": 0.74,
+      "evidence_id": "01JZEVIDENCE0000000000001",
+      "evidence_refs": [
+        "evidence://01JZEVIDENCE0000000000001"
+      ],
+      "payload": {}
+    }
+  ]
+}

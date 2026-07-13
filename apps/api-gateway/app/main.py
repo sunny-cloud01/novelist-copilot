@@ -5,6 +5,7 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.books import router as books_router
 from app.api.v1.configuration import router as configuration_router
 from app.api.v1.extraction import router as extraction_router
+from app.api.v1.evidence import router as evidence_router
 from app.api.v1.graph import router as graph_router
 from app.api.v1.health import router as health_router
 from app.api.v1.knowledge import router as knowledge_router
@@ -20,6 +21,7 @@ app.include_router(health_router, prefix="/v1")
 app.include_router(audit_router, prefix="/v1")
 app.include_router(books_router, prefix="/v1")
 app.include_router(extraction_router, prefix="/v1")
+app.include_router(evidence_router, prefix="/v1")
 app.include_router(knowledge_router, prefix="/v1")
 app.include_router(graph_router, prefix="/v1")
 app.include_router(projects_router, prefix="/v1")

@@ -19,6 +19,13 @@ def load_phase_two_store_module():
     return load_phase_two_store()
 
 
+def dispatch_task(store, task_id: str, trace_id: str) -> str:
+    task = store.mark_task_dispatched(task_id, trace_id=trace_id, dispatched_at="2026-07-12T00:00:00+00:00")
+    assert task is not None
+    assert task["current_dispatch_token"] is not None
+    return task["current_dispatch_token"]
+
+
 def test_build_chapter_plan_fixture_matches_contract_shape() -> None:
     command = build_create_chapter_plan_command()
 
@@ -39,12 +46,14 @@ def test_run_create_chapter_plan_returns_requires_review_result() -> None:
         trace_id="trace-plan-worker",
     )
     assert created is not None
+    dispatch_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-plan-worker")
     command = {
         **build_create_chapter_plan_command(
             project_id=PROJECT_ID,
             chapter_plan_id=created["chapter_plan"]["chapter_plan_id"],
             task_id=created["task"]["task_id"],
             trace_id="trace-plan-worker",
+            dispatch_token=dispatch_token,
         ),
         "chapter_index": 9,
         "target_word_count": 4200,
@@ -60,6 +69,43 @@ def test_run_create_chapter_plan_returns_requires_review_result() -> None:
     assert refreshed["task"]["status"] == "requires_review"
     assert refreshed["chapter_plan"]["payload"]["current_stage"] == "quality_review"
     assert refreshed["events"][-1]["event_type"] == "review_required"
+
+
+def test_run_create_chapter_plan_keeps_running_on_stale_dispatch_token() -> None:
+    store = load_phase_two_store_module()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    created = store.create_chapter_plan(
+        {"project_id": PROJECT_ID, "chapter_index": 10, "target_word_count": 3600, "payload": {}},
+        trace_id="trace-plan-stale",
+    )
+    first_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-plan-stale")
+    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-plan-stale", retry_at="2026-07-12T00:01:00+00:00")
+    fresh_token = store.mark_task_dispatched(
+        created["task"]["task_id"],
+        trace_id="trace-plan-stale",
+        dispatched_at="2026-07-12T00:02:00+00:00",
+    )["current_dispatch_token"]
+    command = {
+        **build_create_chapter_plan_command(
+            project_id=PROJECT_ID,
+            chapter_plan_id=created["chapter_plan"]["chapter_plan_id"],
+            task_id=created["task"]["task_id"],
+            trace_id="trace-plan-stale",
+            dispatch_token=first_token,
+        ),
+        "chapter_index": 10,
+        "target_word_count": 3600,
+    }
+
+    result = run_create_chapter_plan(command)
+    refreshed = load_phase_two_store_module().get_chapter_plan(created["chapter_plan"]["chapter_plan_id"])
+
+    assert first_token != fresh_token
+    assert result["status"] == "running"
+    assert refreshed["task"]["status"] == "running"
+    assert refreshed["task"]["current_dispatch_token"] == fresh_token
+    assert all(event["event_type"] not in {"review_required", "succeeded", "failed"} for event in refreshed["events"][-2:])
 
 
 def test_build_section_plan_fixture_matches_contract_shape() -> None:
@@ -88,10 +134,17 @@ def test_run_create_section_plans_returns_succeeded_result() -> None:
         trace_id="trace-section-worker",
     )
     assert created_sections is not None
+    task = store.STORE.section_plan_tasks[created_plan["chapter_plan"]["chapter_plan_id"]]
+    task["status"] = "queued"
+    task["progress"] = 0
+    task["started_at"] = None
+    task["finished_at"] = None
+    dispatch_token = dispatch_task(store, created_sections["task"]["task_id"], trace_id="trace-section-worker")
     command = build_create_section_plans_command(
         chapter_plan_id=created_plan["chapter_plan"]["chapter_plan_id"],
         task_id=created_sections["task"]["task_id"],
         trace_id="trace-section-worker",
+        dispatch_token=dispatch_token,
     )
 
     result = run_create_section_plans(command)
@@ -103,6 +156,48 @@ def test_run_create_section_plans_returns_succeeded_result() -> None:
     assert result["metrics"]["section_count"] == 3
     assert refreshed["task"]["status"] == "succeeded"
     assert refreshed["events"][-1]["event_type"] == "succeeded"
+
+
+def test_run_create_section_plans_keeps_running_on_stale_dispatch_token() -> None:
+    store = load_phase_two_store_module()
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    created_plan = store.create_chapter_plan(
+        {"project_id": PROJECT_ID, "chapter_index": 4, "target_word_count": 2800, "payload": {}},
+        trace_id="trace-section-stale-plan",
+    )
+    created_sections = store.create_section_plans(
+        created_plan["chapter_plan"]["chapter_plan_id"],
+        section_count=3,
+        trace_id="trace-section-stale",
+    )
+    task = store.STORE.section_plan_tasks[created_plan["chapter_plan"]["chapter_plan_id"]]
+    task["status"] = "queued"
+    task["progress"] = 0
+    task["started_at"] = None
+    task["finished_at"] = None
+    first_token = dispatch_task(store, created_sections["task"]["task_id"], trace_id="trace-section-stale")
+    store.schedule_task_retry(created_sections["task"]["task_id"], "lease_expired", trace_id="trace-section-stale", retry_at="2026-07-12T00:01:00+00:00")
+    fresh_token = store.mark_task_dispatched(
+        created_sections["task"]["task_id"],
+        trace_id="trace-section-stale",
+        dispatched_at="2026-07-12T00:02:00+00:00",
+    )["current_dispatch_token"]
+    command = build_create_section_plans_command(
+        chapter_plan_id=created_plan["chapter_plan"]["chapter_plan_id"],
+        task_id=created_sections["task"]["task_id"],
+        trace_id="trace-section-stale",
+        dispatch_token=first_token,
+    )
+
+    result = run_create_section_plans(command)
+    refreshed = load_phase_two_store_module().list_section_plans(created_plan["chapter_plan"]["chapter_plan_id"])
+
+    assert first_token != fresh_token
+    assert result["status"] == "running"
+    assert refreshed["task"]["status"] == "running"
+    assert refreshed["task"]["current_dispatch_token"] == fresh_token
+    assert all(event["event_type"] not in {"review_required", "succeeded", "failed"} for event in refreshed["events"][-2:])
 
 
 def test_planning_actor_names_are_stable() -> None:

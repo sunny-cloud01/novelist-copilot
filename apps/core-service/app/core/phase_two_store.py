@@ -2,14 +2,29 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
 import importlib.util
+import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 import ulid
 
 try:
-    from app.core.persistence import load_snapshot, save_snapshot
+    from app.core.business_persistence import backfill_business_state_from_snapshot, load_business_state, save_business_state
+except ModuleNotFoundError:
+    spec = importlib.util.spec_from_file_location("phase_two_business_persistence", Path(__file__).with_name("business_persistence.py"))
+    if spec is None or spec.loader is None:
+        raise
+    business_persistence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(business_persistence)
+    backfill_business_state_from_snapshot = business_persistence.backfill_business_state_from_snapshot
+    load_business_state = business_persistence.load_business_state
+    save_business_state = business_persistence.save_business_state
+
+try:
+    from app.core.persistence import load_runtime_projection, load_snapshot, save_snapshot, sync_runtime_projection
 except ModuleNotFoundError:
     spec = importlib.util.spec_from_file_location("phase_two_persistence", Path(__file__).with_name("persistence.py"))
     if spec is None or spec.loader is None:
@@ -18,6 +33,8 @@ except ModuleNotFoundError:
     spec.loader.exec_module(persistence)
     load_snapshot = persistence.load_snapshot
     save_snapshot = persistence.save_snapshot
+    load_runtime_projection = persistence.load_runtime_projection
+    sync_runtime_projection = persistence.sync_runtime_projection
 
 
 USER_ID = "demo-user"
@@ -65,13 +82,40 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _isoformat_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def _normalize_timestamp_string(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = value.replace(" ", "T")
+    if normalized.endswith("Z"):
+        return normalized
+    if len(normalized) >= 3 and normalized[-3] in {"+", "-"}:
+        normalized = f"{normalized}:00"
+    return normalized
+
+
 @dataclass
 class CoreStore:
     users: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspaces: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspace_members: dict[str, dict[str, Any]] = field(default_factory=dict)
     books: dict[str, dict[str, Any]] = field(default_factory=dict)
+    source_contents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    source_content_by_book: dict[str, str] = field(default_factory=dict)
+    evidences: dict[str, dict[str, Any]] = field(default_factory=dict)
+    evidence_by_book: dict[str, list[str]] = field(default_factory=dict)
+    evidence_by_run: dict[str, list[str]] = field(default_factory=dict)
     chapters_by_book: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    source_scenes_by_chapter: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    events_by_scene: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    conflicts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    rewards: dict[str, dict[str, Any]] = field(default_factory=dict)
+    climaxes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    relationship_edges: dict[str, dict[str, Any]] = field(default_factory=dict)
     extraction_runs: dict[str, dict[str, Any]] = field(default_factory=dict)
     knowledge_objects: dict[str, dict[str, Any]] = field(default_factory=dict)
     knowledge_by_run: dict[str, list[str]] = field(default_factory=dict)
@@ -109,13 +153,900 @@ class CoreStore:
     agent_tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     task_events_by_task: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
+    migration_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 STORE = CoreStore()
 
 
+_OBJECT_KIND_OVERRIDES = {
+    "workspace": "workspace",
+    "workspaces": "workspace",
+    "workspace-member": "workspace_member",
+    "workspace-members": "workspace_member",
+    "source-book": "source_book",
+    "source-books": "source_book",
+    "source-content": "source_content",
+    "source-contents": "source_content",
+    "source-chapter": "source_chapter",
+    "source-chapters": "source_chapter",
+    "source-scene": "source_scene",
+    "source-scenes": "source_scene",
+    "story-event": "story_event",
+    "story-events": "story_event",
+    "story-conflict": "story_conflict",
+    "story-conflicts": "story_conflict",
+    "story-hook": "story_hook",
+    "story-hooks": "story_hook",
+    "story-reward": "story_reward",
+    "story-rewards": "story_reward",
+    "story-climax": "story_climax",
+    "story-climaxes": "story_climax",
+    "relationship-edge": "relationship_edge",
+    "relationship-edges": "relationship_edge",
+    "evidence": "evidence",
+    "evidences": "evidence",
+    "extraction-run": "extraction_run",
+    "extraction-runs": "extraction_run",
+    "knowledge-object": "knowledge_object",
+    "knowledge-objects": "knowledge_object",
+    "graph-node": "graph_node",
+    "graph-nodes": "graph_node",
+    "graph-summary": "graph_summary",
+    "graph-summaries": "graph_summary",
+    "novel-project": "novel_project",
+    "novel-projects": "novel_project",
+    "story-bible": "story_bible",
+    "story-bibles": "story_bible",
+    "chapter-plan": "chapter_plan",
+    "chapter-plans": "chapter_plan",
+    "section-plan": "section_plan",
+    "section-plans": "section_plan",
+    "memory-package": "memory_package",
+    "memory-packages": "memory_package",
+    "prompt-package": "prompt_package",
+    "prompt-packages": "prompt_package",
+    "writing-run": "writing_run",
+    "writing-runs": "writing_run",
+    "section-run": "section_run",
+    "section-runs": "section_run",
+    "draft": "draft",
+    "drafts": "draft",
+    "critic-report": "critic_report",
+    "critic-reports": "critic_report",
+    "humanized": "humanized_text",
+    "review-note": "review_note",
+    "review-notes": "review_note",
+    "feedback-comment": "feedback_comment",
+    "feedback-comments": "feedback_comment",
+    "critic-comment": "feedback_comment",
+    "critic-comments": "feedback_comment",
+    "quality-comment": "quality_comment",
+    "quality-comments": "quality_comment",
+    "knowledge-package": "knowledge_package",
+    "knowledge-packages": "knowledge_package",
+    "graph-package": "graph_package",
+    "graph-packages": "graph_package",
+    "extraction-report": "extraction_report",
+    "extraction-reports": "extraction_report",
+    "quality-report": "quality_report",
+    "quality-reports": "quality_report",
+    "consistency-report": "consistency_report",
+    "consistency-reports": "consistency_report",
+    "revision-summary": "revision_summary",
+    "revision-summaries": "revision_summary",
+    "manuscripts": "manuscript",
+    "chapter-snapshot": "chapter_snapshot",
+    "chapter-snapshots": "chapter_snapshot",
+    "manuscript-state": "manuscript_state",
+    "manuscript-states": "manuscript_state",
+    "feedback-record": "feedback_record",
+    "feedback-records": "feedback_record",
+    "ranking": "ranking_snapshot",
+    "rankings": "ranking_snapshot",
+    "pattern": "pattern",
+    "patterns": "pattern",
+    "rhythm-profile": "rhythm_profile",
+    "rhythm-profiles": "rhythm_profile",
+    "asset": "asset",
+    "assets": "asset",
+    "rule": "rule",
+    "rules": "rule",
+    "model-profile": "model_profile",
+    "model-profiles": "model_profile",
+    "provider-account": "provider_account",
+    "provider-accounts": "provider_account",
+    "quality-profile": "quality_profile",
+    "quality-gate-profiles": "quality_profile",
+    "prompt-version": "prompt_version",
+    "prompt-versions": "prompt_version",
+    "configuration": "configuration",
+}
+
+
+_OBJECT_REF_PREFIX_OVERRIDES = {
+    "workspace": "workspaces",
+    "workspace-member": "workspace-members",
+    "source-book": "source-books",
+    "source-content": "source-contents",
+    "source-chapter": "source-chapters",
+    "source-scene": "source-scenes",
+    "story-event": "story-events",
+    "story-conflict": "story-conflicts",
+    "story-hook": "story-hooks",
+    "story-reward": "story-rewards",
+    "story-climax": "story-climaxes",
+    "relationship-edge": "relationship-edges",
+    "evidence": "evidence",
+    "extraction-run": "extraction-runs",
+    "knowledge-object": "knowledge-objects",
+    "graph-node": "graph-nodes",
+    "graph-summary": "graph-summaries",
+    "novel-project": "novel-projects",
+    "story-bible": "story-bibles",
+    "chapter-plan": "chapter-plans",
+    "section-plan": "section-plans",
+    "memory-package": "memory-packages",
+    "prompt-package": "prompt-packages",
+    "writing-run": "writing-runs",
+    "section-run": "section-runs",
+    "draft": "drafts",
+    "critic-report": "critic-reports",
+    "review-note": "review-notes",
+    "feedback-comment": "feedback-comments",
+    "critic-comment": "critic-comments",
+    "quality-comment": "quality-comments",
+    "knowledge-package": "knowledge-packages",
+    "graph-package": "graph-packages",
+    "extraction-report": "extraction-reports",
+    "quality-report": "quality-reports",
+    "consistency-report": "consistency-reports",
+    "revision-summary": "revision-summaries",
+    "chapter-snapshot": "chapter-snapshots",
+    "manuscript-state": "manuscript-states",
+    "feedback-record": "feedback-records",
+    "ranking": "rankings",
+    "pattern": "patterns",
+    "rhythm-profile": "rhythm-profiles",
+    "asset": "assets",
+    "rule": "rules",
+    "model-profile": "model-profiles",
+    "provider-account": "provider-accounts",
+    "quality-profile": "quality-gate-profiles",
+    "prompt-version": "prompt-versions",
+}
+
+
+def _canonical_object_ref(object_ref: str) -> str:
+    if not object_ref.startswith("object://"):
+        return object_ref
+    prefix, *rest = object_ref.removeprefix("object://").split("/", 1)
+    normalized_prefix = _OBJECT_REF_PREFIX_OVERRIDES.get(prefix, prefix)
+    suffix = f"/{rest[0]}" if rest else ""
+    return f"object://{normalized_prefix}{suffix}"
+
+
+def _infer_object_kind(object_ref: str) -> str:
+    if not object_ref.startswith("object://"):
+        return "external_ref"
+    prefix = _canonical_object_ref(object_ref).removeprefix("object://").split("/", 1)[0]
+    return _OBJECT_KIND_OVERRIDES.get(prefix, prefix.replace("-", "_"))
+
+
+def _infer_storage_bucket(object_ref: str) -> str:
+    if not object_ref.startswith("object://"):
+        return "external"
+    return _canonical_object_ref(object_ref).removeprefix("object://").split("/", 1)[0]
+
+
+def _payload_object_metadata(object_ref: str, payload: Any, mime_type: Optional[str]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if isinstance(payload, dict):
+        for key in ("bucket", "storage_bucket"):
+            value = payload.get(key)
+            if value:
+                metadata["bucket"] = value
+                break
+        for key in ("storage_key", "object_key"):
+            value = payload.get(key)
+            if value:
+                metadata["storage_key"] = value
+                break
+        for key in ("checksum", "content_checksum"):
+            value = payload.get(key)
+            if value:
+                metadata["checksum"] = value
+                break
+        for key in ("byte_size", "content_byte_size"):
+            value = payload.get(key)
+            if value is not None:
+                metadata["byte_size"] = value
+                break
+        payload_mime_type = payload.get("mime_type")
+        if payload_mime_type:
+            metadata["mime_type"] = payload_mime_type
+        elif mime_type:
+            metadata["mime_type"] = mime_type
+    elif mime_type:
+        metadata["mime_type"] = mime_type
+    return metadata
+
+
+def _text_artifact_payload(object_ref: str, text: Optional[str], **fields: Any) -> dict[str, Any]:
+    content = text or ""
+    encoded = content.encode("utf-8")
+    return {
+        **fields,
+        "object_ref": object_ref,
+        "content": content,
+        "mime_type": "text/plain; charset=utf-8",
+        "checksum": f"sha256:{hashlib.sha256(encoded).hexdigest()}",
+        "byte_size": len(encoded),
+    }
+
+
+def _json_artifact_payload(object_ref: str, content: Any, **fields: Any) -> dict[str, Any]:
+    normalized_content = deepcopy(content)
+    serialized = json.dumps(normalized_content, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return {
+        **fields,
+        "object_ref": object_ref,
+        "content": normalized_content,
+        "mime_type": "application/json",
+        "checksum": f"sha256:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}",
+        "byte_size": len(serialized.encode("utf-8")),
+    }
+
+
+def _register_projection_object(rows: dict[str, dict[str, Any]], object_ref: str, workspace_id: str, owner_ref: str, payload: Any, created_at: Optional[str] = None, updated_at: Optional[str] = None, mime_type: Optional[str] = None, access_policy: str = "workspace", overwrite: bool = True) -> None:
+    if not object_ref:
+        return
+    canonical_ref = _canonical_object_ref(object_ref)
+    if canonical_ref in rows and not overwrite:
+        return
+    normalized_payload = deepcopy(payload)
+    serialized = json.dumps(normalized_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    metadata = _payload_object_metadata(canonical_ref, normalized_payload, mime_type)
+    rows[canonical_ref] = {
+        "object_ref": canonical_ref,
+        "workspace_id": workspace_id,
+        "object_kind": _infer_object_kind(canonical_ref),
+        "bucket": metadata.get("bucket") or _infer_storage_bucket(canonical_ref),
+        "storage_key": metadata.get("storage_key") or (canonical_ref.removeprefix("object://") if canonical_ref.startswith("object://") else canonical_ref),
+        "checksum": metadata.get("checksum") or f"sha256:{hashlib.sha256(serialized.encode('utf-8')).hexdigest()}",
+        "mime_type": metadata.get("mime_type") or "application/json",
+        "byte_size": metadata.get("byte_size") if metadata.get("byte_size") is not None else len(serialized.encode("utf-8")),
+        "access_policy": access_policy,
+        "owner_ref": owner_ref,
+        "payload": normalized_payload,
+        "created_at": created_at or updated_at or utc_now(),
+        "updated_at": updated_at or created_at or utc_now(),
+    }
+
+
+def _projection_task_record(task_id: str) -> tuple[Optional[str], Optional[str]]:
+    for run_id, run in STORE.extraction_runs.items():
+        task = run.get("task")
+        if task and task["task_id"] == task_id:
+            return "extraction_run", run_id
+    for chapter_plan_id, task in STORE.chapter_plan_tasks.items():
+        if task["task_id"] == task_id:
+            return "chapter_plan", chapter_plan_id
+    for chapter_plan_id, task in STORE.section_plan_tasks.items():
+        if task["task_id"] == task_id:
+            return "section_plan", chapter_plan_id
+    for writing_run_id, task in STORE.writing_run_tasks.items():
+        if task["task_id"] == task_id:
+            return "writing_run", writing_run_id
+    task = STORE.agent_tasks.get(task_id)
+    if task:
+        return "agent_task", task_id
+    return None, None
+
+
+
+def _as_utc_datetime(value: str) -> datetime:
+    normalized = _normalize_timestamp_string(value)
+    dt = datetime.fromisoformat(normalized)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+
+def _clear_task_lock(task: dict[str, Any]) -> None:
+    task["lease_owner"] = None
+    task["lease_expires_at"] = None
+    task["heartbeat_at"] = None
+    task["current_dispatch_token"] = None
+
+
+
+def _build_task_lock_row(task: dict[str, Any]) -> Optional[dict[str, Any]]:
+    if not task.get("lease_owner") and not task.get("lease_expires_at") and not task.get("heartbeat_at"):
+        return None
+    return {
+        "task_lock_id": f"task-lock:{task['task_id']}",
+        "task_id": task["task_id"],
+        "lock_owner": task.get("lease_owner"),
+        "lease_expires_at": task.get("lease_expires_at"),
+        "heartbeat_at": task.get("heartbeat_at"),
+        "created_at": task.get("started_at") or task.get("created_at"),
+        "updated_at": task.get("heartbeat_at") or task.get("started_at") or task.get("created_at"),
+    }
+
+
+
+def _sync_task_owner_runtime_status(task_kind: Optional[str], entity_id: Optional[str], status: str, now: str, task: dict[str, Any]) -> None:
+    if task_kind == "extraction_run" and entity_id:
+        run = STORE.extraction_runs.get(entity_id)
+        if not run:
+            return
+        run["status"] = status
+        run["started_at"] = task.get("started_at") or run.get("started_at")
+        if status in {"queued", "running", "retrying"}:
+            run["finished_at"] = None
+        elif status in {"succeeded", "failed", "requires_review", "blocked"}:
+            run["finished_at"] = task.get("finished_at")
+        return
+    if task_kind == "chapter_plan" and entity_id:
+        chapter_plan = STORE.chapter_plans.get(entity_id)
+        if chapter_plan:
+            chapter_plan["status"] = status
+            chapter_plan["updated_at"] = now
+        return
+    if task_kind == "writing_run" and entity_id:
+        writing_run = STORE.writing_runs.get(entity_id)
+        if writing_run:
+            writing_run["status"] = status
+            writing_run["updated_at"] = now
+
+
+
+def _terminal_recovery_status(task: dict[str, Any]) -> str:
+    if task.get("error_code") in {"structured_output_validation_failed", "provider_invalid_response", "context_too_long"}:
+        return "requires_review"
+    return "failed"
+
+
+LEGAL_DISPATCH_STATUSES = {"queued", "retrying"}
+TERMINAL_TASK_STATUSES = {"succeeded", "requires_review", "failed", "blocked"}
+
+
+def _task_dispatch_token(task: dict[str, Any]) -> Optional[str]:
+    return task.get("current_dispatch_token")
+
+
+def _set_task_dispatch_token(task: dict[str, Any], token: str) -> None:
+    task["current_dispatch_token"] = token
+
+
+def _next_dispatch_attempt(task: dict[str, Any]) -> int:
+    return int(task.get("dispatch_attempt") or 0) + 1
+
+
+def _dispatch_token(trace_id: str, actor_id: str, request_id: str, attempt: int) -> str:
+    return f"{trace_id}:{actor_id}:{request_id}:{attempt}"
+
+
+def _can_dispatch_task(task: dict[str, Any]) -> bool:
+    return task.get("status") in LEGAL_DISPATCH_STATUSES
+
+
+def _can_schedule_retry(task: dict[str, Any]) -> bool:
+    return task.get("status") == "running"
+
+
+def _can_require_manual_review(task: dict[str, Any]) -> bool:
+    return task.get("status") == "running"
+
+
+def _completion_matches_active_dispatch(task: dict[str, Any], dispatch_token: Optional[str]) -> bool:
+    if task.get("status") != "running":
+        return False
+    if not task.get("lease_owner"):
+        return False
+    token = _task_dispatch_token(task)
+    if token and dispatch_token != token:
+        return False
+    return True
+
+
+def _build_runtime_projection() -> dict[str, list[dict[str, Any]]]:
+    object_rows: dict[str, dict[str, Any]] = {}
+    task_rows: list[dict[str, Any]] = []
+    task_lock_rows: list[dict[str, Any]] = []
+    task_event_rows: list[dict[str, Any]] = []
+    audit_rows: list[dict[str, Any]] = []
+
+    for workspace_id, workspace in STORE.workspaces.items():
+        _register_projection_object(object_rows, f"object://workspace/{workspace_id}", workspace_id, f"workspace:{workspace_id}", workspace, workspace.get("created_at"), workspace.get("updated_at"))
+    for member_id, member in STORE.workspace_members.items():
+        _register_projection_object(object_rows, f"object://workspace-member/{member_id}", member["workspace_id"], f"workspace-member:{member_id}", member, member.get("created_at"), member.get("updated_at"))
+    for book_id, book in STORE.books.items():
+        _register_projection_object(object_rows, f"object://source-book/{book_id}", book["workspace_id"], f"book:{book_id}", book, book.get("created_at"), book.get("updated_at"))
+    for content_id, content in STORE.source_contents.items():
+        workspace_id = STORE.books.get(content["book_id"], {}).get("workspace_id", default_workspace_id())
+        _register_projection_object(object_rows, f"object://source-contents/{content_id}", workspace_id, f"source-content:{content_id}", content, content.get("created_at"), content.get("updated_at"), mime_type=content.get("mime_type", "text/plain; charset=utf-8"))
+    for evidence_id, evidence in STORE.evidences.items():
+        workspace_id = STORE.books.get(evidence["book_id"], {}).get("workspace_id", default_workspace_id())
+        _register_projection_object(object_rows, f"object://evidence/{evidence_id}", workspace_id, f"evidence:{evidence_id}", evidence, evidence.get("created_at"), evidence.get("updated_at"), mime_type="application/json")
+    for book_id, chapters in STORE.chapters_by_book.items():
+        workspace_id = STORE.books.get(book_id, {}).get("workspace_id", default_workspace_id())
+        for chapter in chapters:
+            chapter_ref = chapter.get("text_object_ref") or f"object://source-chapter/{chapter['chapter_id']}"
+            _register_projection_object(object_rows, chapter_ref, workspace_id, f"chapter:{chapter['chapter_id']}", chapter, chapter.get("created_at"), chapter.get("updated_at"), mime_type="text/plain")
+    for chapter_id, scenes in STORE.source_scenes_by_chapter.items():
+        for scene in scenes:
+            workspace_id = scene.get("workspace_id") or STORE.books.get(scene.get("book_id"), {}).get("workspace_id", default_workspace_id())
+            _register_projection_object(object_rows, f"object://source-scenes/{scene['scene_id']}", workspace_id, f"source-scene:{scene['scene_id']}", scene, scene.get("created_at"), scene.get("updated_at"))
+    for scene_id, events in STORE.events_by_scene.items():
+        for event in events:
+            workspace_id = event.get("workspace_id") or STORE.books.get(event.get("book_id"), {}).get("workspace_id", default_workspace_id())
+            _register_projection_object(object_rows, f"object://story-events/{event['event_id']}", workspace_id, f"story-event:{event['event_id']}", event, event.get("created_at"), event.get("updated_at"))
+    for field_name, prefix, owner_prefix in (
+        ("conflicts", "story-conflicts", "story-conflict"),
+        ("hooks", "story-hooks", "story-hook"),
+        ("rewards", "story-rewards", "story-reward"),
+        ("climaxes", "story-climaxes", "story-climax"),
+        ("relationship_edges", "relationship-edges", "relationship-edge"),
+    ):
+        for item_id, item in getattr(STORE, field_name).items():
+            workspace_id = item.get("workspace_id") or STORE.books.get(item.get("book_id"), {}).get("workspace_id", default_workspace_id())
+            _register_projection_object(object_rows, f"object://{prefix}/{item_id}", workspace_id, f"{owner_prefix}:{item_id}", item, item.get("created_at"), item.get("updated_at"))
+    for run_id, run in STORE.extraction_runs.items():
+        _register_projection_object(object_rows, f"object://extraction-run/{run_id}", run["workspace_id"], f"extraction-run:{run_id}", run, run.get("created_at"), run.get("finished_at") or run.get("started_at") or run.get("created_at"))
+        extraction_created_at = run.get("created_at")
+        extraction_updated_at = run.get("finished_at") or run.get("started_at") or run.get("created_at")
+        if run.get("knowledge_package_ref"):
+            _register_projection_object(
+                object_rows,
+                run["knowledge_package_ref"],
+                run["workspace_id"],
+                f"extraction-run:{run_id}",
+                _json_artifact_payload(
+                    run["knowledge_package_ref"],
+                    {
+                        "run_id": run_id,
+                        "book_id": run["book_id"],
+                        "current_stage": run.get("current_stage"),
+                        "knowledge_object_refs": [f"object://knowledge-objects/{object_id}" for object_id in STORE.knowledge_by_run.get(run_id, [])],
+                    },
+                    run_id=run_id,
+                    book_id=run["book_id"],
+                ),
+                extraction_created_at,
+                extraction_updated_at,
+                mime_type="application/json",
+                overwrite=False,
+            )
+        if run.get("graph_package_ref"):
+            _register_projection_object(
+                object_rows,
+                run["graph_package_ref"],
+                run["workspace_id"],
+                f"extraction-run:{run_id}",
+                _json_artifact_payload(
+                    run["graph_package_ref"],
+                    STORE.graph_summaries.get(run["book_id"], {}),
+                    run_id=run_id,
+                    book_id=run["book_id"],
+                ),
+                extraction_created_at,
+                extraction_updated_at,
+                mime_type="application/json",
+                overwrite=False,
+            )
+        if run.get("extraction_report_ref"):
+            _register_projection_object(
+                object_rows,
+                run["extraction_report_ref"],
+                run["workspace_id"],
+                f"extraction-run:{run_id}",
+                _json_artifact_payload(
+                    run["extraction_report_ref"],
+                    {
+                        "run_id": run_id,
+                        "status": run.get("status"),
+                        "current_stage": run.get("current_stage"),
+                        "chapter_count": run.get("chapter_count"),
+                        "scene_count": run.get("scene_count"),
+                        "object_count": run.get("object_count"),
+                        "evidence_count": run.get("evidence_count"),
+                        "low_confidence_count": run.get("low_confidence_count"),
+                        "errors": deepcopy(run.get("errors", [])),
+                    },
+                    run_id=run_id,
+                    book_id=run["book_id"],
+                ),
+                extraction_created_at,
+                extraction_updated_at,
+                mime_type="application/json",
+                overwrite=False,
+            )
+        if run.get("quality_report_ref"):
+            low_confidence_items = [
+                deepcopy(STORE.knowledge_objects[object_id])
+                for object_id in STORE.knowledge_by_run.get(run_id, [])
+                if object_id in STORE.knowledge_objects
+                and STORE.knowledge_objects[object_id].get("confidence", 1) < 0.8
+                and STORE.knowledge_objects[object_id].get("review_status") == "pending"
+            ]
+            _register_projection_object(
+                object_rows,
+                run["quality_report_ref"],
+                run["workspace_id"],
+                f"extraction-run:{run_id}",
+                _json_artifact_payload(
+                    run["quality_report_ref"],
+                    {
+                        "run_id": run_id,
+                        "status": run.get("status"),
+                        "low_confidence_count": run.get("low_confidence_count"),
+                        "low_confidence_items": low_confidence_items,
+                    },
+                    run_id=run_id,
+                    book_id=run["book_id"],
+                ),
+                extraction_created_at,
+                extraction_updated_at,
+                mime_type="application/json",
+                overwrite=False,
+            )
+    for object_id, obj in STORE.knowledge_objects.items():
+        _register_projection_object(object_rows, f"object://knowledge-object/{object_id}", obj["workspace_id"], f"knowledge-object:{object_id}", obj, obj.get("created_at"), obj.get("updated_at"))
+    for node_id, node in STORE.graph_node_details.items():
+        _register_projection_object(object_rows, f"object://graph-node/{node_id}", node.get("workspace_id", default_workspace_id()), f"graph-node:{node_id}", {**node, "neighbors": STORE.graph_neighbors_by_node.get(node_id, [])}, node.get("created_at"), node.get("updated_at"))
+    for book_id, summary in STORE.graph_summaries.items():
+        _register_projection_object(object_rows, f"object://graph-summary/{book_id}", summary.get("workspace_id", default_workspace_id()), f"graph-summary:{book_id}", summary, summary.get("created_at"), summary.get("updated_at"))
+    for project_id, project in STORE.novel_projects.items():
+        _register_projection_object(object_rows, f"object://novel-project/{project_id}", project["workspace_id"], f"novel-project:{project_id}", project, project.get("created_at"), project.get("updated_at"))
+    for story_bible_id, story_bible in STORE.story_bibles.items():
+        _register_projection_object(object_rows, f"object://story-bible/{story_bible_id}", story_bible["workspace_id"], f"story-bible:{story_bible_id}", story_bible, story_bible.get("created_at"), story_bible.get("updated_at"))
+    for chapter_plan_id, chapter_plan in STORE.chapter_plans.items():
+        _register_projection_object(object_rows, f"object://chapter-plan/{chapter_plan_id}", chapter_plan["workspace_id"], f"chapter-plan:{chapter_plan_id}", chapter_plan, chapter_plan.get("created_at"), chapter_plan.get("updated_at"))
+    for chapter_plan_id, sections in STORE.section_plans_by_chapter.items():
+        for section in sections:
+            _register_projection_object(object_rows, f"object://section-plan/{section['section_plan_id']}", section["workspace_id"], f"section-plan:{section['section_plan_id']}", section, section.get("created_at"), section.get("updated_at"))
+    for package_id, package in STORE.memory_packages.items():
+        _register_projection_object(object_rows, f"object://memory-package/{package_id}", package["workspace_id"], f"memory-package:{package_id}", package, package.get("created_at"), package.get("updated_at"))
+    for package_id, package in STORE.prompt_packages.items():
+        _register_projection_object(object_rows, f"object://prompt-package/{package_id}", package["workspace_id"], f"prompt-package:{package_id}", package, package.get("created_at"), package.get("updated_at"))
+    for writing_run_id, writing_run in STORE.writing_runs.items():
+        _register_projection_object(object_rows, f"object://writing-run/{writing_run_id}", writing_run["workspace_id"], f"writing-run:{writing_run_id}", writing_run, writing_run.get("created_at"), writing_run.get("updated_at"))
+    for writing_run_id, section_runs in STORE.section_runs_by_writing.items():
+        workspace_id = STORE.writing_runs.get(writing_run_id, {}).get("workspace_id", default_workspace_id())
+        for section_run in section_runs:
+            draft_ref = section_run.get("draft_object_ref")
+            if draft_ref:
+                _register_projection_object(
+                    object_rows,
+                    draft_ref,
+                    workspace_id,
+                    f"section-run:{section_run['section_run_id']}",
+                    _text_artifact_payload(
+                        draft_ref,
+                        section_run.get("writer_output"),
+                        section_run_id=section_run["section_run_id"],
+                        writing_run_id=section_run["writing_run_id"],
+                        section_plan_id=section_run.get("section_plan_id"),
+                    ),
+                    section_run.get("created_at"),
+                    section_run.get("updated_at"),
+                    mime_type="text/plain; charset=utf-8",
+                )
+            critic_ref = section_run.get("critic_report_ref")
+            if critic_ref:
+                _register_projection_object(
+                    object_rows,
+                    critic_ref,
+                    workspace_id,
+                    f"section-run:{section_run['section_run_id']}",
+                    _json_artifact_payload(
+                        critic_ref,
+                        section_run.get("critic_issues", []),
+                        section_run_id=section_run["section_run_id"],
+                        writing_run_id=section_run["writing_run_id"],
+                        section_plan_id=section_run.get("section_plan_id"),
+                        status=section_run.get("status"),
+                    ),
+                    section_run.get("created_at"),
+                    section_run.get("updated_at"),
+                    mime_type="application/json",
+                )
+            humanized_ref = section_run.get("humanized_object_ref")
+            if humanized_ref:
+                _register_projection_object(
+                    object_rows,
+                    humanized_ref,
+                    workspace_id,
+                    f"section-run:{section_run['section_run_id']}",
+                    _text_artifact_payload(
+                        humanized_ref,
+                        section_run.get("humanized_text"),
+                        section_run_id=section_run["section_run_id"],
+                        writing_run_id=section_run["writing_run_id"],
+                        section_plan_id=section_run.get("section_plan_id"),
+                    ),
+                    section_run.get("created_at"),
+                    section_run.get("updated_at"),
+                    mime_type="text/plain; charset=utf-8",
+                )
+            _register_projection_object(object_rows, f"object://section-run/{section_run['section_run_id']}", workspace_id, f"section-run:{section_run['section_run_id']}", section_run, section_run.get("created_at"), section_run.get("updated_at"))
+    for report_id, report in STORE.quality_reports.items():
+        _register_projection_object(object_rows, f"object://quality-report/{report_id}", report["workspace_id"], f"quality-report:{report_id}", report, report.get("created_at"), report.get("updated_at"))
+    for report_id, report in STORE.consistency_reports.items():
+        _register_projection_object(object_rows, f"object://consistency-report/{report_id}", report["workspace_id"], f"consistency-report:{report_id}", report, report.get("created_at"), report.get("updated_at"))
+        for issue in report.get("issues", []):
+            note_ref = issue.get("note") if isinstance(issue.get("note"), str) and str(issue.get("note", "")).startswith("object://") else None
+            if note_ref:
+                _register_projection_object(
+                    object_rows,
+                    note_ref,
+                    report["workspace_id"],
+                    f"consistency-report:{report_id}",
+                    _text_artifact_payload(note_ref, issue.get("note"), consistency_report_id=report_id, issue_id=issue.get("issue_id")),
+                    report.get("updated_at") or report.get("created_at"),
+                    report.get("updated_at") or report.get("created_at"),
+                    mime_type="text/plain; charset=utf-8",
+                    overwrite=False,
+                )
+    for summary_id, summary in STORE.revision_summaries.items():
+        _register_projection_object(object_rows, f"object://revision-summary/{summary_id}", summary["workspace_id"], f"revision-summary:{summary_id}", summary, summary.get("created_at"), summary.get("updated_at"))
+        reviewer_note_ref = summary.get("reviewer_note_ref")
+        if reviewer_note_ref:
+            _register_projection_object(
+                object_rows,
+                reviewer_note_ref,
+                summary["workspace_id"],
+                f"revision-summary:{summary_id}",
+                _text_artifact_payload(reviewer_note_ref, summary.get("change_summary"), revision_summary_id=summary_id, writing_run_id=summary.get("writing_run_id")),
+                summary.get("created_at"),
+                summary.get("updated_at"),
+                mime_type="text/plain; charset=utf-8",
+                overwrite=False,
+            )
+    for snapshot_id, snapshot in STORE.chapter_snapshots.items():
+        workspace_id = STORE.writing_runs.get(snapshot["writing_run_id"], {}).get("workspace_id", default_workspace_id())
+        chapter_text = snapshot.get("chapter_text", "")
+        chapter_checksum = f"sha256:{hashlib.sha256(chapter_text.encode('utf-8')).hexdigest()}"
+        _register_projection_object(
+            object_rows,
+            f"object://chapter-snapshot/{snapshot_id}",
+            workspace_id,
+            f"chapter-snapshot:{snapshot_id}",
+            {
+                **snapshot,
+                "checksum": chapter_checksum,
+                "byte_size": len(chapter_text.encode("utf-8")),
+                "mime_type": "text/plain; charset=utf-8",
+            },
+            snapshot.get("created_at"),
+            snapshot.get("created_at"),
+        )
+        accepted_chapter_ref = snapshot.get("accepted_chapter_ref")
+        if accepted_chapter_ref:
+            _register_projection_object(
+                object_rows,
+                accepted_chapter_ref,
+                workspace_id,
+                f"chapter-snapshot:{snapshot_id}",
+                {
+                    "accepted_chapter_ref": accepted_chapter_ref,
+                    "chapter_snapshot_id": snapshot_id,
+                    "chapter_text": chapter_text,
+                    "mime_type": "text/plain; charset=utf-8",
+                    "byte_size": len(chapter_text.encode("utf-8")),
+                    "checksum": chapter_checksum,
+                },
+                snapshot.get("created_at"),
+                snapshot.get("created_at"),
+                mime_type="text/plain; charset=utf-8",
+                overwrite=False,
+            )
+    for project_id, state in STORE.manuscript_states_by_project.items():
+        _register_projection_object(object_rows, f"object://manuscript-state/{project_id}", state.get("project_id") and STORE.novel_projects.get(state["project_id"], {}).get("workspace_id", default_workspace_id()) or default_workspace_id(), f"manuscript-state:{project_id}", state, state.get("updated_at"), state.get("updated_at"))
+    for feedback_id, record in STORE.feedback_records.items():
+        _register_projection_object(object_rows, f"object://feedback-record/{feedback_id}", record["workspace_id"], f"feedback-record:{feedback_id}", record, record.get("created_at"), record.get("updated_at"))
+        comment_ref = record.get("comment_ref")
+        if comment_ref:
+            _register_projection_object(
+                object_rows,
+                comment_ref,
+                record["workspace_id"],
+                f"feedback-record:{feedback_id}",
+                _text_artifact_payload(
+                    comment_ref,
+                    (record.get("payload") or {}).get("summary"),
+                    feedback_record_id=feedback_id,
+                    target_type=record.get("target_type"),
+                    target_id=record.get("target_id"),
+                    feedback_type=record.get("feedback_type"),
+                ),
+                record.get("created_at"),
+                record.get("updated_at"),
+                mime_type="text/plain; charset=utf-8",
+                overwrite=False,
+            )
+    for ranking_key, snapshot in STORE.ranking_snapshots.items():
+        _register_projection_object(object_rows, f"object://ranking/{ranking_key}", snapshot.get("workspace_id", default_workspace_id()), f"ranking:{ranking_key}", snapshot, snapshot.get("created_at"), snapshot.get("updated_at"))
+    for pattern_id, pattern in STORE.patterns.items():
+        _register_projection_object(object_rows, f"object://pattern/{pattern_id}", pattern["workspace_id"], f"pattern:{pattern_id}", pattern, pattern.get("created_at"), pattern.get("updated_at"))
+    for profile_id, profile in STORE.rhythm_profiles.items():
+        _register_projection_object(object_rows, f"object://rhythm-profile/{profile_id}", profile["workspace_id"], f"rhythm-profile:{profile_id}", profile, profile.get("created_at"), profile.get("updated_at"))
+    for asset_id, asset in STORE.assets.items():
+        _register_projection_object(object_rows, f"object://asset/{asset_id}", asset["workspace_id"], f"asset:{asset_id}", asset, asset.get("created_at"), asset.get("updated_at"))
+    for rule_id, rule in STORE.rules.items():
+        _register_projection_object(object_rows, f"object://rule/{rule_id}", rule["workspace_id"], f"rule:{rule_id}", rule, rule.get("created_at"), rule.get("updated_at"))
+    for profile_id, profile in STORE.model_profiles.items():
+        _register_projection_object(object_rows, f"object://model-profile/{profile_id}", profile.get("workspace_id", default_workspace_id()), f"model-profile:{profile_id}", profile, profile.get("created_at"), profile.get("updated_at"))
+    for account_id, account in STORE.provider_accounts.items():
+        _register_projection_object(object_rows, f"object://provider-account/{account_id}", account.get("workspace_id", default_workspace_id()), f"provider-account:{account_id}", account, account.get("created_at"), account.get("updated_at"))
+    for profile_id, profile in STORE.quality_gate_profiles.items():
+        _register_projection_object(object_rows, f"object://quality-profile/{profile_id}", profile.get("workspace_id", default_workspace_id()), f"quality-profile:{profile_id}", profile, profile.get("created_at"), profile.get("updated_at"))
+    for prompt_version in STORE.prompt_versions:
+        prompt_ref = f"object://prompt-version/{prompt_version['agent_role']}"
+        _register_projection_object(object_rows, prompt_ref, prompt_version.get("workspace_id", default_workspace_id()), f"prompt-version:{prompt_version['agent_role']}", prompt_version, prompt_version.get("created_at"), prompt_version.get("updated_at"))
+
+    task_sources = [
+        *[run["task"] for run in STORE.extraction_runs.values() if run.get("task")],
+        *STORE.chapter_plan_tasks.values(),
+        *STORE.section_plan_tasks.values(),
+        *STORE.writing_run_tasks.values(),
+        *STORE.agent_tasks.values(),
+    ]
+    for task in task_sources:
+        status = task.get("status", "queued")
+        task_kind, entity_id = _projection_task_record(task["task_id"])
+        task_rows.append(
+            {
+                "task_id": task["task_id"],
+                "workspace_id": task["workspace_id"],
+                "task_type": task["task_type"],
+                "owner_module": task.get("owner_module", "ai-worker"),
+                "status": status,
+                "progress": task.get("progress", 0),
+                "idempotency_key": task["idempotency_key"],
+                "request_id": task.get("request_id"),
+                "trace_id": task.get("trace_id"),
+                "actor_id": task.get("actor_id"),
+                "retry_count": task.get("retry_count", 0),
+                "max_retry_count": task.get("max_retry_count", 3),
+                "latency_ms": task.get("latency_ms"),
+                "error_code": task.get("error_code"),
+                "lease_owner": task.get("lease_owner"),
+                "lease_expires_at": task.get("lease_expires_at"),
+                "heartbeat_at": task.get("heartbeat_at"),
+                "next_retry_at": task.get("next_retry_at"),
+                "review_required": task.get("review_required", status == "requires_review"),
+                "blocked_reason": task.get("blocked_reason"),
+                "input_refs": deepcopy(task.get("input_refs", [])),
+                "output_refs": deepcopy(task.get("output_refs", [])),
+                "created_at": task.get("created_at"),
+                "started_at": task.get("started_at"),
+                "finished_at": task.get("finished_at"),
+                "payload": {
+                    "task_kind": task_kind,
+                    "entity_id": entity_id,
+                    "current_dispatch_token": task.get("current_dispatch_token"),
+                    "dispatch_attempt": task.get("dispatch_attempt", 0),
+                },
+                "updated_at": task.get("finished_at") or task.get("started_at") or task.get("created_at"),
+            }
+        )
+        lock_row = _build_task_lock_row(task)
+        if lock_row:
+            task_lock_rows.append(lock_row)
+        for ref in [*task.get("input_refs", []), *task.get("output_refs", [])]:
+            _register_projection_object(object_rows, ref, task["workspace_id"], f"task:{task['task_id']}", {"task_id": task["task_id"], "ref": ref}, task.get("created_at"), task.get("finished_at") or task.get("started_at") or task.get("created_at"), access_policy="task", overwrite=False)
+
+    for events in STORE.task_events_by_task.values():
+        for event in events:
+            task_event_rows.append({**deepcopy(event), "updated_at": event.get("updated_at") or event.get("created_at")})
+    for event in STORE.audit_events:
+        audit_rows.append({**deepcopy(event), "updated_at": event.get("updated_at") or event.get("created_at")})
+
+    return {
+        "objects": sorted(object_rows.values(), key=lambda item: item["object_ref"]),
+        "tasks": sorted(task_rows, key=lambda item: (item.get("created_at") or "", item["task_id"])),
+        "task_locks": sorted(task_lock_rows, key=lambda item: item["task_id"]),
+        "task_events": sorted(task_event_rows, key=lambda item: (item.get("created_at") or "", item["task_event_id"])),
+        "audit_events": sorted(audit_rows, key=lambda item: (item.get("created_at") or "", item["audit_event_id"])),
+    }
+
+
+def _sync_runtime_projection() -> None:
+    projection = _build_runtime_projection()
+    sync_runtime_projection(
+        objects=projection["objects"],
+        tasks=projection["tasks"],
+        task_locks=projection["task_locks"],
+        task_events=projection["task_events"],
+        audit_events=projection["audit_events"],
+    )
+
+
+def _restore_runtime_projection() -> None:
+    projection = load_runtime_projection()
+    if not projection["tasks"] and not projection.get("task_locks") and not projection["task_events"] and not projection["audit_events"]:
+        return
+    events_by_task = {task_id: [] for task_id in STORE.task_events_by_task}
+    for event in projection["task_events"]:
+        events_by_task.setdefault(event["task_id"], []).append(deepcopy(event))
+    task_locks_by_task = {item["task_id"]: item for item in projection.get("task_locks", [])}
+    for task in projection["tasks"]:
+        payload = task.get("payload") or {}
+        task_kind = payload.get("task_kind")
+        entity_id = payload.get("entity_id")
+        if not task_kind:
+            task_kind, entity_id = _projection_task_record(task["task_id"])
+        lock = task_locks_by_task.get(task["task_id"], {})
+        restored_task = {
+            "schema_version": 1,
+            "task_id": task["task_id"],
+            "task_type": task["task_type"],
+            "workspace_id": task["workspace_id"],
+            "owner_module": task.get("owner_module", "ai-worker"),
+            "status": task["status"],
+            "progress": task.get("progress", 0),
+            "idempotency_key": task["idempotency_key"],
+            "request_id": task.get("request_id"),
+            "trace_id": task.get("trace_id"),
+            "actor_id": task.get("actor_id"),
+            "retry_count": task.get("retry_count", 0),
+            "max_retry_count": task.get("max_retry_count", 3),
+            "latency_ms": task.get("latency_ms"),
+            "error_code": task.get("error_code"),
+            "lease_owner": lock.get("lock_owner", task.get("lease_owner")),
+            "lease_expires_at": _normalize_timestamp_string(lock.get("lease_expires_at", task.get("lease_expires_at"))),
+            "heartbeat_at": _normalize_timestamp_string(lock.get("heartbeat_at", task.get("heartbeat_at"))),
+            "current_dispatch_token": payload.get("current_dispatch_token"),
+            "dispatch_attempt": payload.get("dispatch_attempt", 0),
+            "next_retry_at": _normalize_timestamp_string(task.get("next_retry_at")),
+            "review_required": task.get("review_required", False),
+            "blocked_reason": task.get("blocked_reason"),
+            "input_refs": deepcopy(task.get("input_refs", [])),
+            "output_refs": deepcopy(task.get("output_refs", [])),
+            "created_at": _normalize_timestamp_string(task.get("created_at")),
+            "started_at": _normalize_timestamp_string(task.get("started_at")),
+            "finished_at": _normalize_timestamp_string(task.get("finished_at")),
+        }
+        if task_kind == "extraction_run" and entity_id:
+            run = STORE.extraction_runs.get(entity_id)
+            if not run:
+                continue
+            run["task"] = {**deepcopy(run.get("task", {})), **restored_task}
+        elif task_kind == "chapter_plan" and entity_id:
+            STORE.chapter_plan_tasks[entity_id] = {
+                **deepcopy(STORE.chapter_plan_tasks.get(entity_id, {})),
+                **restored_task,
+            }
+        elif task_kind == "section_plan" and entity_id:
+            STORE.section_plan_tasks[entity_id] = {
+                **deepcopy(STORE.section_plan_tasks.get(entity_id, {})),
+                **restored_task,
+            }
+        elif task_kind == "writing_run" and entity_id:
+            STORE.writing_run_tasks[entity_id] = {
+                **deepcopy(STORE.writing_run_tasks.get(entity_id, {})),
+                **restored_task,
+            }
+        elif task_kind == "agent_task":
+            STORE.agent_tasks[task["task_id"]] = {
+                **deepcopy(STORE.agent_tasks.get(task["task_id"], {})),
+                **restored_task,
+            }
+    STORE.task_events_by_task = events_by_task
+    STORE.audit_events = [deepcopy(event) for event in projection["audit_events"]]
+    STORE.migration_events = [deepcopy(event) for event in getattr(STORE, "migration_events", [])]
+
+
+
 def _persist_store() -> None:
-    save_snapshot(asdict(STORE))
+    state = asdict(STORE)
+    save_business_state(state)
+    save_snapshot(state)
+    _sync_runtime_projection()
 
 
 def _persisting_mutation(func):
@@ -125,6 +1056,23 @@ def _persisting_mutation(func):
         return result
 
     return wrapper
+
+
+def _restore_store_from_business_tables() -> bool:
+    snapshot = load_business_state()
+    if snapshot is None or not isinstance(snapshot, dict):
+        return False
+    field_names = set(CoreStore.__dataclass_fields__)
+    if not set(snapshot).issubset(field_names):
+        return False
+    try:
+        restored = CoreStore(**snapshot)
+    except TypeError:
+        return False
+    for field_name in CoreStore.__dataclass_fields__:
+        setattr(STORE, field_name, getattr(restored, field_name))
+    STORE.migration_events = [deepcopy(event) for event in getattr(restored, "migration_events", [])]
+    return True
 
 
 def _restore_store_from_snapshot() -> bool:
@@ -140,6 +1088,7 @@ def _restore_store_from_snapshot() -> bool:
         return False
     for field_name in CoreStore.__dataclass_fields__:
         setattr(STORE, field_name, getattr(restored, field_name))
+    STORE.migration_events = [deepcopy(event) for event in getattr(restored, "migration_events", [])]
     return True
 
 
@@ -148,7 +1097,19 @@ def reset_store() -> None:
     STORE.workspaces.clear()
     STORE.workspace_members.clear()
     STORE.books.clear()
+    STORE.source_contents.clear()
+    STORE.source_content_by_book.clear()
+    STORE.evidences.clear()
+    STORE.evidence_by_book.clear()
+    STORE.evidence_by_run.clear()
     STORE.chapters_by_book.clear()
+    STORE.source_scenes_by_chapter.clear()
+    STORE.events_by_scene.clear()
+    STORE.conflicts.clear()
+    STORE.hooks.clear()
+    STORE.rewards.clear()
+    STORE.climaxes.clear()
+    STORE.relationship_edges.clear()
     STORE.extraction_runs.clear()
     STORE.knowledge_objects.clear()
     STORE.knowledge_by_run.clear()
@@ -186,6 +1147,7 @@ def reset_store() -> None:
     STORE.agent_tasks.clear()
     STORE.task_events_by_task.clear()
     STORE.audit_events.clear()
+    STORE.migration_events.clear()
     _persist_store()
 
 
@@ -256,11 +1218,15 @@ def seed_phase_two_demo_data() -> None:
             "text_object_ref": "object://source-chapters/01JZCHAPTER00000000000002",
         },
     ]
+    llm_provider = os.getenv("NOVELIST_LLM_PROVIDER", "anthropic")
+    llm_model = os.getenv("NOVELIST_LLM_MODEL", "claude-sonnet-5")
+    llm_structured_model = os.getenv("NOVELIST_LLM_STRUCTURED_MODEL", "claude-haiku-4-5-20251001")
+    provider_account_id = f"provider-account-{llm_provider}-default"
     STORE.model_profiles[MODEL_PROFILE_DEFAULT_ID] = {
         "schema_version": 1,
         "model_profile_id": MODEL_PROFILE_DEFAULT_ID,
-        "provider_name": "anthropic",
-        "provider_model_name": "claude-sonnet-5",
+        "provider_name": llm_provider,
+        "provider_model_name": llm_model,
         "label": "默认中文长文本模型",
         "description": "大多数 Agent role 默认使用。",
         "enabled": True,
@@ -270,19 +1236,19 @@ def seed_phase_two_demo_data() -> None:
     STORE.model_profiles[MODEL_PROFILE_STRUCTURED_FALLBACK_ID] = {
         "schema_version": 1,
         "model_profile_id": MODEL_PROFILE_STRUCTURED_FALLBACK_ID,
-        "provider_name": "anthropic",
-        "provider_model_name": "claude-haiku-4-5-20251001",
+        "provider_name": llm_provider,
+        "provider_model_name": llm_structured_model,
         "label": "结构化兜底模型",
         "description": "结构化输出失败后重试使用。",
         "enabled": True,
         "supports_structured_output": True,
         "fallback_profile_ids": [],
     }
-    STORE.provider_accounts["provider-account-anthropic-default"] = {
-        "provider_account_id": "provider-account-anthropic-default",
-        "provider_name": "anthropic",
-        "account_label": "Anthropic 默认账号",
-        "secret_ref": "secret://providers/anthropic/default",
+    STORE.provider_accounts[provider_account_id] = {
+        "provider_account_id": provider_account_id,
+        "provider_name": llm_provider,
+        "account_label": f"{llm_provider} 默认账号",
+        "secret_ref": f"secret://providers/{llm_provider}/default",
         "status": "active",
         "created_at": "2026-07-11T00:00:00Z",
         "updated_at": "2026-07-11T00:10:00Z",
@@ -361,6 +1327,57 @@ def seed_phase_two_demo_data() -> None:
     for obj in knowledge_objects:
         STORE.knowledge_objects[obj["object_id"]] = obj
     STORE.knowledge_by_run[RUN_ID] = [obj["object_id"] for obj in knowledge_objects]
+    seeded_evidences = [
+        {
+            "schema_version": 1,
+            "evidence_id": "01JZEVIDENCE0000000000001",
+            "evidence_ref": "evidence://01JZEVIDENCE0000000000001",
+            "book_id": BOOK_ID,
+            "chapter_id": "01JZCHAPTER00000000000001",
+            "chapter_index": 1,
+            "text_range": "c1:p5-p8",
+            "excerpt": "萧炎沉默地站在大厅中央，所有目光都落在他身上，少年把羞辱压进喉间。",
+            "source_object_refs": ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+            "source_content_ref": f"object://source-books/{BOOK_ID}",
+            "confidence": 0.58,
+            "trace_id": "01JZTRC000000000000000001",
+        },
+        {
+            "schema_version": 1,
+            "evidence_id": "01JZEVIDENCE0000000000002",
+            "evidence_ref": "evidence://01JZEVIDENCE0000000000002",
+            "book_id": BOOK_ID,
+            "chapter_id": "01JZCHAPTER00000000000002",
+            "chapter_index": 2,
+            "text_range": "c2:p4-p8",
+            "excerpt": "戒指中传来苍老的低笑，药老第一次点破少年体内异变的根源。",
+            "source_object_refs": ["object://knowledge-objects/01JZOBJ0000000000000000002"],
+            "source_content_ref": f"object://source-books/{BOOK_ID}",
+            "confidence": 0.91,
+            "trace_id": "01JZTRC000000000000000001",
+        },
+        {
+            "schema_version": 1,
+            "evidence_id": "01JZEVIDENCE0000000000003",
+            "evidence_ref": "evidence://01JZEVIDENCE0000000000003",
+            "book_id": BOOK_ID,
+            "chapter_id": "01JZCHAPTER00000000000001",
+            "chapter_index": 1,
+            "text_range": "c1:p1-p3",
+            "excerpt": "乌坦城萧家议事堂内，家族压力像潮水一样一层层压向少年。",
+            "source_object_refs": ["object://knowledge-objects/01JZOBJ0000000000000000003"],
+            "source_content_ref": f"object://source-books/{BOOK_ID}",
+            "confidence": 0.97,
+            "trace_id": "01JZTRC000000000000000001",
+        },
+    ]
+    STORE.evidence_by_run[RUN_ID] = []
+    STORE.evidence_by_book[BOOK_ID] = []
+    for evidence in seeded_evidences:
+        evidence_id = evidence["evidence_id"]
+        STORE.evidences[evidence_id] = evidence
+        STORE.evidence_by_run[RUN_ID].append(evidence_id)
+        STORE.evidence_by_book[BOOK_ID].append(evidence_id)
 
     STORE.extraction_runs[RUN_ID] = {
         "schema_version": 1,
@@ -375,6 +1392,10 @@ def seed_phase_two_demo_data() -> None:
         "object_count": 3,
         "evidence_count": 3,
         "low_confidence_count": 2,
+        "knowledge_package_ref": f"object://knowledge-packages/{RUN_ID}",
+        "graph_package_ref": f"object://graph-packages/{BOOK_ID}",
+        "extraction_report_ref": f"object://extraction-reports/{RUN_ID}",
+        "quality_report_ref": f"object://quality-reports/{RUN_ID}",
         "errors": [],
         "created_at": "2026-07-11T00:00:00Z",
         "started_at": "2026-07-11T00:00:05Z",
@@ -386,12 +1407,19 @@ def seed_phase_two_demo_data() -> None:
             "workspace_id": _workspace_or_default(),
             "owner_module": "ai-worker",
             "input_refs": [f"object://source-books/{BOOK_ID}"],
-            "output_refs": [f"object://extraction-runs/{RUN_ID}"],
+            "output_refs": [
+                f"object://extraction-runs/{RUN_ID}",
+                f"object://knowledge-packages/{RUN_ID}",
+                f"object://graph-packages/{BOOK_ID}",
+                f"object://extraction-reports/{RUN_ID}",
+                f"object://quality-reports/{RUN_ID}",
+            ],
             "status": "requires_review",
             "progress": 88,
             "idempotency_key": f"extract-{BOOK_ID}-001",
             "retry_count": 0,
             "error_code": None,
+            "heartbeat_at": None,
             "created_at": "2026-07-11T00:00:00Z",
             "started_at": "2026-07-11T00:00:05Z",
             "finished_at": None,
@@ -570,8 +1598,46 @@ def seed_phase_two_demo_data() -> None:
             "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
             "protagonist": "萧炎",
             "core_conflict": "天赋跌落后的家族压力与三年之约。",
+            "style_target": "克制、证据充分、节奏稳步升级。",
+            "forbidden_similarities": "不直接复刻原作人物名、金手指机制和关键桥段。",
+            "world_rules": ["所有突破都必须付出明确代价。", "家族与宗门冲突都要落到资源争夺上。"],
+            "narrative_promises": ["前三章完成主角受辱、立誓和第一条破局线索。", "每卷都兑现一次阶段性胜利。"],
         },
+        "confirmed_payload": {
+            "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+            "protagonist": "萧炎",
+            "core_conflict": "天赋跌落后的家族压力与三年之约。",
+            "style_target": "克制、证据充分、节奏稳步升级。",
+            "forbidden_similarities": "不直接复刻原作人物名、金手指机制和关键桥段。",
+            "world_rules": ["所有突破都必须付出明确代价。", "家族与宗门冲突都要落到资源争夺上。"],
+            "narrative_promises": ["前三章完成主角受辱、立誓和第一条破局线索。", "每卷都兑现一次阶段性胜利。"],
+        },
+        "diff": None,
+        "history": [
+            {
+                "version": 1,
+                "status": "approved",
+                "change_type": "create",
+                "payload": {
+                    "premise": "少年背负退婚耻辱后，踏上逆袭与成长之路。",
+                    "protagonist": "萧炎",
+                    "core_conflict": "天赋跌落后的家族压力与三年之约。",
+                    "style_target": "克制、证据充分、节奏稳步升级。",
+                    "forbidden_similarities": "不直接复刻原作人物名、金手指机制和关键桥段。",
+                    "world_rules": ["所有突破都必须付出明确代价。", "家族与宗门冲突都要落到资源争夺上。"],
+                    "narrative_promises": ["前三章完成主角受辱、立誓和第一条破局线索。", "每卷都兑现一次阶段性胜利。"],
+                },
+                "changed_fields": ["premise", "protagonist", "core_conflict", "style_target", "forbidden_similarities", "world_rules", "narrative_promises"],
+                "summary": "建立首版故事圣经。",
+                "note": None,
+                "trace_id": "01JZTRC000000000000000002",
+                "actor_id": USER_ID,
+                "created_at": "2026-07-11T02:00:00Z",
+            }
+        ],
         "trace_id": "01JZTRC000000000000000002",
+        "approved_at": "2026-07-11T02:05:00Z",
+        "approved_by": USER_ID,
         "created_at": "2026-07-11T02:00:00Z",
         "updated_at": "2026-07-11T02:05:00Z",
     }
@@ -716,6 +1782,7 @@ def seed_phase_two_demo_data() -> None:
             "object://section-plans/01JZSECT0000000000000001",
             "object://graph-summaries/01JZBOOK000000000000000001",
         ],
+        "source_snapshot_id": f"snapshot://knowledge-state/{WRITING_RUN_ID}",
         "created_at": "2026-07-11T03:00:00Z",
         "updated_at": "2026-07-11T03:00:00Z",
     }
@@ -1359,6 +2426,7 @@ def seed_phase_two_demo_data() -> None:
             "created_at": "2026-07-11T02:18:00Z",
         },
     ]
+    _normalize_seed_records()
 
 
 def default_workspace_id() -> str:
@@ -1495,6 +2563,14 @@ def _build_task(
     started_at: Optional[str] = None,
     finished_at: Optional[str] = None,
     latency_ms: Optional[int] = None,
+    max_retry_count: int = 3,
+    lease_owner: Optional[str] = None,
+    lease_expires_at: Optional[str] = None,
+    heartbeat_at: Optional[str] = None,
+    next_retry_at: Optional[str] = None,
+    blocked_reason: Optional[str] = None,
+    current_dispatch_token: Optional[str] = None,
+    dispatch_attempt: int = 0,
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -1511,8 +2587,17 @@ def _build_task(
         "trace_id": trace_id,
         "actor_id": actor_id,
         "retry_count": retry_count,
+        "max_retry_count": max_retry_count,
         "latency_ms": latency_ms,
         "error_code": error_code,
+        "lease_owner": lease_owner,
+        "lease_expires_at": lease_expires_at,
+        "heartbeat_at": heartbeat_at,
+        "next_retry_at": next_retry_at,
+        "review_required": status == "requires_review",
+        "blocked_reason": blocked_reason,
+        "current_dispatch_token": current_dispatch_token,
+        "dispatch_attempt": dispatch_attempt,
         "created_at": created_at,
         "started_at": started_at,
         "finished_at": finished_at,
@@ -1696,6 +2781,9 @@ def _normalize_seed_records() -> None:
         obj.setdefault("input_refs", [f"object://extraction-runs/{RUN_ID}"])
         obj.setdefault("output_refs", [f"object://knowledge-objects/{object_id}"])
 
+    for story_bible in STORE.story_bibles.values():
+        _hydrate_story_bible(story_bible)
+
     for chapter_plan in STORE.chapter_plans.values():
         chapter_plan.setdefault("trace_id", "01JZTRC000000000000000002")
         chapter_plan.setdefault("input_refs", [f"object://novel-projects/{chapter_plan['project_id']}"])
@@ -1712,6 +2800,15 @@ def _normalize_seed_records() -> None:
         task.setdefault("trace_id", "seed-trace")
         task.setdefault("actor_id", USER_ID)
         task.setdefault("latency_ms", 1000 if task.get("finished_at") else 0)
+        task.setdefault("max_retry_count", 3)
+        task.setdefault("lease_owner", None)
+        task.setdefault("lease_expires_at", None)
+        task.setdefault("heartbeat_at", None)
+        task.setdefault("current_dispatch_token", None)
+        task.setdefault("dispatch_attempt", 0)
+        task.setdefault("next_retry_at", None)
+        task.setdefault("review_required", task.get("status") == "requires_review")
+        task.setdefault("blocked_reason", None)
 
     extraction_task = STORE.extraction_runs.get(RUN_ID, {}).get("task")
     if extraction_task:
@@ -1719,6 +2816,15 @@ def _normalize_seed_records() -> None:
         extraction_task.setdefault("trace_id", "01JZTRC000000000000000001")
         extraction_task.setdefault("actor_id", USER_ID)
         extraction_task.setdefault("latency_ms", 0)
+        extraction_task.setdefault("max_retry_count", 3)
+        extraction_task.setdefault("lease_owner", None)
+        extraction_task.setdefault("lease_expires_at", None)
+        extraction_task.setdefault("heartbeat_at", None)
+        extraction_task.setdefault("current_dispatch_token", None)
+        extraction_task.setdefault("dispatch_attempt", 0)
+        extraction_task.setdefault("next_retry_at", None)
+        extraction_task.setdefault("review_required", extraction_task.get("status") == "requires_review")
+        extraction_task.setdefault("blocked_reason", None)
 
     for writing_run_id, provider_calls in STORE.provider_calls_by_writing.items():
         task = STORE.writing_run_tasks.get(writing_run_id)
@@ -1777,17 +2883,247 @@ def _normalize_seed_records() -> None:
             if event.get("event_type") == "progress" and event.get("payload_json", {}).get("status") == "requires_review":
                 event["event_type"] = "review_required"
 
+    for writing_task in STORE.writing_run_tasks.values():
+        writing_task.setdefault("request_id", "seed-request")
+        writing_task.setdefault("trace_id", "seed-trace")
+        writing_task.setdefault("actor_id", USER_ID)
+        writing_task.setdefault("latency_ms", 1000 if writing_task.get("finished_at") else 0)
+        writing_task.setdefault("max_retry_count", 3)
+        writing_task.setdefault("lease_owner", None)
+        writing_task.setdefault("lease_expires_at", None)
+        writing_task.setdefault("heartbeat_at", None)
+        writing_task.setdefault("current_dispatch_token", None)
+        writing_task.setdefault("next_retry_at", None)
+        writing_task.setdefault("review_required", writing_task.get("status") == "requires_review")
+        writing_task.setdefault("blocked_reason", None)
 
-if not _restore_store_from_snapshot():
+
+
+def _source_content_ref(source_content_id: str) -> str:
+    return f"object://source-contents/{source_content_id}"
+
+
+def _evidence_ref(evidence_id: str) -> str:
+    return f"evidence://{evidence_id}"
+
+
+def _evidence_id_from_ref(evidence_id_or_ref: str) -> str:
+    return evidence_id_or_ref.removeprefix("evidence://")
+
+
+def _default_story_bible_payload(title: Optional[str] = None) -> dict[str, Any]:
+    project_title = title or "该项目"
+    return {
+        "premise": f"{project_title} 的故事设定待完善。",
+        "protagonist": "待设定",
+        "core_conflict": "待设定",
+        "style_target": "克制、证据充分、节奏稳步升级。",
+        "forbidden_similarities": "不直接复刻参考作品的人物名、金手指机制和关键桥段。",
+        "world_rules": ["所有关键成长都要付出明确代价。"],
+        "narrative_promises": ["前三章完成主角困境、破局线索和阶段承诺。"],
+    }
+
+
+def _normalize_story_bible_payload(payload: Optional[dict[str, Any]], title: Optional[str] = None) -> dict[str, Any]:
+    base = _default_story_bible_payload(title)
+    merged = {**base, **(payload or {})}
+    normalized: dict[str, Any] = {}
+    for field in ("premise", "protagonist", "core_conflict", "style_target", "forbidden_similarities"):
+        value = str(merged.get(field) or base[field]).strip()
+        normalized[field] = value or base[field]
+    for field in ("world_rules", "narrative_promises"):
+        value = merged.get(field)
+        if isinstance(value, list):
+            items = [str(item).strip() for item in value if str(item).strip()]
+        elif value is None:
+            items = []
+        else:
+            items = [item.strip() for item in str(value).splitlines() if item.strip()]
+        normalized[field] = items or deepcopy(base[field])
+    return normalized
+
+
+def _story_bible_changed_fields(before_payload: Optional[dict[str, Any]], after_payload: dict[str, Any]) -> list[str]:
+    if before_payload is None:
+        return list(after_payload.keys())
+    before = _normalize_story_bible_payload(before_payload)
+    after = _normalize_story_bible_payload(after_payload)
+    return [field for field in after if before.get(field) != after.get(field)]
+
+
+def _story_bible_diff(
+    from_version: Optional[int],
+    to_version: int,
+    before_payload: Optional[dict[str, Any]],
+    after_payload: dict[str, Any],
+    summary: str,
+) -> dict[str, Any]:
+    normalized_after = _normalize_story_bible_payload(after_payload)
+    normalized_before = _normalize_story_bible_payload(before_payload) if before_payload is not None else None
+    changed_fields = _story_bible_changed_fields(normalized_before, normalized_after)
+    return {
+        "from_version": from_version,
+        "to_version": to_version,
+        "changed_fields": changed_fields,
+        "changes": [
+            {
+                "field": field,
+                "before": normalized_before.get(field) if normalized_before is not None else None,
+                "after": normalized_after.get(field),
+            }
+            for field in changed_fields
+        ],
+        "summary": summary,
+    }
+
+
+def _story_bible_history_entry(
+    version: int,
+    status: str,
+    change_type: str,
+    payload: dict[str, Any],
+    changed_fields: list[str],
+    summary: str,
+    trace_id: str,
+    actor_id: str,
+    created_at: str,
+    note: Optional[str] = None,
+) -> dict[str, Any]:
+    return {
+        "version": version,
+        "status": status,
+        "change_type": change_type,
+        "payload": _normalize_story_bible_payload(payload),
+        "changed_fields": changed_fields,
+        "summary": summary,
+        "note": note,
+        "trace_id": trace_id,
+        "actor_id": actor_id,
+        "created_at": created_at,
+    }
+
+
+def _hydrate_story_bible(story_bible: dict[str, Any]) -> dict[str, Any]:
+    story_bible["payload"] = _normalize_story_bible_payload(story_bible.get("payload"))
+    confirmed_payload = story_bible.get("confirmed_payload")
+    if confirmed_payload is not None:
+        story_bible["confirmed_payload"] = _normalize_story_bible_payload(confirmed_payload)
+    elif story_bible.get("status") == "approved":
+        story_bible["confirmed_payload"] = deepcopy(story_bible["payload"])
+    else:
+        story_bible["confirmed_payload"] = None
+    story_bible.setdefault("approved_at", story_bible.get("updated_at") if story_bible.get("status") == "approved" else None)
+    story_bible.setdefault("approved_by", USER_ID if story_bible.get("status") == "approved" else None)
+    history = story_bible.setdefault("history", [])
+    if not history:
+        history.append(
+            _story_bible_history_entry(
+                version=story_bible.get("version", 1),
+                status=story_bible.get("status", "draft"),
+                change_type="create",
+                payload=story_bible["payload"],
+                changed_fields=list(story_bible["payload"].keys()),
+                summary="建立首版故事圣经。",
+                trace_id=story_bible.get("trace_id", "seed-trace"),
+                actor_id=story_bible.get("approved_by") or USER_ID,
+                created_at=story_bible.get("created_at") or utc_now(),
+            )
+        )
+    for entry in history:
+        entry["payload"] = _normalize_story_bible_payload(entry.get("payload"))
+        entry.setdefault("changed_fields", list(entry["payload"].keys()) if entry.get("change_type") == "create" else [])
+        entry.setdefault("summary", "故事圣经已更新。")
+        entry.setdefault("note", None)
+        entry.setdefault("trace_id", story_bible.get("trace_id", "seed-trace"))
+        entry.setdefault("actor_id", story_bible.get("approved_by") or USER_ID)
+        entry.setdefault("created_at", story_bible.get("updated_at") or story_bible.get("created_at") or utc_now())
+    if story_bible.get("diff") is None and len(history) >= 2 and (
+        story_bible.get("status") == "pending_review" or history[-1].get("change_type") == "regenerate"
+    ):
+        previous = history[-2]
+        current = history[-1]
+        story_bible["diff"] = _story_bible_diff(
+            previous.get("version"),
+            story_bible.get("version", current.get("version", 1)),
+            previous.get("payload"),
+            story_bible["payload"],
+            current.get("summary", "故事圣经已更新。"),
+        )
+    story_bible.setdefault("diff", None)
+    return story_bible
+
+
+if _restore_store_from_business_tables():
+    _normalize_seed_records()
+    _restore_runtime_projection()
+elif _restore_store_from_snapshot():
+    _normalize_seed_records()
+    backfill_business_state_from_snapshot(asdict(STORE))
+    _restore_runtime_projection()
+else:
     seed_phase_two_demo_data()
     _normalize_seed_records()
     _persist_store()
+
+
+def _split_source_text_into_chapters(book_id: str, source_text: str, now: str) -> list[dict[str, Any]]:
+    lines = [line.strip() for line in source_text.splitlines()]
+    chunks: list[tuple[str, list[str]]] = []
+    current_title: Optional[str] = None
+    current_lines: list[str] = []
+
+    def flush() -> None:
+        nonlocal current_title, current_lines
+        text = "\n".join(line for line in current_lines if line).strip()
+        if text:
+            chunks.append((current_title or f"第 {len(chunks) + 1} 章", current_lines.copy()))
+        current_title = None
+        current_lines = []
+
+    for line in lines:
+        is_heading = bool(line) and (line.startswith("第") and "章" in line[:12] or line.lower().startswith("chapter "))
+        if is_heading:
+            flush()
+            current_title = line
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+    flush()
+
+    if not chunks:
+        chunks = [("第 1 章", [source_text])]
+
+    chapters = []
+    for index, (title, chapter_lines) in enumerate(chunks, start=1):
+        chapter_id = str(ulid.new())
+        raw_text = "\n".join(chapter_lines).strip()
+        excerpt = raw_text[:160]
+        chapters.append(
+            {
+                "schema_version": 1,
+                "chapter_id": chapter_id,
+                "book_id": book_id,
+                "chapter_index": index,
+                "title": title or f"第 {index} 章",
+                "segmentation_status": "segmented",
+                "text_object_ref": f"object://source-chapters/{chapter_id}",
+                "text_range": f"c{index}:p1-p{max(1, len([line for line in chapter_lines if line]))}",
+                "raw_text": raw_text,
+                "text_excerpt": excerpt,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+    return chapters
 
 
 @_persisting_mutation
 def create_book(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
     book_id = str(ulid.new())
     now = utc_now()
+    source_text = payload.get("source_text")
+    source_content_id = str(ulid.new()) if source_text is not None else None
+    encoded_source = source_text.encode("utf-8") if source_text is not None else b""
     book = {
         "schema_version": 1,
         "book_id": book_id,
@@ -1795,13 +3131,40 @@ def create_book(payload: dict[str, Any], trace_id: str) -> dict[str, Any]:
         "title": payload["title"],
         "author_name": payload["author_name"],
         "source_type": payload["source_type"],
-        "import_status": "uploaded",
+        "platform": payload.get("platform"),
+        "genre": payload.get("genre"),
+        "usage_boundary": payload.get("usage_boundary"),
+        "source_content_ref": _source_content_ref(source_content_id) if source_content_id else None,
+        "content_checksum": f"sha256:{hashlib.sha256(encoded_source).hexdigest()}" if source_text is not None else None,
+        "content_byte_size": len(encoded_source) if source_text is not None else None,
+        "chapter_count": 0,
+        "import_status": "ready" if source_text else "uploaded",
         "trace_id": trace_id,
         "created_at": now,
         "updated_at": now,
     }
     STORE.books[book_id] = book
     STORE.chapters_by_book[book_id] = []
+
+    if source_text is not None and source_content_id is not None:
+        content = {
+            "schema_version": 1,
+            "source_content_id": source_content_id,
+            "book_id": book_id,
+            "object_ref": _source_content_ref(source_content_id),
+            "mime_type": "text/plain; charset=utf-8",
+            "checksum": book["content_checksum"],
+            "byte_size": book["content_byte_size"],
+            "content": source_text,
+            "created_at": now,
+            "updated_at": now,
+        }
+        STORE.source_contents[source_content_id] = content
+        STORE.source_content_by_book[book_id] = source_content_id
+        chapters = _split_source_text_into_chapters(book_id, source_text, now)
+        STORE.chapters_by_book[book_id] = chapters
+        book["chapter_count"] = len(chapters)
+
     _persist_store()
     return book
 
@@ -1812,6 +3175,138 @@ def get_book(book_id: str) -> Optional[dict[str, Any]]:
 
 def list_book_chapters(book_id: str) -> list[dict[str, Any]]:
     return STORE.chapters_by_book.get(book_id, [])
+
+
+def get_book_source_content(book_id: str) -> Optional[dict[str, Any]]:
+    source_content_id = STORE.source_content_by_book.get(book_id)
+    if not source_content_id:
+        return None
+    return STORE.source_contents.get(source_content_id)
+
+
+def list_evidence_for_book(book_id: str) -> list[dict[str, Any]]:
+    return [STORE.evidences[evidence_id] for evidence_id in STORE.evidence_by_book.get(book_id, []) if evidence_id in STORE.evidences]
+
+
+def get_evidence(evidence_id_or_ref: str) -> Optional[dict[str, Any]]:
+    return STORE.evidences.get(_evidence_id_from_ref(evidence_id_or_ref))
+
+
+def _latest_extraction_run_for_book(book_id: str) -> Optional[dict[str, Any]]:
+    runs = [run for run in STORE.extraction_runs.values() if run.get("book_id") == book_id]
+    if not runs:
+        return None
+    return sorted(runs, key=lambda item: item.get("created_at", ""), reverse=True)[0]
+
+
+def _analysis_exceptions_for_run(run_id: Optional[str]) -> list[dict[str, Any]]:
+    if not run_id:
+        return []
+    exceptions = []
+    for obj in list_knowledge_objects_for_run(run_id):
+        if obj.get("confidence", 1) < 0.8 and obj.get("review_status") == "pending":
+            exceptions.append(
+                {
+                    "exception_id": f"analysis-exception-{obj['object_id']}",
+                    "type": "low_confidence_object",
+                    "severity": "warning",
+                    "title": f"{obj.get('canonical_name', obj['object_id'])} 需要确认",
+                    "summary": f"{obj.get('canonical_name', obj['object_id'])} 的置信度为 {obj.get('confidence')}，需要确认后再进入知识包。",
+                    "target_ref": f"object://knowledge-objects/{obj['object_id']}",
+                    "evidence_refs": deepcopy(obj.get("evidence_refs", [])),
+                    "recommended_action": "approve_or_reextract",
+                }
+            )
+    return exceptions
+
+
+def get_book_analysis(book_id: str) -> Optional[dict[str, Any]]:
+    book = get_book(book_id)
+    if not book:
+        return None
+    run = _latest_extraction_run_for_book(book_id)
+    run_id = run.get("run_id") if run else None
+    knowledge_objects = list_knowledge_objects_for_run(run_id) if run_id else []
+    evidence_samples = list_evidence_for_book(book_id)
+    exceptions = _analysis_exceptions_for_run(run_id)
+    scenes = [scene for chapter in list_book_chapters(book_id) for scene in STORE.source_scenes_by_chapter.get(chapter["chapter_id"], [])]
+    scene_ids = {scene["scene_id"] for scene in scenes}
+    events = [event for scene_id in scene_ids for event in STORE.events_by_scene.get(scene_id, [])]
+    book_conflicts = [item for item in STORE.conflicts.values() if item.get("book_id") == book_id]
+    book_hooks = [item for item in STORE.hooks.values() if item.get("book_id") == book_id]
+    book_rewards = [item for item in STORE.rewards.values() if item.get("book_id") == book_id]
+    book_climaxes = [item for item in STORE.climaxes.values() if item.get("book_id") == book_id]
+    book_relationships = [item for item in STORE.relationship_edges.values() if item.get("book_id") == book_id]
+    return {
+        "schema_version": 1,
+        "book": book,
+        "run": run,
+        "chapters": list_book_chapters(book_id),
+        "summary": {
+            "book_id": book_id,
+            "run_id": run_id,
+            "status": run.get("status") if run else book.get("import_status", "uploaded"),
+            "current_stage": run.get("current_stage") if run else "source_submission",
+            "chapter_count": len(list_book_chapters(book_id)),
+            "scene_count": len(scenes) or (run.get("scene_count", 0) if run else 0),
+            "event_count": len(events),
+            "conflict_count": len(book_conflicts),
+            "hook_count": len(book_hooks),
+            "reward_count": len(book_rewards),
+            "climax_count": len(book_climaxes),
+            "relationship_count": len(book_relationships),
+            "knowledge_object_count": len(knowledge_objects),
+            "evidence_count": len(evidence_samples),
+            "pattern_count": len(STORE.patterns),
+            "rhythm_profile_count": len(STORE.rhythm_profiles),
+            "asset_count": len(STORE.assets),
+            "rule_count": len(STORE.rules),
+            "needs_attention_count": len(exceptions),
+            "can_commit_knowledge": bool(run and run.get("status") in {"requires_review", "succeeded"}),
+        },
+        "exceptions": exceptions,
+        "evidence_samples": evidence_samples[:3],
+        "knowledge_objects": knowledge_objects,
+        "scenes": scenes,
+        "events": events,
+        "conflicts": book_conflicts,
+        "hooks": book_hooks,
+        "rewards": book_rewards,
+        "climaxes": book_climaxes,
+        "relationships": book_relationships,
+        "patterns": list_patterns(status="approved"),
+        "rhythm_profiles": list_rhythm_profiles(status="approved"),
+        "assets": list_assets(status="approved"),
+        "rules": list_rules(),
+    }
+
+
+def list_knowledge_sources(workspace_id: Optional[str] = None, status: str = "committed") -> list[dict[str, Any]]:
+    current_workspace = _workspace_or_default(workspace_id)
+    items = []
+    for book_id, book in STORE.books.items():
+        if book.get("workspace_id") != current_workspace:
+            continue
+        run = _latest_extraction_run_for_book(book_id)
+        source_status = "committed" if run and run.get("status") == "succeeded" else book.get("import_status", "uploaded")
+        if status != "all" and source_status != status:
+            continue
+        run_id = run.get("run_id") if run else None
+        items.append(
+            {
+                "source_ref": f"object://source-books/{book_id}",
+                "label": book["title"],
+                "book_id": book_id,
+                "run_id": run_id,
+                "source_type": book["source_type"],
+                "status": source_status,
+                "knowledge_object_count": len(list_knowledge_objects_for_run(run_id)) if run_id else 0,
+                "evidence_count": len(list_evidence_for_book(book_id)),
+                "graph_summary_ref": f"object://graph-summaries/{book_id}" if book_id in STORE.graph_summaries else None,
+                "updated_at": book.get("updated_at") or book.get("created_at"),
+            }
+        )
+    return items
 
 
 @_persisting_mutation
@@ -1837,7 +3332,13 @@ def create_extraction_run(
         task_type="extract_knowledge",
         workspace_id=context["workspace_id"],
         input_refs=[f"object://source-books/{book_id}"],
-        output_refs=[f"object://extraction-runs/{run_id}"],
+        output_refs=[
+            f"object://extraction-runs/{run_id}",
+            f"object://knowledge-packages/{run_id}",
+            f"object://graph-packages/{book_id}",
+            f"object://extraction-reports/{run_id}",
+            f"object://quality-reports/{run_id}",
+        ],
         status="queued",
         progress=0,
         idempotency_key=f"extract-{book_id}",
@@ -1863,6 +3364,10 @@ def create_extraction_run(
         "object_count": 0,
         "evidence_count": 0,
         "low_confidence_count": 0,
+        "knowledge_package_ref": f"object://knowledge-packages/{run_id}",
+        "graph_package_ref": f"object://graph-packages/{book_id}",
+        "extraction_report_ref": f"object://extraction-reports/{run_id}",
+        "quality_report_ref": f"object://quality-reports/{run_id}",
         "errors": [],
         "created_at": now,
         "started_at": None,
@@ -1899,6 +3404,10 @@ def get_extraction_report(run_id: str) -> Optional[dict[str, Any]]:
         "run": run,
         "task": run["task"],
         "events": STORE.task_events_by_task.get(task_id, []),
+        "knowledge_package_ref": run.get("knowledge_package_ref"),
+        "graph_package_ref": run.get("graph_package_ref"),
+        "extraction_report_ref": run.get("extraction_report_ref"),
+        "quality_report_ref": run.get("quality_report_ref"),
         "low_confidence_items": [
             obj for obj in list_knowledge_objects_for_run(run_id)
             if obj["confidence"] < 0.8 and obj["review_status"] == "pending"
@@ -1960,10 +3469,16 @@ def apply_review_action(
                 run["errors"] = []
                 run["task"]["status"] = "queued"
                 run["task"]["progress"] = 0
+                run["task"]["retry_count"] = 0
+                run["task"]["dispatch_attempt"] = 0
                 run["task"]["started_at"] = None
                 run["task"]["finished_at"] = None
                 run["task"]["latency_ms"] = None
                 run["task"]["error_code"] = None
+                _clear_task_lock(run["task"])
+                run["task"]["next_retry_at"] = None
+                run["task"]["review_required"] = False
+                run["task"]["blocked_reason"] = None
                 _append_task_event(
                     run["task"],
                     "requeued",
@@ -2025,12 +3540,15 @@ def commit_knowledge_package(run_id: str) -> Optional[dict[str, Any]]:
     run = STORE.extraction_runs.get(run_id)
     if not run:
         return None
+    finished_at = utc_now()
     run["status"] = "succeeded"
     run["current_stage"] = "knowledge_base_commit"
     run["task"]["status"] = "succeeded"
     run["task"]["progress"] = 100
-    run["finished_at"] = utc_now()
-    run["task"]["finished_at"] = run["finished_at"]
+    run["task"]["review_required"] = False
+    run["finished_at"] = finished_at
+    run["task"]["finished_at"] = finished_at
+    run["task"]["heartbeat_at"] = finished_at
     return {
         "run_id": run_id,
         "status": run["status"],
@@ -2047,6 +3565,31 @@ def get_graph_summary(book_id: Optional[str] = None) -> dict[str, Any]:
         "edge_count": 0,
         "nodes": [],
     })
+
+
+def search_graph_nodes(book_id: Optional[str] = None, query: str = "", node_type: Optional[str] = None) -> dict[str, Any]:
+    summary = get_graph_summary(book_id)
+    normalized_query = query.strip().lower()
+    normalized_type = (node_type or "").strip().lower()
+    items = []
+    for node in summary.get("nodes", []):
+        label = str(node.get("label", ""))
+        current_type = str(node.get("node_type", ""))
+        detail = STORE.graph_node_details.get(node.get("node_id", ""), {})
+        summary_text = str(detail.get("summary", ""))
+        haystack = f"{label} {current_type} {summary_text}".lower()
+        if normalized_query and normalized_query not in haystack:
+            continue
+        if normalized_type and current_type.lower() != normalized_type:
+            continue
+        items.append(deepcopy(node))
+    return {
+        "book_id": summary.get("book_id"),
+        "query": query,
+        "node_type": node_type,
+        "count": len(items),
+        "items": items,
+    }
 
 
 def get_graph_node(node_id: str) -> Optional[dict[str, Any]]:
@@ -2424,6 +3967,17 @@ def create_novel_project(
     project_id = str(ulid.new())
     story_bible_id = str(ulid.new())
     now = utc_now()
+    explicit_knowledge_source_refs = "allowed_knowledge_source_refs" in payload
+    allowed_knowledge_source_refs = payload.get(
+        "allowed_knowledge_source_refs",
+        [f"object://source-books/{BOOK_ID}"],
+    )
+    if explicit_knowledge_source_refs:
+        available_source_refs = {item["source_ref"] for item in list_knowledge_sources(context["workspace_id"], status="all")}
+        available_source_refs.update(item["graph_summary_ref"] for item in list_knowledge_sources(context["workspace_id"], status="all") if item.get("graph_summary_ref"))
+        for source_ref in allowed_knowledge_source_refs:
+            if source_ref not in available_source_refs:
+                raise ValueError("knowledge source not found")
     project = {
         "schema_version": 1,
         "project_id": project_id,
@@ -2433,10 +3987,7 @@ def create_novel_project(
         "status": "planning",
         "story_bible_id": story_bible_id,
         "quality_gate_profile_id": payload.get("quality_gate_profile_id", QUALITY_GATE_PROFILE_ID),
-        "allowed_knowledge_source_refs": payload.get(
-            "allowed_knowledge_source_refs",
-            [f"object://source-books/{BOOK_ID}"],
-        ),
+        "allowed_knowledge_source_refs": allowed_knowledge_source_refs,
         "created_at": now,
         "updated_at": now,
     }
@@ -2447,18 +3998,17 @@ def create_novel_project(
         "project_id": project_id,
         "version": 1,
         "status": "draft",
-        "payload": payload.get(
-            "story_bible_payload",
-            {
-                "premise": f"{payload['title']} 的故事设定待完善。",
-                "protagonist": "待设定",
-                "core_conflict": "待设定",
-            },
-        ),
+        "payload": _normalize_story_bible_payload(payload.get("story_bible_payload"), payload["title"]),
+        "confirmed_payload": None,
+        "diff": None,
+        "history": [],
         "trace_id": trace_id,
+        "approved_at": None,
+        "approved_by": None,
         "created_at": now,
         "updated_at": now,
     }
+    _hydrate_story_bible(story_bible)
     STORE.novel_projects[project_id] = project
     STORE.story_bibles[story_bible_id] = story_bible
     _persist_store()
@@ -2474,14 +4024,115 @@ def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
     if not project:
         return None
     story_bible = STORE.story_bibles.get(project["story_bible_id"])
+    hydrated_story_bible = deepcopy(_hydrate_story_bible(story_bible)) if story_bible else None
     return {
         "project": project,
-        "story_bible": story_bible,
+        "story_bible": hydrated_story_bible,
         "chapter_plans": list_chapter_plans_for_project(project_id),
         "patterns": list_patterns(status="approved"),
         "rhythm_profiles": list_rhythm_profiles(status="approved"),
         "assets": list_assets(status="approved"),
     }
+
+
+def get_story_bible(story_bible_id: str) -> Optional[dict[str, Any]]:
+    story_bible = STORE.story_bibles.get(story_bible_id)
+    if not story_bible:
+        return None
+    return deepcopy(_hydrate_story_bible(story_bible))
+
+
+@_persisting_mutation
+def apply_story_bible_action(
+    story_bible_id: str,
+    action: str,
+    request_id: str = "system-story-bible",
+    trace_id: str = "system-trace",
+    actor_id: str = USER_ID,
+    actor_role: str = "owner",
+    workspace_id: Optional[str] = None,
+    payload: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    context = _actor_context(workspace_id, actor_id, actor_role)
+    _require_role(context["actor_role"], {"owner", "editor"})
+
+    story_bible = STORE.story_bibles.get(story_bible_id)
+    if not story_bible:
+        return None
+
+    now = utc_now()
+    note = (payload or {}).get("note")
+    summary = (payload or {}).get("summary")
+    project = STORE.novel_projects.get(story_bible["project_id"])
+    normalized_current = _normalize_story_bible_payload(story_bible.get("payload"), project.get("title") if project else None)
+
+    if action == "confirm":
+        story_bible["status"] = "approved"
+        story_bible["confirmed_payload"] = deepcopy(normalized_current)
+        story_bible["approved_at"] = now
+        story_bible["approved_by"] = context["actor_id"]
+        changed_fields = []
+        final_summary = summary or "确认当前故事圣经版本。"
+    elif action == "reject":
+        story_bible["status"] = "rejected"
+        changed_fields = []
+        final_summary = summary or "驳回当前故事圣经版本。"
+    elif action == "regenerate":
+        next_payload = _normalize_story_bible_payload((payload or {}).get("story_bible_payload"), project.get("title") if project else None)
+        previous_version = story_bible.get("version", 1)
+        previous_payload = deepcopy(story_bible.get("payload"))
+        story_bible["version"] = previous_version + 1
+        story_bible["status"] = "pending_review"
+        story_bible["payload"] = deepcopy(next_payload)
+        story_bible["diff"] = _story_bible_diff(
+            previous_version,
+            story_bible["version"],
+            previous_payload,
+            next_payload,
+            summary or "补强故事圣经候选版本。",
+        )
+        changed_fields = story_bible["diff"]["changed_fields"]
+        final_summary = story_bible["diff"]["summary"]
+    else:
+        raise ValueError(f"unsupported action: {action}")
+
+    story_bible["updated_at"] = now
+    story_bible.setdefault("history", []).append(
+        _story_bible_history_entry(
+            version=story_bible["version"],
+            status=story_bible["status"],
+            change_type=action,
+            payload=story_bible["payload"],
+            changed_fields=changed_fields,
+            summary=final_summary,
+            trace_id=trace_id,
+            actor_id=context["actor_id"],
+            created_at=now,
+            note=note,
+        )
+    )
+    if action != "regenerate":
+        story_bible["diff"] = None
+
+    _append_audit_event(
+        action=f"story_bible.{action}",
+        target_type="story_bible",
+        target_id=story_bible_id,
+        target_ref=f"object://story-bibles/{story_bible_id}",
+        request_id=request_id,
+        trace_id=trace_id,
+        actor_id=context["actor_id"],
+        actor_role=context["actor_role"],
+        workspace_id=context["workspace_id"],
+        reason=note,
+        payload={
+            "version": story_bible["version"],
+            "status": story_bible["status"],
+            "changed_fields": changed_fields,
+        },
+        created_at=now,
+    )
+    return deepcopy(_hydrate_story_bible(story_bible))
 
 
 @_persisting_mutation
@@ -2847,6 +4498,7 @@ def create_writing_run(
             f"object://chapter-plans/{chapter_plan_id}",
             f"object://story-bibles/{STORE.novel_projects[project_id]['story_bible_id']}",
         ],
+        "source_snapshot_id": f"snapshot://knowledge-state/{writing_run_id}",
         "created_at": now,
         "updated_at": now,
     }
@@ -3158,6 +4810,174 @@ def list_runtime_tasks(status: Optional[str] = None) -> list[dict[str, Any]]:
     return sorted((deepcopy(task) for task in tasks), key=lambda item: (item["created_at"], item["task_id"]))
 
 
+@_persisting_mutation
+def schedule_task_retry(
+    task_id: str,
+    error_code: str,
+    trace_id: str,
+    request_id: str = "system-scheduler",
+    actor_id: str = "scheduler",
+    retry_at: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    task, task_kind, entity_id = _find_task_record(task_id)
+    if not task or not _can_schedule_retry(task):
+        return deepcopy(task) if task else None
+    now = utc_now()
+    next_retry_at = retry_at or _isoformat_utc(datetime.now(timezone.utc) + timedelta(minutes=1))
+    task["status"] = "retrying"
+    task["retry_count"] = task.get("retry_count", 0) + 1
+    task["next_retry_at"] = next_retry_at
+    task["error_code"] = error_code
+    task["finished_at"] = None
+    task["review_required"] = False
+    task["blocked_reason"] = None
+    _clear_task_lock(task)
+    _sync_task_owner_runtime_status(task_kind, entity_id, "retrying", now, task)
+    _append_task_event(
+        task,
+        "retry_scheduled",
+        f"{task['task_type']} scheduled for retry.",
+        task["status"],
+        request_id,
+        trace_id,
+        actor_id,
+        agent_role="scheduler",
+        payload_json={"task_kind": task_kind, "entity_id": entity_id, "next_retry_at": next_retry_at},
+        error_code=error_code,
+        created_at=now,
+    )
+    return deepcopy(task)
+
+
+@_persisting_mutation
+def recover_task_for_manual_review(
+    task_id: str,
+    error_code: str,
+    trace_id: str,
+    request_id: str = "system-scheduler",
+    actor_id: str = "scheduler",
+) -> Optional[dict[str, Any]]:
+    task, task_kind, entity_id = _find_task_record(task_id)
+    if not task or not _can_require_manual_review(task):
+        return deepcopy(task) if task else None
+    now = utc_now()
+    task["status"] = "requires_review"
+    task["error_code"] = error_code
+    task["finished_at"] = now
+    task["review_required"] = True
+    task["blocked_reason"] = None
+    _clear_task_lock(task)
+    task["dispatch_attempt"] = 0
+    _sync_task_owner_runtime_status(task_kind, entity_id, "requires_review", now, task)
+    _append_task_event(
+        task,
+        "review_required",
+        f"{task['task_type']} requires manual review.",
+        task["status"],
+        request_id,
+        trace_id,
+        actor_id,
+        agent_role="scheduler",
+        payload_json={"task_kind": task_kind, "entity_id": entity_id, "reason": error_code},
+        error_code=error_code,
+        created_at=now,
+    )
+    return deepcopy(task)
+
+
+@_persisting_mutation
+def fail_task_recovery(
+    task_id: str,
+    error_code: str,
+    trace_id: str,
+    request_id: str = "system-scheduler",
+    actor_id: str = "scheduler",
+) -> Optional[dict[str, Any]]:
+    task, task_kind, entity_id = _find_task_record(task_id)
+    if not task:
+        return None
+    now = utc_now()
+    task["status"] = "failed"
+    task["error_code"] = error_code
+    task["finished_at"] = now
+    task["review_required"] = False
+    task["blocked_reason"] = None
+    _clear_task_lock(task)
+    task["dispatch_attempt"] = 0
+    _sync_task_owner_runtime_status(task_kind, entity_id, "failed", now, task)
+    _append_task_event(
+        task,
+        "failed",
+        f"{task['task_type']} marked failed by recovery.",
+        task["status"],
+        request_id,
+        trace_id,
+        actor_id,
+        agent_role="scheduler",
+        payload_json={"task_kind": task_kind, "entity_id": entity_id, "reason": error_code},
+        error_code=error_code,
+        created_at=now,
+    )
+    return deepcopy(task)
+
+
+@_persisting_mutation
+def recover_expired_runtime_tasks(
+    now: Optional[str] = None,
+    request_id: str = "system-scheduler",
+    trace_id: str = "system-trace",
+    actor_id: str = "scheduler",
+) -> list[dict[str, Any]]:
+    current = now or utc_now()
+    current_dt = _as_utc_datetime(current)
+    recovered = []
+    for task in list_runtime_tasks("running"):
+        lease_expires_at = task.get("lease_expires_at")
+        if not lease_expires_at or _as_utc_datetime(lease_expires_at) > current_dt:
+            continue
+        if task.get("retry_count", 0) < task.get("max_retry_count", 3):
+            recovered_task = schedule_task_retry(
+                task["task_id"],
+                task.get("error_code") or "lease_expired",
+                trace_id=trace_id,
+                request_id=request_id,
+                actor_id=actor_id,
+                retry_at=current,
+            )
+        else:
+            terminal_status = _terminal_recovery_status(task)
+            if terminal_status == "requires_review":
+                recovered_task = recover_task_for_manual_review(
+                    task["task_id"],
+                    task.get("error_code") or "lease_expired",
+                    trace_id=trace_id,
+                    request_id=request_id,
+                    actor_id=actor_id,
+                )
+            else:
+                recovered_task = fail_task_recovery(
+                    task["task_id"],
+                    task.get("error_code") or "lease_expired",
+                    trace_id=trace_id,
+                    request_id=request_id,
+                    actor_id=actor_id,
+                )
+        if recovered_task:
+            recovered.append(recovered_task)
+    return recovered
+
+
+@_persisting_mutation
+def list_due_retry_tasks(now: Optional[str] = None) -> list[dict[str, Any]]:
+    current = _as_utc_datetime(now or utc_now())
+    due = []
+    for task in list_runtime_tasks("retrying"):
+        next_retry_at = task.get("next_retry_at")
+        if next_retry_at and _as_utc_datetime(next_retry_at) <= current:
+            due.append(task)
+    return sorted(due, key=lambda item: (item.get("next_retry_at") or "", item["task_id"]))
+
+
 def _find_task_record(task_id: str) -> tuple[Optional[dict[str, Any]], Optional[str], Optional[str]]:
     for run_id, run in STORE.extraction_runs.items():
         task = run.get("task")
@@ -3184,15 +5004,31 @@ def mark_task_dispatched(
     request_id: str = "system-dispatch",
     trace_id: str = "system-trace",
     actor_id: str = "scheduler",
+    dispatched_at: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     task, task_kind, entity_id = _find_task_record(task_id)
     if not task:
         return None
-    now = utc_now()
-    task["status"] = "in_progress"
+    if not _can_dispatch_task(task):
+        return deepcopy(task)
+    now = dispatched_at or utc_now()
+    lease_expires_at = _isoformat_utc(_as_utc_datetime(now) + timedelta(minutes=5))
+    dispatch_attempt = _next_dispatch_attempt(task)
+    dispatch_token = _dispatch_token(trace_id, actor_id, request_id, dispatch_attempt)
+    task["status"] = "running"
     task["progress"] = max(task.get("progress", 0), 10)
     task["started_at"] = task.get("started_at") or now
+    task["finished_at"] = None
     task["error_code"] = None
+    task["lease_owner"] = actor_id
+    task["lease_expires_at"] = lease_expires_at
+    task["heartbeat_at"] = now
+    task["next_retry_at"] = None
+    task["review_required"] = False
+    task["blocked_reason"] = None
+    task["dispatch_attempt"] = dispatch_attempt
+    _set_task_dispatch_token(task, dispatch_token)
+    _sync_task_owner_runtime_status(task_kind, entity_id, "running", now, task)
     _append_task_event(
         task,
         "dispatched",
@@ -3202,7 +5038,7 @@ def mark_task_dispatched(
         trace_id,
         actor_id,
         agent_role="scheduler",
-        payload_json={"task_kind": task_kind, "entity_id": entity_id},
+        payload_json={"task_kind": task_kind, "entity_id": entity_id, "lease_expires_at": lease_expires_at, "dispatch_token": dispatch_token},
         created_at=now,
     )
     return deepcopy(task)
@@ -3217,10 +5053,13 @@ def apply_task_execution_result(
     trace_id: str,
     request_id: str = "system-worker",
     actor_id: str = "ai-worker",
+    dispatch_token: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     task, task_kind, entity_id = _find_task_record(task_id)
     if not task or not task_kind or not entity_id:
         return None
+    if not _completion_matches_active_dispatch(task, dispatch_token=dispatch_token):
+        return deepcopy(task)
     now = utc_now()
     task["status"] = status
     task["output_refs"] = output_refs
@@ -3228,6 +5067,13 @@ def apply_task_execution_result(
     task["finished_at"] = now if status in {"succeeded", "requires_review", "blocked", "failed"} else task.get("finished_at")
     task["latency_ms"] = metrics.get("latency_ms", 1000)
     task["error_code"] = metrics.get("error_code")
+    task["heartbeat_at"] = now
+    task["review_required"] = status == "requires_review"
+    task["blocked_reason"] = metrics.get("blocked_reason") if status == "blocked" else None
+    if status in {"succeeded", "requires_review", "failed", "blocked"}:
+        _clear_task_lock(task)
+    if status != "retrying":
+        task["next_retry_at"] = None
 
     if task_kind == "extraction_run":
         run = STORE.extraction_runs.get(entity_id)
@@ -3241,6 +5087,10 @@ def apply_task_execution_result(
             run["object_count"] = metrics.get("object_count", run["object_count"])
             run["evidence_count"] = metrics.get("evidence_count", run["evidence_count"])
             run["low_confidence_count"] = metrics.get("low_confidence_count", run["low_confidence_count"])
+            run["knowledge_package_ref"] = metrics.get("knowledge_package_ref", run.get("knowledge_package_ref"))
+            run["graph_package_ref"] = metrics.get("graph_package_ref", run.get("graph_package_ref"))
+            run["extraction_report_ref"] = metrics.get("extraction_report_ref", run.get("extraction_report_ref"))
+            run["quality_report_ref"] = metrics.get("quality_report_ref", run.get("quality_report_ref"))
             run["errors"] = deepcopy(metrics.get("errors", run["errors"]))
             run["started_at"] = task.get("started_at") or run.get("started_at")
             run["finished_at"] = task.get("finished_at")
@@ -3249,6 +5099,21 @@ def apply_task_execution_result(
                 for item in knowledge_objects:
                     STORE.knowledge_objects[item["object_id"]] = deepcopy(item)
                     STORE.knowledge_by_run[entity_id].append(item["object_id"])
+            evidences = metrics.get("evidences")
+            if evidences is not None:
+                STORE.evidence_by_run[entity_id] = []
+                STORE.evidence_by_book[run["book_id"]] = []
+                for item in evidences:
+                    evidence_id = item["evidence_id"]
+                    STORE.evidences[evidence_id] = deepcopy(item)
+                    STORE.evidence_by_run[entity_id].append(evidence_id)
+                    STORE.evidence_by_book[run["book_id"]].append(evidence_id)
+            deep_analysis = metrics.get("deep_analysis", {})
+            STORE.source_scenes_by_chapter = deepcopy(deep_analysis.get("scenes_by_chapter", STORE.source_scenes_by_chapter))
+            STORE.events_by_scene = deepcopy(deep_analysis.get("events_by_scene", STORE.events_by_scene))
+            for field_name in ("conflicts", "hooks", "rewards", "climaxes", "relationship_edges"):
+                if field_name in deep_analysis:
+                    setattr(STORE, field_name, deepcopy(deep_analysis[field_name]))
             if graph_summary is not None:
                 STORE.graph_summaries[run["book_id"]] = deepcopy(graph_summary)
     elif task_kind == "chapter_plan":
@@ -3375,6 +5240,7 @@ def apply_task_execution_result(
         if writing_run:
             _sync_writing_run_phase_one_state(writing_run)
 
+    _sync_task_owner_runtime_status(task_kind, entity_id, status, now, task)
     event_type = "review_required" if status == "requires_review" else status
     _append_task_event(
         task,

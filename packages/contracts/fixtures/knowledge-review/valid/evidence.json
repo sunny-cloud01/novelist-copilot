@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "evidence_id": "01JZEVIDENCE0000000000001",
+  "evidence_ref": "evidence://01JZEVIDENCE0000000000001",
+  "book_id": "01JZBOOK000000000000000001",
+  "chapter_id": "01JZCHAPTER0000000000001",
+  "chapter_index": 1,
+  "text_range": "c1:p1-p2",
+  "excerpt": "萧炎沉默地站在大厅中央。",
+  "source_object_refs": ["object://knowledge-objects/01JZOBJ0000000000000000001"],
+  "source_content_ref": "object://source-contents/01JZSOURCECONTENT000000001",
+  "confidence": 0.82,
+  "trace_id": "01JZTRC000000000000000001"
+}

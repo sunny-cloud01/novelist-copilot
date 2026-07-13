@@ -6,7 +6,10 @@ import {
   commitKnowledgePackage,
   createInitialPhaseTwoState,
   createUploadedBook,
+  deriveAnalysisExceptions,
   deriveLowConfidenceItems,
+  findEvidenceByRef,
+  getBookAnalysisSummary,
   promoteStrategySuggestionInState,
   toggleModelProfileInState,
   updateAgentAssignmentInState,
@@ -15,13 +18,40 @@ import {
 } from "../components/phase-two-state";
 
 describe("phase two state", () => {
-  it("creates uploaded source book metadata", () => {
-    const book = createUploadedBook("Coiling Dragon", "I Eat Tomatoes", "reference_novel");
+  it("creates book analysis summary with evidence and exception mappings", () => {
+    const initial = createInitialPhaseTwoState();
+    const summary = getBookAnalysisSummary(initial, initial.book.bookId);
+    const evidence = findEvidenceByRef(initial, "evidence://01JZEVIDENCE0000000000002");
+    const exceptions = deriveAnalysisExceptions(initial);
 
-    expect(book.title).toBe("Coiling Dragon");
-    expect(book.authorName).toBe("I Eat Tomatoes");
-    expect(book.importStatus).toBe("uploaded");
+    expect(summary?.sceneCount).toBe(6);
+    expect(summary?.patternCount).toBe(1);
+    expect(summary?.canCommitKnowledge).toBe(true);
+    expect(initial.chapterAnalysis[0].conflictIndex).toBeGreaterThan(0.7);
+    expect(evidence?.excerpt).toContain("药老");
+    expect(exceptions).toHaveLength(2);
+    expect(exceptions[0].targetRef).toContain("object://knowledge-objects/");
   });
+
+  it("syncs analysis summary when knowledge is reviewed and committed", () => {
+    const initial = createInitialPhaseTwoState();
+    const reviewed = applyReviewActionToState(initial, "01JZOBJ0000000000000000001", "approve");
+    const committed = commitKnowledgePackage(reviewed);
+
+    expect(reviewed.bookAnalysisSummary.needsAttentionCount).toBe(1);
+    expect(reviewed.analysisExceptions).toHaveLength(1);
+    expect(committed.bookAnalysisSummary.status).toBe("succeeded");
+    expect(committed.bookAnalysisSummary.currentStage).toBe("knowledge_base_commit");
+    expect(committed.bookAnalysisSummary.canCommitKnowledge).toBe(false);
+  });
+
+  it("finds evidence by ref or raw id", () => {
+    const initial = createInitialPhaseTwoState();
+
+    expect(findEvidenceByRef(initial, "evidence://01JZEVIDENCE0000000000002")?.excerpt).toContain("药老");
+    expect(findEvidenceByRef(initial, "01JZEVIDENCE0000000000002")?.excerpt).toContain("药老");
+  });
+
 
   it("resolves low-confidence queue after approvals", () => {
     const initial = createInitialPhaseTwoState();

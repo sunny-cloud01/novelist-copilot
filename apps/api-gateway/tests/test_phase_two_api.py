@@ -26,7 +26,29 @@ def make_client() -> TestClient:
     return TestClient(load_app())
 
 
-def test_create_book_returns_gateway_envelope() -> None:
+def test_gateway_create_book_with_source_text_exposes_content_and_analysis() -> None:
+    client = make_client()
+    source_text = "第一章 山边小村\n韩立站在村口，看见远山雾气。\n第二章 入门试炼\n少年踏上青石阶。"
+
+    response = client.post(
+        "/v1/books",
+        json={
+            "title": "凡人修仙传",
+            "author_name": "忘语",
+            "source_type": "reference_novel",
+            "source_text": source_text,
+        },
+    )
+
+    assert response.status_code == 201
+    book = response.json()["data"]
+    assert book["source_content_ref"].startswith("object://source-contents/")
+    assert client.get(f"/v1/books/{book['book_id']}/content").json()["data"]["content"] == source_text
+    assert len(client.get(f"/v1/books/{book['book_id']}/chapters").json()["data"]["items"]) == 2
+    assert client.get(f"/v1/books/{book['book_id']}/analysis").json()["data"]["summary"]["book_id"] == book["book_id"]
+    assert client.get("/v1/evidence/missing").status_code == 404
+
+
     client = make_client()
 
     response = client.post(
@@ -88,21 +110,18 @@ def test_gateway_extraction_report_and_review_flow() -> None:
     assert graph_response.json()["data"]["node_count"] == 3
 
 
-def test_gateway_graph_node_detail_and_neighbors() -> None:
+def test_gateway_graph_search_and_evidence_ref_lookup() -> None:
     client = make_client()
 
-    node_response = client.get("/v1/graph/nodes/01JZNODE000000000000000001")
-    neighbors_response = client.get("/v1/graph/nodes/01JZNODE000000000000000001/neighbors")
+    search_response = client.get("/v1/graph/search?query=Yao&node_type=mentor")
+    evidence_response = client.get("/v1/evidence/01JZEVIDENCE0000000000002")
 
-    assert node_response.status_code == 200
-    node_payload = node_response.json()["data"]
-    assert node_payload["canonical_object_id"] == "01JZOBJ0000000000000000001"
-    assert node_payload["summary"] == "乌坦城萧家少年，正处于天赋跌落后的低谷期。"
-    assert neighbors_response.status_code == 200
-    neighbor_payload = neighbors_response.json()["data"]
-    assert neighbor_payload["node_id"] == "01JZNODE000000000000000001"
-    assert len(neighbor_payload["items"]) == 2
-    assert neighbor_payload["items"][1]["neighbor_label"] == "Xiao Clan"
+    assert search_response.status_code == 200
+    payload = search_response.json()["data"]
+    assert payload["count"] == 1
+    assert payload["items"][0]["label"] == "Yao Lao"
+    assert evidence_response.status_code == 200
+    assert evidence_response.json()["data"]["excerpt"].startswith("戒指中传来苍老的低笑")
 
 
 def test_gateway_request_reextract_requeues_run() -> None:

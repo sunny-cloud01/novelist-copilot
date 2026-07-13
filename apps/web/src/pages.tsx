@@ -1,32 +1,25 @@
-import { FormEvent, createContext, useContext, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
   DEMO_BOOK_ID,
   DEMO_RUN_ID,
   DEMO_WRITING_RUN_ID,
-  PhaseTwoState,
-  ReviewAction,
-  WritingReviewAction,
-  applyReviewActionToState,
-  applyWritingReviewActionToState,
-  commitKnowledgePackage,
-  createInitialPhaseTwoState,
-  createUploadedBook,
   deriveLowConfidenceItems,
+  findEvidenceByRef,
   DEFAULT_MODEL_PROFILE_ID,
   STRUCTURED_FALLBACK_MODEL_PROFILE_ID,
-  promoteStrategySuggestionInState,
-  toggleModelProfileInState,
-  updateAgentAssignmentInState,
-  updatePromptVersionInState,
-  updateQualityGateProfileInState,
 } from "./components/phase-two-state";
+import { createNovelFactoryApiClient } from "./lib/api-client";
+export { PhaseTwoProvider, usePhaseTwo } from "./state/phase-two-provider";
+import { usePhaseTwo } from "./state/phase-two-provider";
 
 const statusLabels: Record<string, string> = {
   active: "进行中",
   approved: "已通过",
   pending: "待处理",
+  pending_review: "待审核",
+  draft: "草稿",
   planning: "规划中",
   ready: "已就绪",
   requires_review: "待复核",
@@ -119,75 +112,6 @@ function Page({ title, body }: { title: string; body: string }) {
       <p>{body}</p>
     </section>
   );
-}
-
-type PhaseTwoContextValue = {
-  state: PhaseTwoState;
-  uploadBook: (payload: { title: string; authorName: string; sourceType: string }) => void;
-  applyReviewAction: (objectId: string, action: ReviewAction, targetObjectId?: string) => void;
-  applyWritingReviewAction: (writingRunId: string, sectionRunId: string, action: WritingReviewAction) => void;
-  toggleModelProfile: (modelProfileId: string, enabled: boolean) => void;
-  updateQualityGateProfile: (qualityGateProfileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) => void;
-  updateAgentAssignment: (assignmentId: string, modelProfileId: string) => void;
-  updatePromptVersion: (agentRole: string, templateRef: string) => void;
-  promoteStrategySuggestion: (suggestionId: string) => void;
-  commitRun: () => void;
-};
-
-const PhaseTwoContext = createContext<PhaseTwoContextValue | null>(null);
-
-export function PhaseTwoProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<PhaseTwoState>(createInitialPhaseTwoState);
-
-  const value = useMemo<PhaseTwoContextValue>(
-    () => ({
-      state,
-      uploadBook: ({ title, authorName, sourceType }) => {
-        setState((current) => ({
-          ...current,
-          book: createUploadedBook(title, authorName, sourceType),
-          activityLog: [...current.activityLog, `已上传《${title}》，等待确定性抽取。`],
-        }));
-      },
-      applyReviewAction: (objectId, action, targetObjectId) => {
-        setState((current) => applyReviewActionToState(current, objectId, action, targetObjectId));
-      },
-      applyWritingReviewAction: (writingRunId, sectionRunId, action) => {
-        setState((current) => applyWritingReviewActionToState(current, writingRunId, sectionRunId, action));
-      },
-      toggleModelProfile: (modelProfileId, enabled) => {
-        setState((current) => toggleModelProfileInState(current, modelProfileId, enabled));
-      },
-      updateQualityGateProfile: (qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold) => {
-        setState((current) =>
-          updateQualityGateProfileInState(current, qualityGateProfileId, aiFlavorThreshold, originalitySafetyThreshold),
-        );
-      },
-      updateAgentAssignment: (assignmentId, modelProfileId) => {
-        setState((current) => updateAgentAssignmentInState(current, assignmentId, modelProfileId));
-      },
-      updatePromptVersion: (agentRole, templateRef) => {
-        setState((current) => updatePromptVersionInState(current, agentRole, templateRef));
-      },
-      promoteStrategySuggestion: (suggestionId) => {
-        setState((current) => promoteStrategySuggestionInState(current, suggestionId));
-      },
-      commitRun: () => {
-        setState((current) => commitKnowledgePackage(current));
-      },
-    }),
-    [state],
-  );
-
-  return <PhaseTwoContext.Provider value={value}>{children}</PhaseTwoContext.Provider>;
-}
-
-export function usePhaseTwo() {
-  const context = useContext(PhaseTwoContext);
-  if (!context) {
-    throw new Error("PhaseTwoContext missing");
-  }
-  return context;
 }
 
 export function WorkspaceHomePage() {
@@ -435,73 +359,208 @@ export function KnowledgeReviewPage() {
 
 export function GraphPage() {
   const { state } = usePhaseTwo();
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(state.graphNodes[0]?.nodeId ?? "");
-  const selectedNode = selectedNodeId ? state.graphNodeDetails[selectedNodeId] : undefined;
-  const neighbors = selectedNodeId ? state.graphNeighborsByNode[selectedNodeId] ?? [] : [];
+  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(apiClient ? "" : state.graphNodes[0]?.nodeId ?? "");
+  const [query, setQuery] = useState("");
+  const [selectedNodeType, setSelectedNodeType] = useState<string>("");
+  const [selectedEvidenceRef, setSelectedEvidenceRef] = useState<string>(apiClient ? "" : state.graphNodes[0]?.evidenceRefs[0] ?? "");
+  const [apiNodes, setApiNodes] = useState<any[] | null>(null);
+  const [apiNode, setApiNode] = useState<any | null>(null);
+  const [apiNeighbors, setApiNeighbors] = useState<any[] | null>(null);
+  const [apiEvidence, setApiEvidence] = useState<any | null>(null);
+  const [loading, setLoading] = useState(Boolean(apiClient));
+  const [error, setError] = useState<string | null>(null);
+  const selectedNode = apiNode ?? (selectedNodeId ? state.graphNodeDetails[selectedNodeId] : undefined);
+  const neighbors = apiNeighbors ?? (selectedNodeId ? state.graphNeighborsByNode[selectedNodeId] ?? [] : []);
+  const selectedEvidence = apiEvidence ?? (selectedEvidenceRef ? findEvidenceByRef(state, selectedEvidenceRef) : undefined);
+  const filteredNodes = apiNodes ?? state.graphNodes.filter((node) =>
+    `${node.label} ${node.nodeType}`.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  useEffect(() => {
+    if (!apiClient) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void apiClient.searchGraphNodes({ query, nodeType: selectedNodeType || undefined }).then((result: any) => {
+      if (cancelled) return;
+      setApiNodes(result.items ?? []);
+      if (result.items?.[0]?.node_id) {
+        setSelectedNodeId((current) => current || result.items[0].node_id);
+      }
+    }).catch((caught) => {
+      if (cancelled) return;
+      setError(caught instanceof Error ? caught.message : "图谱检索失败");
+      setApiNodes([]);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, query, selectedNodeType]);
+
+  useEffect(() => {
+    if (!apiClient || !selectedNodeId) return;
+    let cancelled = false;
+    setError(null);
+    void Promise.all([
+      apiClient.getGraphNode(selectedNodeId),
+      apiClient.getGraphNeighbors(selectedNodeId),
+    ]).then(([node, neighborResult]: any[]) => {
+      if (cancelled) return;
+      setApiNode(node);
+      setApiNeighbors(neighborResult.items ?? []);
+      const nextEvidenceRef = node?.evidence_refs?.[0] ?? "";
+      setSelectedEvidenceRef(nextEvidenceRef);
+    }).catch((caught) => {
+      if (cancelled) return;
+      setError(caught instanceof Error ? caught.message : "图谱详情加载失败");
+      setApiNode(null);
+      setApiNeighbors([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, selectedNodeId]);
+
+  useEffect(() => {
+    if (!apiClient || !selectedEvidenceRef) return;
+    let cancelled = false;
+    void apiClient.getEvidence(selectedEvidenceRef).then((evidence: any) => {
+      if (cancelled) return;
+      setApiEvidence({
+        evidenceId: evidence.evidence_id ?? selectedEvidenceRef,
+        bookId: evidence.book_id,
+        chapterId: evidence.chapter_id,
+        chapterIndex: evidence.chapter_index,
+        textRange: evidence.text_range,
+        excerpt: evidence.excerpt,
+        sourceObjectRefs: evidence.source_object_refs ?? [],
+        confidence: evidence.confidence,
+        traceId: evidence.trace_id,
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setApiEvidence(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, selectedEvidenceRef]);
 
   return (
-    <section style={{ display: "grid", gap: 16 }}>
+    <section className="nf-analysis-page">
       <div>
         <h2>故事图谱查看器</h2>
-        <p>查看节点、关系与快照细节。</p>
+        <p>搜索节点、查看关系来源，并跳转原文证据；图谱只做辅助查看，不做重编辑画布。</p>
       </div>
-      <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
-        <h3>图谱节点</h3>
-        <ul style={{ display: "grid", gap: 12, padding: 0, listStyle: "none" }}>
-          {state.graphNodes.map((node) => (
-            <li key={node.nodeId} style={{ border: "1px solid #e4e4e7", padding: 12 }}>
-              <button type="button" onClick={() => setSelectedNodeId(node.nodeId)}>
-                {node.label}（{labelOf(objectTypeLabels, node.nodeType)}）
-              </button>
-              <p>证据 {node.evidenceRefs.length} 条</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-      {selectedNode ? (
-        <>
-          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
-            <h3>节点详情</h3>
-            <dl>
-              <dt>名称</dt>
-              <dd>{selectedNode.label}</dd>
-              <dt>类型</dt>
-              <dd>{labelOf(objectTypeLabels, selectedNode.nodeType)}</dd>
-              <dt>审核状态</dt>
-              <dd>{labelOf(statusLabels, selectedNode.reviewStatus)}</dd>
-              <dt>生命周期</dt>
-              <dd>{labelOf(statusLabels, selectedNode.lifecycleStatus)}</dd>
-              <dt>置信度</dt>
-              <dd>{selectedNode.confidence}</dd>
-              <dt>别名</dt>
-              <dd>{selectedNode.aliases.join("、") || "无"}</dd>
-              <dt>对象引用</dt>
-              <dd>{selectedNode.canonicalObjectId}</dd>
-            </dl>
-            <p>{selectedNode.summary}</p>
-          </section>
-          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
-            <h3>关系查看</h3>
-            {neighbors.length === 0 ? <p>当前节点暂无关系。</p> : null}
-            <ul>
-              {neighbors.map((neighbor) => (
-                <li key={neighbor.edgeId}>
-                  {neighbor.direction === "outgoing" ? "指向" : "来自"}
-                  {neighbor.neighborLabel} · {neighbor.relationType} · 置信度 {neighbor.confidence}
+      <div className="nf-graph-grid">
+        <section className="nf-card">
+          <div className="nf-card-header">
+            <h3 className="nf-card-title">图谱节点</h3>
+            <p className="nf-card-description">按角色、势力、地点或事件搜索。</p>
+          </div>
+          <input
+            aria-label="搜索图谱节点"
+            className="nf-search-input"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索 Xiao Yan / mentor / clan"
+            value={query}
+          />
+          <label className="nf-field" style={{ marginTop: 12 }}>
+            节点类型
+            <select aria-label="筛选节点类型" value={selectedNodeType} onChange={(event) => setSelectedNodeType(event.target.value)}>
+              <option value="">全部</option>
+              <option value="character">角色</option>
+              <option value="mentor">导师</option>
+              <option value="clan">家族</option>
+            </select>
+          </label>
+          {loading ? <p>图谱检索中…</p> : null}
+          {error ? <p role="alert">{error}</p> : null}
+          <ul className="nf-source-list" style={{ marginTop: 12 }}>
+            {filteredNodes.map((node: any) => {
+              const nodeId = node.nodeId ?? node.node_id;
+              const nodeType = node.nodeType ?? node.node_type;
+              const evidenceRefs = node.evidenceRefs ?? node.evidence_refs ?? [];
+              return (
+                <li className="nf-source-item" key={nodeId}>
+                  <button type="button" onClick={() => {
+                    setSelectedNodeId(nodeId);
+                    setSelectedEvidenceRef(evidenceRefs[0] ?? "");
+                  }}>
+                    {node.label}（{labelOf(objectTypeLabels, nodeType)}）
+                  </button>
+                  <p>证据 {evidenceRefs.length} 条</p>
                 </li>
-              ))}
-            </ul>
-          </section>
-          <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
-            <h3>Source evidence</h3>
-            <ul>
-              {selectedNode.evidenceRefs.map((ref) => (
-                <li key={ref}>{ref}</li>
-              ))}
-            </ul>
-          </section>
-        </>
-      ) : null}
+              );
+            })}
+          </ul>
+        </section>
+        {selectedNode ? (
+          <div className="nf-analysis-stack">
+            <section className="nf-card">
+              <div className="nf-card-header">
+                <h3 className="nf-card-title">节点详情</h3>
+                <p className="nf-card-description">{selectedNode.summary}</p>
+              </div>
+              <dl>
+                <dt>名称</dt>
+                <dd>{selectedNode.label}</dd>
+                <dt>类型</dt>
+                <dd>{labelOf(objectTypeLabels, selectedNode.nodeType ?? selectedNode.node_type)}</dd>
+                <dt>审核状态</dt>
+                <dd>{labelOf(statusLabels, selectedNode.reviewStatus ?? selectedNode.review_status)}</dd>
+                <dt>生命周期</dt>
+                <dd>{labelOf(statusLabels, selectedNode.lifecycleStatus ?? selectedNode.lifecycle_status)}</dd>
+                <dt>置信度</dt>
+                <dd>{selectedNode.confidence}</dd>
+                <dt>别名</dt>
+                <dd>{(selectedNode.aliases ?? []).join("、") || "无"}</dd>
+                <dt>对象引用</dt>
+                <dd>{selectedNode.canonicalObjectId ?? selectedNode.canonical_object_id}</dd>
+              </dl>
+            </section>
+            <section className="nf-card">
+              <div className="nf-card-header">
+                <h3 className="nf-card-title">关系查看</h3>
+                <p className="nf-card-description">关系必须来自已绑定证据。</p>
+              </div>
+              {neighbors.length === 0 ? <p>当前节点暂无关系。</p> : null}
+              <ul>
+                {neighbors.map((neighbor: any) => (
+                  <li key={neighbor.edgeId ?? neighbor.edge_id}>
+                    {(neighbor.direction === "outgoing" ? "指向" : "来自")}
+                    {neighbor.neighborLabel ?? neighbor.neighbor_label} · {neighbor.relationType ?? neighbor.relation_type} · 置信度 {neighbor.confidence}
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className="nf-card">
+              <div className="nf-card-header">
+                <h3 className="nf-card-title">Source evidence</h3>
+                <p className="nf-card-description">点击 evidence ref 查看原文片段。</p>
+              </div>
+              <ul>
+                {(selectedNode.evidenceRefs ?? selectedNode.evidence_refs ?? []).map((ref: string) => (
+                  <li key={ref}>
+                    <button className="nf-evidence-button" type="button" onClick={() => setSelectedEvidenceRef(ref)}>{ref}</button>
+                  </li>
+                ))}
+              </ul>
+              {selectedEvidence ? (
+                <article className="nf-evidence-item">
+                  <strong>第 {selectedEvidence.chapterIndex} 章 · {selectedEvidence.textRange}</strong>
+                  <p className="nf-evidence-excerpt">“{selectedEvidence.excerpt}”</p>
+                  <small>trace {selectedEvidence.traceId}</small>
+                </article>
+              ) : null}
+            </section>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -532,17 +591,194 @@ export function ProjectListPage() {
   );
 }
 
+function normalizeProjectView(project: any) {
+  if (!project) return null;
+  return {
+    projectId: project.project_id ?? project.projectId ?? "",
+    title: project.title ?? "",
+    genreScope: project.genre_scope ?? project.genreScope ?? "",
+    status: project.status ?? "",
+    qualityGateProfileId: project.quality_gate_profile_id ?? project.qualityGateProfileId ?? "",
+    storyBibleId: project.story_bible_id ?? project.storyBibleId ?? "",
+  };
+}
+
+function normalizeStoryBibleView(storyBible: any) {
+  if (!storyBible) return null;
+  const payload = storyBible.payload ?? {
+    premise: storyBible.premise,
+    protagonist: storyBible.protagonist,
+    core_conflict: storyBible.coreConflict,
+    style_target: storyBible.styleTarget,
+    forbidden_similarities: storyBible.forbiddenSimilarities,
+    world_rules: storyBible.worldRules,
+    narrative_promises: storyBible.narrativePromises,
+  };
+  const diffSource = storyBible.diff ?? null;
+  const historySource = Array.isArray(storyBible.history) ? storyBible.history : [];
+  return {
+    storyBibleId: storyBible.story_bible_id ?? storyBible.storyBibleId ?? "",
+    projectId: storyBible.project_id ?? storyBible.projectId ?? "",
+    version: storyBible.version ?? 0,
+    status: storyBible.status ?? "",
+    premise: payload.premise ?? "",
+    protagonist: payload.protagonist ?? "",
+    coreConflict: payload.core_conflict ?? payload.coreConflict ?? "",
+    styleTarget: payload.style_target ?? payload.styleTarget ?? "",
+    forbiddenSimilarities: payload.forbidden_similarities ?? payload.forbiddenSimilarities ?? "",
+    worldRules: Array.isArray(payload.world_rules ?? payload.worldRules) ? (payload.world_rules ?? payload.worldRules) : [],
+    narrativePromises: Array.isArray(payload.narrative_promises ?? payload.narrativePromises)
+      ? (payload.narrative_promises ?? payload.narrativePromises)
+      : [],
+    confirmedPayload: storyBible.confirmed_payload ?? storyBible.confirmedPayload ?? null,
+    diff: diffSource ? {
+      fromVersion: diffSource.from_version ?? diffSource.fromVersion ?? null,
+      toVersion: diffSource.to_version ?? diffSource.toVersion ?? storyBible.version ?? 0,
+      summary: diffSource.summary ?? "",
+      changedFields: diffSource.changed_fields ?? diffSource.changedFields ?? [],
+    } : null,
+    history: historySource.map((item: any) => ({
+      version: item.version ?? 0,
+      status: item.status ?? "",
+      changeType: item.change_type ?? item.changeType ?? "",
+      summary: item.summary ?? "",
+      note: item.note ?? null,
+      createdAt: item.created_at ?? item.createdAt ?? "",
+    })),
+    approvedAt: storyBible.approved_at ?? storyBible.approvedAt ?? null,
+    approvedBy: storyBible.approved_by ?? storyBible.approvedBy ?? null,
+    traceId: storyBible.trace_id ?? storyBible.traceId ?? "",
+  };
+}
+
+function parseMultilineList(value: string) {
+  return value.split(/\n+/).map((item) => item.trim()).filter(Boolean);
+}
+
 export function ProjectHomePage() {
   const { projectId } = useParams();
   const { state } = usePhaseTwo();
-  const project = state.projects.find((item) => item.projectId === projectId) ?? state.projects[0];
+  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
+  const fallbackProject = state.projects.find((item) => item.projectId === projectId) ?? state.projects[0];
+  const fallbackStoryBible = state.storyBibles.find((item) => item.storyBibleId === fallbackProject?.storyBibleId);
+  const [apiProjectDetail, setApiProjectDetail] = useState<any | null>(null);
+  const [apiStoryBible, setApiStoryBible] = useState<any | null>(null);
+  const [loading, setLoading] = useState(Boolean(apiClient));
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    premise: "",
+    protagonist: "",
+    coreConflict: "",
+    styleTarget: "",
+    forbiddenSimilarities: "",
+    worldRules: "",
+    narrativePromises: "",
+    summary: "补强故事圣经候选版本。",
+    note: "",
+  });
+
+  useEffect(() => {
+    if (!apiClient || !projectId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const detail: any = await apiClient.getNovelProject(projectId);
+        if (cancelled) return;
+        setApiProjectDetail(detail);
+        const storyBibleId = detail?.story_bible?.story_bible_id ?? detail?.project?.story_bible_id ?? "";
+        if (!storyBibleId) {
+          setApiStoryBible(null);
+          return;
+        }
+        const storyBible = await apiClient.getStoryBible(storyBibleId);
+        if (cancelled) return;
+        setApiStoryBible(storyBible);
+      } catch (caught) {
+        if (cancelled) return;
+        setError(caught instanceof Error ? caught.message : "项目详情加载失败");
+        setApiProjectDetail(null);
+        setApiStoryBible(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient, projectId]);
+
+  const project = normalizeProjectView(apiProjectDetail?.project) ?? fallbackProject;
+  const storyBible = normalizeStoryBibleView(apiStoryBible ?? apiProjectDetail?.story_bible ?? fallbackStoryBible);
+  const chapterPlans = (apiProjectDetail?.chapter_plans ?? state.chapterPlans.filter((item) => item.projectId === project?.projectId)).map((plan: any) => ({
+    chapterPlanId: plan.chapter_plan_id ?? plan.chapterPlanId,
+    chapterIndex: plan.chapter_index ?? plan.chapterIndex,
+    title: plan.title,
+    status: plan.status,
+    targetWordCount: plan.target_word_count ?? plan.targetWordCount,
+  }));
+
+  useEffect(() => {
+    if (!storyBible) return;
+    setDraft({
+      premise: storyBible.premise,
+      protagonist: storyBible.protagonist,
+      coreConflict: storyBible.coreConflict,
+      styleTarget: storyBible.styleTarget ?? "",
+      forbiddenSimilarities: storyBible.forbiddenSimilarities ?? "",
+      worldRules: (storyBible.worldRules ?? []).join("\n"),
+      narrativePromises: (storyBible.narrativePromises ?? []).join("\n"),
+      summary: storyBible.diff?.summary ?? "补强故事圣经候选版本。",
+      note: "",
+    });
+  }, [storyBible?.storyBibleId, storyBible?.version, storyBible?.status]);
 
   if (!project) {
     return <Page title="项目不存在" body="未找到对应项目。" />;
   }
 
-  const storyBible = state.storyBibles.find((item) => item.storyBibleId === project.storyBibleId);
-  const chapterPlans = state.chapterPlans.filter((item) => item.projectId === project.projectId);
+  async function handleStoryBibleAction(action: "regenerate" | "confirm" | "reject") {
+    if (!apiClient || !storyBible?.storyBibleId) return;
+    setSubmittingAction(action);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const payload = action === "regenerate"
+        ? {
+            action,
+            summary: draft.summary,
+            note: draft.note,
+            story_bible_payload: {
+              premise: draft.premise,
+              protagonist: draft.protagonist,
+              core_conflict: draft.coreConflict,
+              style_target: draft.styleTarget,
+              forbidden_similarities: draft.forbiddenSimilarities,
+              world_rules: parseMultilineList(draft.worldRules),
+              narrative_promises: parseMultilineList(draft.narrativePromises),
+            },
+          }
+        : {
+            action,
+            summary: draft.summary,
+            note: draft.note,
+          };
+      const nextStoryBible = await apiClient.reviewStoryBible(storyBible.storyBibleId, payload);
+      setApiStoryBible(nextStoryBible);
+      setActionMessage(
+        action === "confirm" ? "候选版本已确认。" : action === "reject" ? "候选版本已驳回。" : "已生成候选版本。",
+      );
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "Story Bible 审核动作失败");
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -550,6 +786,8 @@ export function ProjectHomePage() {
         <h2>项目主页</h2>
         <p>查看项目状态、故事圣经摘要与章节入口。</p>
       </div>
+      {loading ? <p>正在加载项目详情...</p> : null}
+      {error ? <p role="alert">{error}</p> : null}
       <dl>
         <dt>项目名称</dt>
         <dd>{project.title}</dd>
@@ -561,26 +799,134 @@ export function ProjectHomePage() {
         <dd>{project.qualityGateProfileId}</dd>
       </dl>
       {storyBible ? (
-        <section>
-          <h3>故事圣经摘要</h3>
-          <dl>
-            <dt>版本</dt>
-            <dd>{storyBible.version}</dd>
-            <dt>状态</dt>
-            <dd>{labelOf(statusLabels, storyBible.status)}</dd>
-            <dt>故事前提</dt>
-            <dd>{storyBible.premise}</dd>
-            <dt>主角</dt>
-            <dd>{storyBible.protagonist}</dd>
-            <dt>核心冲突</dt>
-            <dd>{storyBible.coreConflict}</dd>
-          </dl>
+        <section style={{ display: "grid", gap: 16 }}>
+          <div>
+            <h3>故事圣经摘要</h3>
+            <dl>
+              <dt>版本</dt>
+              <dd>{storyBible.version}</dd>
+              <dt>状态</dt>
+              <dd>{labelOf(statusLabels, storyBible.status)}</dd>
+              <dt>故事前提</dt>
+              <dd>{storyBible.premise}</dd>
+              <dt>主角</dt>
+              <dd>{storyBible.protagonist}</dd>
+              <dt>核心冲突</dt>
+              <dd>{storyBible.coreConflict}</dd>
+              <dt>风格目标</dt>
+              <dd>{storyBible.styleTarget || "未填写"}</dd>
+              <dt>禁用相似点</dt>
+              <dd>{storyBible.forbiddenSimilarities || "未填写"}</dd>
+              <dt>批准时间</dt>
+              <dd>{storyBible.approvedAt ?? "未确认"}</dd>
+            </dl>
+            {storyBible.worldRules.length ? (
+              <div>
+                <h4>世界规则</h4>
+                <ul>
+                  {storyBible.worldRules.map((item: string) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            ) : null}
+            {storyBible.narrativePromises.length ? (
+              <div>
+                <h4>叙事承诺</h4>
+                <ul>
+                  {storyBible.narrativePromises.map((item: string) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+          {storyBible.diff ? (
+            <section style={{ border: "1px solid #d4d4d8", padding: 16 }}>
+              <h4>候选变更</h4>
+              <p>{storyBible.diff.summary || "待补充变更摘要。"}</p>
+              <p>版本 {storyBible.diff.fromVersion ?? storyBible.version - 1} 到 {storyBible.diff.toVersion}</p>
+              <p>变更字段：{storyBible.diff.changedFields.length ? storyBible.diff.changedFields.join("、") : "未标注"}</p>
+            </section>
+          ) : null}
+          {storyBible.history.length ? (
+            <section>
+              <h4>审核历史</h4>
+              <ul>
+                {storyBible.history.map((item: { changeType: string; version: number; createdAt?: string; status: string; summary?: string }) => (
+                  <li key={`${item.changeType}-${item.version}-${item.createdAt}`}>
+                    v{item.version} · {item.changeType} · {labelOf(statusLabels, item.status)} · {item.summary || "无摘要"}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {apiClient ? (
+            <section style={{ border: "1px solid #d4d4d8", padding: 16, display: "grid", gap: 12 }}>
+              <h4>Story Bible 审核</h4>
+              <label>
+                故事前提
+                <textarea value={draft.premise} onChange={(event) => setDraft((current) => ({ ...current, premise: event.target.value }))} />
+              </label>
+              <label>
+                主角
+                <input value={draft.protagonist} onChange={(event) => setDraft((current) => ({ ...current, protagonist: event.target.value }))} />
+              </label>
+              <label>
+                核心冲突
+                <textarea value={draft.coreConflict} onChange={(event) => setDraft((current) => ({ ...current, coreConflict: event.target.value }))} />
+              </label>
+              <label>
+                风格目标
+                <input value={draft.styleTarget} onChange={(event) => setDraft((current) => ({ ...current, styleTarget: event.target.value }))} />
+              </label>
+              <label>
+                禁用相似点
+                <textarea value={draft.forbiddenSimilarities} onChange={(event) => setDraft((current) => ({ ...current, forbiddenSimilarities: event.target.value }))} />
+              </label>
+              <label>
+                世界规则
+                <textarea value={draft.worldRules} onChange={(event) => setDraft((current) => ({ ...current, worldRules: event.target.value }))} />
+              </label>
+              <label>
+                叙事承诺
+                <textarea value={draft.narrativePromises} onChange={(event) => setDraft((current) => ({ ...current, narrativePromises: event.target.value }))} />
+              </label>
+              <label>
+                变更摘要
+                <input value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} />
+              </label>
+              <label>
+                备注
+                <textarea value={draft.note} onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))} />
+              </label>
+              {actionMessage ? <p>{actionMessage}</p> : null}
+              {actionError ? <p role="alert">{actionError}</p> : null}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => void handleStoryBibleAction("regenerate")} disabled={submittingAction !== null}>
+                  {submittingAction === "regenerate" ? "生成中..." : "生成候选版本"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleStoryBibleAction("confirm")}
+                  disabled={submittingAction !== null || storyBible.status !== "pending_review"}
+                >
+                  {submittingAction === "confirm" ? "确认中..." : "确认候选版本"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleStoryBibleAction("reject")}
+                  disabled={submittingAction !== null || storyBible.status !== "pending_review"}
+                >
+                  {submittingAction === "reject" ? "驳回中..." : "驳回候选版本"}
+                </button>
+              </div>
+            </section>
+          ) : (
+            <p>配置 VITE_NOVEL_FACTORY_API_BASE_URL 后可生成候选、确认或驳回 Story Bible。</p>
+          )}
         </section>
       ) : null}
       <section>
         <h3>章节规划入口</h3>
         <ul>
-          {chapterPlans.map((plan) => (
+          {chapterPlans.map((plan: any) => (
             <li key={plan.chapterPlanId}>
               第 {plan.chapterIndex} 章《{plan.title}》 · {labelOf(statusLabels, plan.status)} · 目标 {plan.targetWordCount} 字
             </li>

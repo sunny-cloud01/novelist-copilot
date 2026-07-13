@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_content_id": "01JZSOURCECONTENT000000001",
+  "book_id": "01JZBOOK000000000000000001",
+  "object_ref": "object://source-contents/01JZSOURCECONTENT000000001",
+  "mime_type": "text/plain; charset=utf-8",
+  "checksum": "sha256:abc123",
+  "byte_size": 48,
+  "content": "第一章 乌坦城风起\n萧炎沉默地站在大厅中央。",
+  "created_at": "2026-07-12T02:00:00Z",
+  "updated_at": "2026-07-12T02:00:00Z"
+}

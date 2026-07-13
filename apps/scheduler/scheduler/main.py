@@ -49,6 +49,7 @@ def _build_command(store: Any, task: dict[str, Any]) -> Optional[dict[str, Any]]
             "input_refs": [f"object://source-books/{run['book_id']}", f"object://extraction-runs/{entity_id}"],
             "idempotency_key": task["idempotency_key"],
             "trace_id": trace_id,
+            "dispatch_token": task.get("current_dispatch_token"),
             "requested_by": "scheduler",
         }
     if task_kind == "chapter_plan":
@@ -66,6 +67,7 @@ def _build_command(store: Any, task: dict[str, Any]) -> Optional[dict[str, Any]]
             "chapter_index": chapter_plan["chapter_index"],
             "target_word_count": chapter_plan["target_word_count"],
             "trace_id": trace_id,
+            "dispatch_token": task.get("current_dispatch_token"),
             "requested_by": "scheduler",
         }
     if task_kind == "section_plan":
@@ -78,6 +80,7 @@ def _build_command(store: Any, task: dict[str, Any]) -> Optional[dict[str, Any]]
             "chapter_plan_id": entity_id,
             "section_count": len(store.STORE.section_plans_by_chapter.get(entity_id, [])),
             "trace_id": trace_id,
+            "dispatch_token": task.get("current_dispatch_token"),
             "requested_by": "scheduler",
         }
     if task_kind == "writing_run":
@@ -97,6 +100,7 @@ def _build_command(store: Any, task: dict[str, Any]) -> Optional[dict[str, Any]]
             "critic_model_profile_id": writing_run["critic_model_profile_id"],
             "humanizer_model_profile_id": writing_run["humanizer_model_profile_id"],
             "trace_id": trace_id,
+            "dispatch_token": task.get("current_dispatch_token"),
             "requested_by": "scheduler",
         }
     return None
@@ -119,21 +123,31 @@ def run_scheduler_tick(now: Optional[datetime] = None, broker: Optional[RedisBro
     current = now or datetime.now(timezone.utc)
     runtime_store = load_phase_two_store()
     active_broker = broker or build_broker(os.getenv("NOVEL_FACTORY_REDIS_URL", "redis://localhost:6379/0"))
+    current_iso = current.isoformat()
+    expired = runtime_store.recover_expired_runtime_tasks(
+        now=current_iso,
+        request_id="system-scheduler-recovery",
+        trace_id="system-scheduler-recovery",
+        actor_id="scheduler",
+    )
+    due_retry_tasks = runtime_store.list_due_retry_tasks(now=current_iso)
     dispatched = 0
-    for task in runtime_store.list_runtime_tasks("queued"):
+    for task in [*runtime_store.list_runtime_tasks("queued"), *due_retry_tasks]:
         if task["task_type"] not in TASK_ROUTE_MAP:
             continue
-        command = _build_command(runtime_store, task)
+        dispatched_task = runtime_store.mark_task_dispatched(task["task_id"], trace_id=task.get("trace_id") or "system-trace", dispatched_at=current_iso)
+        if not dispatched_task or dispatched_task.get("status") != "running" or not dispatched_task.get("current_dispatch_token"):
+            continue
+        command = _build_command(runtime_store, dispatched_task)
         if not command:
             continue
-        _enqueue_task(active_broker, task, command)
-        runtime_store.mark_task_dispatched(task["task_id"], trace_id=command["trace_id"])
+        _enqueue_task(active_broker, dispatched_task, command)
         dispatched += 1
     return SchedulerTickResult(
         requeued=dispatched,
-        expired_leases=0,
-        due_retries=0,
-        ran_at=current.isoformat(),
+        expired_leases=len(expired),
+        due_retries=len(due_retry_tasks),
+        ran_at=current_iso,
     )
 
 

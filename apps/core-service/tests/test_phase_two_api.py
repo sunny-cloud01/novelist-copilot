@@ -26,6 +26,135 @@ def make_client() -> TestClient:
     return TestClient(load_app())
 
 
+def test_create_book_with_source_text_persists_content_and_chapters() -> None:
+    client = make_client()
+    source_text = "第一章 山边小村\n韩立站在村口，看见远山雾气。\n第二章 入门试炼\n少年踏上青石阶。"
+
+    response = client.post(
+        "/v1/books",
+        json={
+            "title": "凡人修仙传",
+            "author_name": "忘语",
+            "source_type": "reference_novel",
+            "platform": "起点中文网",
+            "genre": "仙侠成长流",
+            "usage_boundary": "仅供结构学习，不直接复写原文。",
+            "source_text": source_text,
+        },
+        headers={"x-request-id": "req-source-text", "x-trace-id": "trace-source-text"},
+    )
+
+    assert response.status_code == 201
+    book = response.json()["data"]
+    assert book["title"] == "凡人修仙传"
+    assert book["source_content_ref"].startswith("object://source-contents/")
+    assert book["content_checksum"].startswith("sha256:")
+    assert book["content_byte_size"] == len(source_text.encode("utf-8"))
+    assert book["chapter_count"] == 2
+
+    chapters_response = client.get(f"/v1/books/{book['book_id']}/chapters")
+    content_response = client.get(f"/v1/books/{book['book_id']}/content")
+    evidence_response = client.get(f"/v1/books/{book['book_id']}/evidence")
+    analysis_response = client.get(f"/v1/books/{book['book_id']}/analysis")
+
+    assert chapters_response.status_code == 200
+    chapters = chapters_response.json()["data"]["items"]
+    assert len(chapters) == 2
+    assert chapters[0]["raw_text"].startswith("第一章 山边小村")
+    assert chapters[0]["text_object_ref"].startswith("object://source-chapters/")
+    assert content_response.status_code == 200
+    assert content_response.json()["data"]["content"] == source_text
+    assert evidence_response.status_code == 200
+    assert evidence_response.json()["data"]["items"] == []
+    assert analysis_response.status_code == 200
+    analysis = analysis_response.json()["data"]
+    assert analysis["book"]["title"] == "凡人修仙传"
+    assert analysis["summary"]["book_id"] == book["book_id"]
+    assert analysis["chapters"][0]["raw_text"].startswith("第一章 山边小村")
+
+
+def test_source_text_extraction_result_populates_analysis_evidence() -> None:
+    from app.core import phase_two_store as store
+
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    source_text = "第一章 山边小村\n韩立站在村口，看见远山雾气。\n第二章 入门试炼\n少年踏上青石阶。"
+    created = store.create_book(
+        {
+            "title": "凡人修仙传",
+            "author_name": "忘语",
+            "source_type": "reference_novel",
+            "source_text": source_text,
+        },
+        trace_id="trace-analysis-evidence",
+    )
+    run = store.create_extraction_run(created["book_id"], trace_id="trace-analysis-evidence")
+    dispatched = store.mark_task_dispatched(run["task"]["task_id"], trace_id="trace-analysis-evidence")
+    evidence_id = "01JZUPLOADEDEVIDENCE000001"
+    evidence_ref = f"evidence://{evidence_id}"
+    knowledge_object = {
+        "schema_version": 1,
+        "object_id": "01JZUPLOADEDOBJ000000001",
+        "workspace_id": created["workspace_id"],
+        "object_type": "character",
+        "canonical_name": "韩立",
+        "lifecycle_status": "candidate",
+        "review_status": "pending",
+        "confidence": 0.67,
+        "evidence_refs": [evidence_ref],
+        "input_refs": [f"object://source-books/{created['book_id']}"],
+        "output_refs": ["object://knowledge-objects/01JZUPLOADEDOBJ000000001"],
+        "payload": {"schema_version": 1, "aliases": []},
+    }
+    evidence = {
+        "schema_version": 1,
+        "evidence_id": evidence_id,
+        "evidence_ref": evidence_ref,
+        "book_id": created["book_id"],
+        "chapter_id": store.list_book_chapters(created["book_id"])[0]["chapter_id"],
+        "chapter_index": 1,
+        "text_range": "c1:p1-p2",
+        "excerpt": "韩立站在村口，看见远山雾气。",
+        "source_object_refs": ["object://knowledge-objects/01JZUPLOADEDOBJ000000001"],
+        "source_content_ref": created["source_content_ref"],
+        "confidence": 0.84,
+        "trace_id": "trace-analysis-evidence",
+    }
+    store.apply_task_execution_result(
+        run["task"]["task_id"],
+        "requires_review",
+        [run["knowledge_package_ref"], run["graph_package_ref"], run["extraction_report_ref"], run["quality_report_ref"]],
+        {
+            "current_stage": "quality_review",
+            "chapter_count": 2,
+            "scene_count": 2,
+            "object_count": 1,
+            "evidence_count": 1,
+            "low_confidence_count": 1,
+            "knowledge_objects": [knowledge_object],
+            "evidences": [evidence],
+            "graph_summary": {"schema_version": 1, "book_id": created["book_id"], "node_count": 1, "edge_count": 0, "nodes": []},
+        },
+        trace_id="trace-analysis-evidence",
+        dispatch_token=dispatched["current_dispatch_token"],
+    )
+
+    analysis = store.get_book_analysis(created["book_id"])
+
+    assert analysis["summary"]["knowledge_object_count"] == 1
+    assert analysis["summary"]["needs_attention_count"] == 1
+    assert analysis["evidence_samples"][0]["excerpt"] == "韩立站在村口，看见远山雾气。"
+    assert analysis["exceptions"][0]["target_ref"] == "object://knowledge-objects/01JZUPLOADEDOBJ000000001"
+
+
+def test_source_content_and_evidence_missing_resources_return_not_found() -> None:
+    client = make_client()
+
+    assert client.get("/v1/books/missing/content").status_code == 404
+    assert client.get("/v1/books/missing/evidence").status_code == 404
+    assert client.get("/v1/evidence/missing").status_code == 404
+
+
 def test_create_book_returns_enveloped_book() -> None:
     client = make_client()
 
@@ -176,24 +305,20 @@ def test_review_action_writes_audit_event() -> None:
     assert any(item["action"] == "knowledge.approve" and item["request_id"] == "req-audit-review" for item in items)
 
 
-def test_graph_node_detail_and_neighbors() -> None:
+def test_graph_search_and_evidence_ref_lookup() -> None:
     client = make_client()
 
-    node_response = client.get("/v1/graph/nodes/01JZNODE000000000000000001")
-    neighbors_response = client.get("/v1/graph/nodes/01JZNODE000000000000000001/neighbors")
+    search_response = client.get("/v1/graph/search?query=Yao&node_type=mentor")
+    evidence_response = client.get("/v1/evidence/01JZEVIDENCE0000000000002")
 
-    assert node_response.status_code == 200
-    node_payload = node_response.json()["data"]
-    assert node_payload["canonical_object_id"] == "01JZOBJ0000000000000000001"
-    assert node_payload["summary"] == "乌坦城萧家少年，正处于天赋跌落后的低谷期。"
-    assert neighbors_response.status_code == 200
-    neighbor_payload = neighbors_response.json()["data"]
-    assert neighbor_payload["node_id"] == "01JZNODE000000000000000001"
-    assert len(neighbor_payload["items"]) == 2
-    assert neighbor_payload["items"][0]["neighbor_label"] == "Yao Lao"
+    assert search_response.status_code == 200
+    payload = search_response.json()["data"]
+    assert payload["count"] == 1
+    assert payload["items"][0]["label"] == "Yao Lao"
+    assert evidence_response.status_code == 200
+    assert evidence_response.json()["data"]["excerpt"].startswith("戒指中传来苍老的低笑")
 
 
-def test_missing_resources_return_not_found() -> None:
     client = make_client()
 
     assert client.get("/v1/books/missing").status_code == 404

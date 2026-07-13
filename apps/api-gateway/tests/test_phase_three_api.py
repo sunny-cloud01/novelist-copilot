@@ -90,7 +90,37 @@ def test_gateway_seed_project_and_planning_flow() -> None:
     assert sections_payload["asset_options"][0]["asset_id"] == "01JZASSET000000000000001"
 
 
-def test_gateway_create_chapter_plan_and_sections() -> None:
+def test_gateway_story_bible_detail_and_review_actions() -> None:
+    client = make_client()
+
+    project_response = client.post(
+        "/v1/novel-projects",
+        json={
+            "title": "网关故事圣经流转项目",
+            "genre_scope": "东方玄幻",
+        },
+        headers={"x-request-id": "req-gateway-story-bible", "x-trace-id": "trace-gateway-story-bible"},
+    )
+
+    assert project_response.status_code == 202
+    story_bible_id = project_response.json()["data"]["story_bible"]["story_bible_id"]
+
+    detail_response = client.get(f"/v1/story-bibles/{story_bible_id}")
+    reject_response = client.post(
+        f"/v1/story-bibles/{story_bible_id}/review-actions",
+        json={"action": "reject", "note": "候选版本需重做。"},
+        headers={"x-request-id": "req-gateway-story-bible-reject", "x-trace-id": "trace-gateway-story-bible-reject"},
+    )
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["data"]["story_bible_id"] == story_bible_id
+    assert reject_response.status_code == 200
+    rejected = reject_response.json()["data"]
+    assert rejected["status"] == "rejected"
+    assert rejected["history"][-1]["change_type"] == "reject"
+    assert reject_response.json()["meta"]["trace_id"] == "trace-gateway-story-bible-reject"
+
+
     client = make_client()
 
     create_plan = client.post(

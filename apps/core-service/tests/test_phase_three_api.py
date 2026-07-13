@@ -87,7 +87,67 @@ def test_get_seed_project_detail() -> None:
     assert payload["chapter_plans"][0]["chapter_index"] == 1
 
 
-def test_create_and_fetch_chapter_plan_and_section_plans() -> None:
+def test_story_bible_detail_and_review_actions() -> None:
+    client = make_client()
+
+    project_response = client.post(
+        "/v1/novel-projects",
+        json={
+            "title": "故事圣经流转项目",
+            "genre_scope": "东方玄幻",
+        },
+        headers={"x-request-id": "req-story-bible", "x-trace-id": "trace-story-bible"},
+    )
+
+    assert project_response.status_code == 202
+    story_bible = project_response.json()["data"]["story_bible"]
+    story_bible_id = story_bible["story_bible_id"]
+
+    detail_response = client.get(f"/v1/story-bibles/{story_bible_id}")
+    regenerate_response = client.post(
+        f"/v1/story-bibles/{story_bible_id}/review-actions",
+        json={
+            "action": "regenerate",
+            "summary": "补强世界规则与叙事承诺。",
+            "note": "加入项目级原创边界。",
+            "story_bible_payload": {
+                "premise": "少年踏入失序宗门后重建秩序。",
+                "protagonist": "林澈",
+                "core_conflict": "底层弟子与宗门旧规之间的成长冲突。",
+                "style_target": "克制、证据充分、节奏稳步升级。",
+                "forbidden_similarities": "不复刻原作人物名、外挂和名场面。",
+                "world_rules": ["所有突破都要付出明确代价。"],
+                "narrative_promises": ["前三章完成受压、立誓与破局线索。"],
+            },
+        },
+        headers={"x-request-id": "req-story-bible-regenerate", "x-trace-id": "trace-story-bible-regenerate"},
+    )
+    confirm_response = client.post(
+        f"/v1/story-bibles/{story_bible_id}/review-actions",
+        json={"action": "confirm", "summary": "确认候选版本。"},
+        headers={"x-request-id": "req-story-bible-confirm", "x-trace-id": "trace-story-bible-confirm"},
+    )
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["data"]["status"] == "draft"
+    assert detail_response.json()["data"]["history"][0]["change_type"] == "create"
+
+    assert regenerate_response.status_code == 200
+    regenerated = regenerate_response.json()["data"]
+    assert regenerated["status"] == "pending_review"
+    assert regenerated["version"] == 2
+    assert regenerated["diff"]["summary"] == "补强世界规则与叙事承诺。"
+    assert "world_rules" in regenerated["diff"]["changed_fields"]
+    assert regenerated["history"][-1]["change_type"] == "regenerate"
+
+    assert confirm_response.status_code == 200
+    confirmed = confirm_response.json()["data"]
+    assert confirmed["status"] == "approved"
+    assert confirmed["diff"] is None
+    assert confirmed["confirmed_payload"]["protagonist"] == "林澈"
+    assert confirmed["history"][-1]["change_type"] == "confirm"
+
+
     client = make_client()
 
     create_plan = client.post(

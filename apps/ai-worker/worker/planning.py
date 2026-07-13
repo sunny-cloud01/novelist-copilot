@@ -31,6 +31,7 @@ def build_create_chapter_plan_command(
     chapter_plan_id: str = CHAPTER_PLAN_ID,
     task_id: str = CHAPTER_PLAN_TASK_ID,
     trace_id: str = TRACE_ID,
+    dispatch_token: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -43,6 +44,7 @@ def build_create_chapter_plan_command(
         "chapter_index": 1,
         "target_word_count": 3200,
         "trace_id": trace_id,
+        "dispatch_token": dispatch_token,
         "requested_by": "core-service",
     }
 
@@ -51,6 +53,7 @@ def build_create_section_plans_command(
     chapter_plan_id: str = CHAPTER_PLAN_ID,
     task_id: str = SECTION_PLAN_TASK_ID,
     trace_id: str = TRACE_ID,
+    dispatch_token: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -61,6 +64,7 @@ def build_create_section_plans_command(
         "chapter_plan_id": chapter_plan_id,
         "section_count": 3,
         "trace_id": trace_id,
+        "dispatch_token": dispatch_token,
         "requested_by": "core-service",
     }
 
@@ -259,11 +263,12 @@ def run_create_chapter_plan(command: dict[str, Any]) -> dict[str, Any]:
         [f"object://chapter-plans/{chapter_plan_id}"],
         metrics,
         trace_id=command["trace_id"],
+        dispatch_token=command.get("dispatch_token"),
     )
     return {
         "schema_version": 1,
         "task_id": command["task_id"],
-        "status": "requires_review",
+        "status": task["status"] if task else "requires_review",
         "output_refs": task["output_refs"] if task else [f"object://chapter-plans/{chapter_plan_id}"],
         "metrics": metrics,
         "errors": [],
@@ -287,11 +292,12 @@ def run_create_section_plans(command: dict[str, Any]) -> dict[str, Any]:
         [f"object://section-plans/{item['section_plan_id']}" for item in items],
         metrics,
         trace_id=command["trace_id"],
+        dispatch_token=command.get("dispatch_token"),
     )
     return {
         "schema_version": 1,
         "task_id": command["task_id"],
-        "status": "succeeded",
+        "status": task["status"] if task else "succeeded",
         "output_refs": task["output_refs"] if task else [f"object://section-plans/{item['section_plan_id']}" for item in items],
         "metrics": metrics,
         "errors": [],

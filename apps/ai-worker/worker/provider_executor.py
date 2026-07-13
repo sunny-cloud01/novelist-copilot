@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
+import os
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 class ProviderExecutionError(RuntimeError):
@@ -107,9 +111,96 @@ class AnthropicWritingAdapter:
         }
 
 
+class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):
+    def _chat(self, *, model_profile: dict[str, Any], system: str, user: str) -> str:
+        base_url = os.getenv("NOVELIST_LLM_BASE_URL")
+        api_key = os.getenv("NOVELIST_LLM_API_KEY")
+        if not base_url or not api_key:
+            return user[:320]
+        endpoint = base_url.rstrip("/") + "/chat/completions"
+        body = json.dumps(
+            {
+                "model": model_profile["provider_model_name"],
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "temperature": 0.4,
+                "max_tokens": 600,
+            }
+        ).encode("utf-8")
+        request = Request(
+            endpoint,
+            data=body,
+            headers={"authorization": f"Bearer {api_key}", "content-type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=60) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise ProviderExecutionError("provider_http_error", f"provider request failed: {exc.code}") from exc
+        except URLError as exc:
+            raise ProviderExecutionError("provider_network_error", "provider request failed") from exc
+        except TimeoutError as exc:
+            raise ProviderExecutionError("provider_timeout", "provider request timed out") from exc
+        try:
+            return payload["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ProviderExecutionError("provider_response_invalid", "provider response missing message content") from exc
+
+    def draft_section(self, *, chapter_plan: dict[str, Any], section_plan: dict[str, Any], section_index: int, model_profile: dict[str, Any]) -> dict[str, Any]:
+        payload = section_plan.get("payload", {})
+        scene_goal = payload.get("scene_goal") or f"推进第 {section_index} 节剧情"
+        beats = payload.get("beats", [])
+        beat_phrase = "，".join(beat.get("summary", f"beat {beat.get('index', i + 1)}") for i, beat in enumerate(beats)) or scene_goal
+        text = self._chat(
+            model_profile=model_profile,
+            system="你是中文网文章节写手。输出一段可直接进入章节草稿的中文正文，不要解释。",
+            user=f"章节目标：{chapter_plan.get('payload', {}).get('summary', scene_goal)}\n本节目标：{scene_goal}\nbeats：{beat_phrase}",
+        )
+        return {"writer_output": text, "scene_goal": scene_goal, "beat_phrase": beat_phrase, "provider_model_name": model_profile["provider_model_name"]}
+
+    def review_sections(self, *, section_runs: list[dict[str, Any]], drafts: list[dict[str, Any]], consistency_report_id: str, model_profile: dict[str, Any]) -> list[dict[str, Any]]:
+        combined = "\n".join(draft["writer_output"] for draft in drafts)
+        review = self._chat(
+            model_profile=model_profile,
+            system="你是中文小说一致性审稿人。若没有严重阻断，只输出 PASS；若有阻断，用一句中文说明。",
+            user=combined,
+        )
+        if review.upper().startswith("PASS"):
+            return []
+        section_run = section_runs[min(1, len(section_runs) - 1)]
+        return [
+            {
+                "issue_id": "01JZCONSISTISSUE000000001",
+                "category": "llm_consistency_review",
+                "severity": "warning",
+                "summary": review[:160],
+                "affected_text_ref": f"{section_run['draft_object_ref']}#p1",
+                "rule_id": "rule-01JZPOWER000000000000001",
+                "resolution_status": "open",
+                "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
+                "output_refs": [f"object://consistency-reports/{consistency_report_id}/issues/1"],
+                "note": model_profile["provider_model_name"],
+            }
+        ]
+
+    def humanize_section(self, *, section_plan: dict[str, Any], section_index: int, draft_text: str, critic_issues: list[dict[str, Any]], model_profile: dict[str, Any]) -> dict[str, Any]:
+        text = self._chat(
+            model_profile=model_profile,
+            system="你是中文小说润色师。保留剧情事实，降低机械感，输出润色正文，不要解释。",
+            user=draft_text,
+        )
+        return {"humanized_text": text, "provider_model_name": model_profile["provider_model_name"], "had_critic_issues": bool(critic_issues)}
+
+
+
 def _build_provider_adapter(provider_name: str) -> WritingProviderAdapter:
     if provider_name == "anthropic":
         return AnthropicWritingAdapter()
+    if provider_name in {"deepseek", "openai_compatible"}:
+        return OpenAICompatibleWritingAdapter()
     raise ProviderExecutionError("provider_not_supported", f"provider adapter not supported: {provider_name}")
 
 

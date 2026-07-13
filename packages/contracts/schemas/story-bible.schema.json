@@ -3,6 +3,93 @@
   "$id": "https://novelfactory.dev/schemas/story-bible.schema.json",
   "title": "StoryBible",
   "type": "object",
+  "$defs": {
+    "storyBiblePayload": {
+      "type": "object",
+      "required": [
+        "premise",
+        "protagonist",
+        "core_conflict",
+        "style_target",
+        "forbidden_similarities",
+        "world_rules",
+        "narrative_promises"
+      ],
+      "properties": {
+        "premise": { "type": "string", "minLength": 1 },
+        "protagonist": { "type": "string", "minLength": 1 },
+        "core_conflict": { "type": "string", "minLength": 1 },
+        "style_target": { "type": "string", "minLength": 1 },
+        "forbidden_similarities": { "type": "string", "minLength": 1 },
+        "world_rules": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "narrative_promises": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "storyBibleDiff": {
+      "type": "object",
+      "required": ["from_version", "to_version", "changed_fields", "changes", "summary"],
+      "properties": {
+        "from_version": { "type": ["integer", "null"], "minimum": 1 },
+        "to_version": { "type": "integer", "minimum": 1 },
+        "changed_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "before", "after"],
+            "properties": {
+              "field": { "type": "string", "minLength": 1 },
+              "before": {},
+              "after": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "storyBibleHistoryEntry": {
+      "type": "object",
+      "required": [
+        "version",
+        "status",
+        "change_type",
+        "payload",
+        "changed_fields",
+        "summary",
+        "trace_id",
+        "actor_id",
+        "created_at"
+      ],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "status": { "type": "string", "enum": ["draft", "pending_review", "approved", "rejected"] },
+        "change_type": { "type": "string", "enum": ["create", "update", "regenerate", "confirm", "reject"] },
+        "payload": { "$ref": "#/$defs/storyBiblePayload" },
+        "changed_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "note": { "type": ["string", "null"] },
+        "trace_id": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string", "minLength": 1 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  },
   "required": [
     "schema_version",
     "story_bible_id",
@@ -11,6 +98,7 @@
     "version",
     "status",
     "payload",
+    "history",
     "trace_id",
     "created_at"
   ],
@@ -20,9 +108,27 @@
     "workspace_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
     "version": { "type": "integer", "minimum": 1 },
-    "status": { "type": "string", "enum": ["draft", "approved", "rejected"] },
-    "payload": { "type": "object" },
+    "status": { "type": "string", "enum": ["draft", "pending_review", "approved", "rejected"] },
+    "payload": { "$ref": "#/$defs/storyBiblePayload" },
+    "confirmed_payload": {
+      "anyOf": [
+        { "$ref": "#/$defs/storyBiblePayload" },
+        { "type": "null" }
+      ]
+    },
+    "diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/storyBibleDiff" },
+        { "type": "null" }
+      ]
+    },
+    "history": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/storyBibleHistoryEntry" }
+    },
     "trace_id": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": ["string", "null"], "format": "date-time" },
+    "approved_by": { "type": ["string", "null"], "minLength": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": ["string", "null"], "format": "date-time" }
   },

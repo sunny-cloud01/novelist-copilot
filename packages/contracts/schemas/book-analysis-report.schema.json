@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novelfactory.dev/schemas/book-analysis-report.schema.json",
+  "title": "BookAnalysisReport",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "book",
+    "run",
+    "chapters",
+    "summary",
+    "exceptions",
+    "evidence_samples",
+    "knowledge_objects",
+    "scenes",
+    "events",
+    "conflicts",
+    "hooks",
+    "rewards",
+    "climaxes",
+    "relationships"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "book": {
+      "$ref": "https://novelfactory.dev/schemas/source-book.schema.json"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "$ref": "https://novelfactory.dev/schemas/extraction-run.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/source-chapter.schema.json"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "book_id",
+        "status",
+        "current_stage",
+        "chapter_count",
+        "scene_count",
+        "knowledge_object_count",
+        "evidence_count",
+        "pattern_count",
+        "rhythm_profile_count",
+        "asset_count",
+        "rule_count",
+        "needs_attention_count",
+        "can_commit_knowledge",
+        "event_count",
+        "conflict_count",
+        "hook_count",
+        "reward_count",
+        "climax_count",
+        "relationship_count"
+      ],
+      "properties": {
+        "book_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chapter_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scene_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "knowledge_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pattern_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rhythm_profile_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "asset_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rule_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "needs_attention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "can_commit_knowledge": {
+          "type": "boolean"
+        },
+        "event_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conflict_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hook_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reward_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "climax_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relationship_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "exception_id",
+          "type",
+          "severity",
+          "title",
+          "summary",
+          "target_ref",
+          "evidence_refs",
+          "recommended_action"
+        ],
+        "properties": {
+          "exception_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "blocking",
+              "critical"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "recommended_action": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence_samples": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/evidence.schema.json"
+      }
+    },
+    "knowledge_objects": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/knowledge-object.schema.json"
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/source-scene.schema.json"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/story-event.schema.json"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/story-conflict.schema.json"
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/story-hook.schema.json"
+      }
+    },
+    "rewards": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/story-reward.schema.json"
+      }
+    },
+    "climaxes": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/story-climax.schema.json"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "https://novelfactory.dev/schemas/relationship-edge.schema.json"
+      }
+    }
+  },
+  "additionalProperties": false
+}

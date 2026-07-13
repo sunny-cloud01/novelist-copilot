@@ -21,7 +21,12 @@
       "type": "string",
       "enum": ["pending", "segmented", "review_required", "failed"]
     },
-    "text_object_ref": { "type": ["string", "null"], "minLength": 1 }
+    "text_object_ref": { "type": ["string", "null"], "minLength": 1 },
+    "text_range": { "type": ["string", "null"], "minLength": 1 },
+    "raw_text": { "type": ["string", "null"] },
+    "text_excerpt": { "type": ["string", "null"] },
+    "created_at": { "type": ["string", "null"], "format": "date-time" },
+    "updated_at": { "type": ["string", "null"], "format": "date-time" }
   },
   "additionalProperties": false
 }

@@ -41,6 +41,7 @@ def build_create_writing_run_command(
     writing_run_id: str = WRITING_RUN_ID,
     task_id: str = WRITING_TASK_ID,
     trace_id: str = TRACE_ID,
+    dispatch_token: str | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -55,6 +56,7 @@ def build_create_writing_run_command(
         "critic_model_profile_id": MODEL_PROFILE_DEFAULT_ID,
         "humanizer_model_profile_id": MODEL_PROFILE_DEFAULT_ID,
         "trace_id": trace_id,
+        "dispatch_token": dispatch_token,
         "requested_by": "core-service",
     }
 
@@ -377,11 +379,12 @@ def run_create_writing_run(command: dict[str, Any]) -> dict[str, Any]:
             trace_id=command["trace_id"],
             request_id=request_id,
             actor_id=actor_id,
+            dispatch_token=command.get("dispatch_token"),
         )
         return {
             "schema_version": 1,
             "task_id": command["task_id"],
-            "status": "failed",
+            "status": task["status"] if task else "failed",
             "output_refs": task["output_refs"] if task else [f"object://writing-runs/{writing_run_id}"],
             "metrics": metrics,
             "errors": [str(exc)],
@@ -521,11 +524,12 @@ def run_create_writing_run(command: dict[str, Any]) -> dict[str, Any]:
         trace_id=command["trace_id"],
         request_id=request_id,
         actor_id=actor_id,
+        dispatch_token=command.get("dispatch_token"),
     )
     return {
         "schema_version": 1,
         "task_id": command["task_id"],
-        "status": status,
+        "status": task["status"] if task else status,
         "output_refs": task["output_refs"] if task else [f"object://writing-runs/{writing_run_id}"],
         "metrics": metrics,
         "errors": [],
