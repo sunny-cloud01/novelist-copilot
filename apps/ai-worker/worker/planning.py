@@ -302,10 +302,61 @@ def run_create_chapter_plan(command: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _generate_section_plans(chapter_plan: dict[str, Any], story_bible: dict[str, Any] | None, knowledge_context: str, section_count: int, workspace_id: str) -> list[dict[str, Any]]:
+    chapter_plan_id = chapter_plan["chapter_plan_id"]
+    chapter_summary = chapter_plan.get("payload", {}).get("summary", "")
+    protagonist = (story_bible or {}).get("payload", {}).get("protagonist", "主角")
+    core_conflict = (story_bible or {}).get("payload", {}).get("core_conflict", "")
+    roles = ["setup", "conflict", "turn"]
+    knowledge_block = f"\n【可用拆书知识】\n{knowledge_context}\n" if knowledge_context.strip() else ""
+    generated = generate_json(
+        system="你是中文网文分节规划师。为本章输出 setup/conflict/turn 三段分节，每段含 scene_goal 与 2 个 beats。只输出 JSON：{\"sections\":[{\"scene_goal\":\"\",\"beats\":[\"\",\"\"]}]}，不要解释。",
+        user=f"本章摘要：{chapter_summary}\n主角：{protagonist}\n核心冲突：{core_conflict}{knowledge_block}",
+    )
+    gen_sections = generated.get("sections") if isinstance(generated, dict) else None
+    now = utc_now()
+    items: list[dict[str, Any]] = []
+    for index in range(1, section_count + 1):
+        role = roles[min(index - 1, len(roles) - 1)]
+        gen = gen_sections[index - 1] if isinstance(gen_sections, list) and len(gen_sections) >= index and isinstance(gen_sections[index - 1], dict) else None
+        if gen and str(gen.get("scene_goal", "")).strip():
+            scene_goal = str(gen["scene_goal"]).strip()
+            raw_beats = gen.get("beats", []) if isinstance(gen.get("beats"), list) else []
+            beats = [{"index": bi + 1, "summary": str(b).strip()} for bi, b in enumerate(raw_beats) if str(b).strip()] or [{"index": 1, "summary": scene_goal}]
+        else:
+            phase = {"setup": "铺垫", "conflict": "冲突升级", "turn": "转折"}[role]
+            scene_goal = f"{protagonist}在本节推进{core_conflict or chapter_summary or '主线'}的{phase}"
+            beats = [
+                {"index": 1, "summary": f"{protagonist}面对{phase}情境"},
+                {"index": 2, "summary": f"{phase}推动局势变化"},
+            ]
+        items.append({
+            "schema_version": 1,
+            "section_plan_id": f"{chapter_plan_id}SEC{index}",
+            "workspace_id": workspace_id,
+            "chapter_plan_id": chapter_plan_id,
+            "section_index": index,
+            "planning_role": role,
+            "payload": {"scene_goal": scene_goal, "beats": beats},
+            "created_at": now,
+            "updated_at": now,
+        })
+    return items
+
+
 def run_create_section_plans(command: dict[str, Any]) -> dict[str, Any]:
     store = load_phase_two_store()
     chapter_plan_id = command["chapter_plan_id"]
     items = store.STORE.section_plans_by_chapter.get(chapter_plan_id, [])
+    if not items:
+        chapter_plan = store.STORE.chapter_plans.get(chapter_plan_id)
+        if chapter_plan:
+            project = store.STORE.novel_projects.get(chapter_plan.get("project_id"))
+            story_bible = store.STORE.story_bibles.get(project["story_bible_id"]) if project else None
+            allowed_refs = project.get("allowed_knowledge_source_refs", []) if project else []
+            knowledge = store.build_knowledge_context(allowed_refs)
+            items = _generate_section_plans(chapter_plan, story_bible, knowledge["context_text"], command.get("section_count", 3), command["workspace_id"])
+            store.STORE.section_plans_by_chapter[chapter_plan_id] = items
     metrics = {
         "planning_stages": PLANNING_STAGES,
         "current_stage": "quality_review",
