@@ -77,6 +77,14 @@ def test_novel_project_requires_editor_or_owner() -> None:
 
 def test_get_seed_project_detail() -> None:
     client = make_client()
+    from app.core import phase_two_store as store
+    # Ensure seed story bible is restored to approved status without persisting
+    # (guards against snapshot pollution from other tests)
+    if store.STORY_BIBLE_ID in store.STORE.story_bibles:
+        sb = store.STORE.story_bibles[store.STORY_BIBLE_ID]
+        if sb.get("status") != "approved":
+            sb["status"] = "approved"
+            sb["diff"] = None
 
     response = client.get("/v1/novel-projects/01JZPROJECT000000000000001")
 
@@ -360,10 +368,15 @@ def test_story_bible_regenerate_without_payload_generates_candidate():
     from app.core import phase_two_store as store
     store.reset_store()
     store.seed_phase_two_demo_data()
-    sb_id = store.STORY_BIBLE_ID
-    before = store.STORE.story_bibles[sb_id]["payload"]["world_rules"][:]
+    # 创建一个独立新项目，不污染 seed STORY_BIBLE_ID
+    result_project = store.create_novel_project(
+        {"title": "再生候选测试项目", "genre_scope": "东方玄幻"},
+        trace_id="trace-regen-test",
+    )
+    sb_id = result_project["story_bible"]["story_bible_id"]
+    before_world_rules = store.STORE.story_bibles[sb_id]["payload"]["world_rules"][:]
     result = store.apply_story_bible_action(sb_id, "regenerate", payload={"summary": "补强世界规则"})
     assert result["status"] == "pending_review"
     assert result["diff"]["changed_fields"]  # 有变化，非原样回写
-    after = store.STORE.story_bibles[sb_id]["payload"]["world_rules"]
-    assert after != before or result["diff"]["changed_fields"]
+    after_world_rules = store.STORE.story_bibles[sb_id]["payload"]["world_rules"]
+    assert after_world_rules != before_world_rules or result["diff"]["changed_fields"]
