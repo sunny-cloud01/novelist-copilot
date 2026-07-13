@@ -729,3 +729,28 @@ def test_business_tables_round_trip_without_snapshot(monkeypatch) -> None:
                 )
                 cursor.execute(f'DROP DATABASE IF EXISTS "{database}"')
 
+
+
+def test_apply_task_result_persists_graph_node_details():
+    from app.core import phase_two_store as store
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    run_id = store.RUN_ID
+    run = store.STORE.extraction_runs[run_id]
+    task_id = run["task"]["task_id"]
+    # Force task into running state so apply_task_execution_result passes the dispatch guard
+    run["task"]["status"] = "running"
+    run["task"]["lease_owner"] = "test-worker"
+    metrics = {
+        "graph_summary": {"schema_version": 1, "book_id": run["book_id"], "node_count": 1, "edge_count": 0,
+                          "nodes": [{"node_id": "NEWNODE1", "label": "萧宁", "node_type": "character", "evidence_refs": []}]},
+        "graph_node_details": {"NEWNODE1": {"schema_version": 1, "node_id": "NEWNODE1", "book_id": run["book_id"],
+                              "label": "萧宁", "node_type": "character", "canonical_object_id": "OBJ1",
+                              "review_status": "pending", "lifecycle_status": "candidate", "confidence": 0.6,
+                              "aliases": [], "summary": "少年", "evidence_refs": []}},
+        "graph_neighbors_by_node": {"NEWNODE1": []},
+    }
+    store.apply_task_execution_result(task_id, "requires_review", run["task"]["output_refs"], metrics,
+                                      trace_id="t", dispatch_token=run["task"].get("dispatch_token"))
+    assert store.get_graph_node("NEWNODE1") is not None
+    assert store.list_graph_neighbors("NEWNODE1") == {"node_id": "NEWNODE1", "items": []}

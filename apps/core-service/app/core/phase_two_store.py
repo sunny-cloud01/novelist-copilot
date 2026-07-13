@@ -5116,6 +5116,22 @@ def apply_task_execution_result(
                     setattr(STORE, field_name, deepcopy(deep_analysis[field_name]))
             if graph_summary is not None:
                 STORE.graph_summaries[run["book_id"]] = deepcopy(graph_summary)
+            node_details = metrics.get("graph_node_details")
+            neighbors_map = metrics.get("graph_neighbors_by_node")
+            if node_details is not None:
+                book_id = run["book_id"]
+                stale_nodes = [
+                    node_id for node_id, node in STORE.graph_node_details.items()
+                    if node.get("book_id") == book_id
+                ]
+                for node_id in stale_nodes:
+                    STORE.graph_node_details.pop(node_id, None)
+                    STORE.graph_neighbors_by_node.pop(node_id, None)
+                for node_id, node in node_details.items():
+                    STORE.graph_node_details[node_id] = deepcopy(node)
+                if neighbors_map is not None:
+                    for node_id, items in neighbors_map.items():
+                        STORE.graph_neighbors_by_node[node_id] = deepcopy(items)
     elif task_kind == "chapter_plan":
         chapter_plan = STORE.chapter_plans.get(entity_id)
         if chapter_plan:
