@@ -73,46 +73,8 @@ def build_extraction_fixture(command: dict[str, Any]) -> dict[str, Any]:
     run_id = run_ref.rsplit("/", 1)[-1]
     book_id = book_ref.rsplit("/", 1)[-1]
 
-    low_confidence_items = [
-        {
-            "schema_version": 1,
-            "object_id": "01JZOBJ0000000000000000001",
-            "workspace_id": command["workspace_id"],
-            "object_type": "character",
-            "canonical_name": "Xiao Yan",
-            "lifecycle_status": "candidate",
-            "review_status": "pending",
-            "confidence": 0.58,
-            "evidence_refs": ["evidence://01JZEVIDENCE0000000000001"],
-            "payload": {"schema_version": 1, "aliases": ["Yan"]},
-        },
-        {
-            "schema_version": 1,
-            "object_id": "01JZOBJ0000000000000000002",
-            "workspace_id": command["workspace_id"],
-            "object_type": "mentor",
-            "canonical_name": "Yao Lao",
-            "lifecycle_status": "candidate",
-            "review_status": "pending",
-            "confidence": 0.44,
-            "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"],
-            "payload": {"schema_version": 1, "aliases": ["Old Yao"]},
-        },
-    ]
-    approved_items = [
-        {
-            "schema_version": 1,
-            "object_id": "01JZOBJ0000000000000000003",
-            "workspace_id": command["workspace_id"],
-            "object_type": "clan",
-            "canonical_name": "Xiao Clan",
-            "lifecycle_status": "approved",
-            "review_status": "approved",
-            "confidence": 0.97,
-            "evidence_refs": ["evidence://01JZEVIDENCE0000000000003"],
-            "payload": {"schema_version": 1, "aliases": []},
-        }
-    ]
+    low_confidence_items: list[dict[str, Any]] = []
+    approved_items: list[dict[str, Any]] = []
 
     knowledge_package_ref = f"object://knowledge-packages/{run_id}"
     graph_package_ref = f"object://graph-packages/{book_id}"
@@ -131,9 +93,9 @@ def build_extraction_fixture(command: dict[str, Any]) -> dict[str, Any]:
             "current_stage": "quality_review",
             "chapter_count": 2,
             "scene_count": 6,
-            "object_count": 3,
-            "evidence_count": 3,
-            "low_confidence_count": 2,
+            "object_count": 0,
+            "evidence_count": 0,
+            "low_confidence_count": 0,
             "knowledge_package_ref": knowledge_package_ref,
             "graph_package_ref": graph_package_ref,
             "extraction_report_ref": extraction_report_ref,
@@ -196,28 +158,9 @@ def build_extraction_fixture(command: dict[str, Any]) -> dict[str, Any]:
         "graph_summary": {
             "schema_version": 1,
             "book_id": book_id,
-            "node_count": 3,
-            "edge_count": 2,
-            "nodes": [
-                {
-                    "node_id": "01JZNODE000000000000000001",
-                    "label": "Xiao Yan",
-                    "node_type": "character",
-                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000001"],
-                },
-                {
-                    "node_id": "01JZNODE000000000000000002",
-                    "label": "Yao Lao",
-                    "node_type": "mentor",
-                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000002"],
-                },
-                {
-                    "node_id": "01JZNODE000000000000000003",
-                    "label": "Xiao Clan",
-                    "node_type": "clan",
-                    "evidence_refs": ["evidence://01JZEVIDENCE0000000000003"],
-                },
-            ],
+            "node_count": 0,
+            "edge_count": 0,
+            "nodes": [],
         },
     }
 
@@ -504,6 +447,78 @@ def _aggregate_entities(
     return objects
 
 
+def _build_graph_from_analysis(
+    knowledge_objects: list[dict[str, Any]],
+    relationship_edges: dict[str, dict[str, Any]],
+    book_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    node_by_object: dict[str, str] = {}
+    node_details: dict[str, dict[str, Any]] = {}
+    summary_nodes: list[dict[str, Any]] = []
+    for index, obj in enumerate(knowledge_objects, start=1):
+        node_id = f"{run_id}NODE{index:03d}"
+        node_by_object[obj["object_id"]] = node_id
+        aliases = obj.get("payload", {}).get("aliases", [])
+        node_details[node_id] = {
+            "schema_version": 1,
+            "node_id": node_id,
+            "book_id": book_id,
+            "label": obj["canonical_name"],
+            "node_type": obj["object_type"],
+            "canonical_object_id": obj["object_id"],
+            "review_status": obj.get("review_status", "pending"),
+            "lifecycle_status": obj.get("lifecycle_status", "candidate"),
+            "confidence": obj.get("confidence", 0.5),
+            "aliases": aliases,
+            "summary": obj.get("payload", {}).get("summary", f"{obj['canonical_name']} 相关对象。"),
+            "evidence_refs": obj.get("evidence_refs", []),
+        }
+        summary_nodes.append({
+            "node_id": node_id,
+            "label": obj["canonical_name"],
+            "node_type": obj["object_type"],
+            "evidence_refs": obj.get("evidence_refs", []),
+        })
+
+    def _resolve_node(ref: str) -> str | None:
+        object_id = ref.rsplit("/", 1)[-1] if isinstance(ref, str) else ref
+        return node_by_object.get(object_id)
+
+    neighbors: dict[str, list[dict[str, Any]]] = {node_id: [] for node_id in node_details}
+    edge_count = 0
+    for edge in relationship_edges.values():
+        source_node = _resolve_node(edge.get("source_id"))
+        target_node = _resolve_node(edge.get("target_id"))
+        if not source_node or not target_node or source_node == target_node:
+            continue
+        edge_count += 1
+        relation = edge.get("relation_type", "related_to")
+        confidence = edge.get("confidence", 0.7)
+        evidence_refs = edge.get("evidence_refs", [])
+        neighbors[source_node].append({
+            "edge_id": edge["edge_id"], "relation_type": relation, "direction": "outgoing",
+            "neighbor_node_id": target_node, "neighbor_label": node_details[target_node]["label"],
+            "neighbor_type": node_details[target_node]["node_type"], "confidence": confidence,
+            "evidence_refs": evidence_refs,
+        })
+        neighbors[target_node].append({
+            "edge_id": edge["edge_id"], "relation_type": relation, "direction": "incoming",
+            "neighbor_node_id": source_node, "neighbor_label": node_details[source_node]["label"],
+            "neighbor_type": node_details[source_node]["node_type"], "confidence": confidence,
+            "evidence_refs": evidence_refs,
+        })
+
+    return {
+        "summary": {
+            "schema_version": 1, "book_id": book_id,
+            "node_count": len(summary_nodes), "edge_count": edge_count, "nodes": summary_nodes,
+        },
+        "node_details": node_details,
+        "neighbors": neighbors,
+    }
+
+
 def _build_chapter_prompt(chapter: dict[str, Any]) -> str:
     chapter_index = chapter.get("chapter_index", 1)
     raw_text = (chapter.get("raw_text") or chapter.get("text_excerpt") or "")[:6000]
@@ -511,6 +526,7 @@ def _build_chapter_prompt(chapter: dict[str, Any]) -> str:
         "按小说结构分析当前章节。只输出 JSON 对象，不要解释。\n"
         "JSON 结构：{\n"
         '  "summary": "章节摘要",\n'
+        '  "entities": [{"name": "人物或势力名", "type": "character|clan|mentor|faction|location", "aliases": ["别名"], "confidence": 0.0, "summary": "一句话说明"}],\n'
         '  "scenes": [\n'
         "    {\n"
         '      "title": "场景标题",\n'
@@ -904,24 +920,17 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
                 "chapter_index": chapter["chapter_index"],
                 "text_range": chapter.get("text_range") or f"c{chapter['chapter_index']}:p1-p1",
                 "excerpt": (chapter.get("text_excerpt") or chapter.get("raw_text") or source_content["content"])[:160],
-                "source_object_refs": [f"object://knowledge-objects/{fixture['knowledge_objects'][min(index - 1, len(fixture['knowledge_objects']) - 1)]['object_id']}"],
+                "source_object_refs": [source_content["object_ref"]],
                 "source_content_ref": source_content["object_ref"],
                 "confidence": 0.82 if index == 1 else 0.76,
                 "trace_id": command["trace_id"],
             }
             for index, chapter in enumerate(chapters[:3], start=1)
         ]
-        for index, item in enumerate(fixture["knowledge_objects"]):
-            if evidences:
-                item["evidence_refs"] = [evidences[min(index, len(evidences) - 1)]["evidence_ref"]]
-        fixture["graph_summary"]["nodes"] = [
-            {**node, "evidence_refs": fixture["knowledge_objects"][min(index, len(fixture["knowledge_objects"]) - 1)].get("evidence_refs", node["evidence_refs"])}
-            for index, node in enumerate(fixture["graph_summary"]["nodes"])
-        ]
-
     deep_analysis = {"scenes_by_chapter": {}, "events_by_scene": {}, "conflicts": {}, "hooks": {}, "rewards": {}, "climaxes": {}, "relationship_edges": {}}
     model_profile, provider_calls, assignment = _resolve_extraction_profile(store)
     provider_used = False
+    entity_lists: list[list[dict[str, Any]]] = []
 
     if chapters:
         for index, chapter in enumerate(chapters[:3], start=1):
@@ -940,6 +949,10 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
                 knowledge_objects=fixture["knowledge_objects"],
             )
             provider_used = provider_used or used_provider
+            raw_entities = chapter_analysis.get("entities") if isinstance(chapter_analysis.get("entities"), list) else []
+            if not raw_entities:
+                raw_entities = _extract_entity_candidates(chapter)
+            entity_lists.append(raw_entities)
             normalized = _normalize_chapter_analysis(
                 run_id=run_id,
                 book_id=book_id,
@@ -959,10 +972,19 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
             deep_analysis["climaxes"].update(normalized["climaxes"])
             deep_analysis["relationship_edges"].update(normalized["relationships"])
 
+    knowledge_objects = _aggregate_entities(entity_lists, run_id=run_id, workspace_id=command["workspace_id"]) if entity_lists else []
+    # 绑证据到真实对象
+    for obj_index, obj in enumerate(knowledge_objects):
+        if evidences:
+            obj["evidence_refs"] = [evidences[min(obj_index, len(evidences) - 1)]["evidence_ref"]]
+    graph = _build_graph_from_analysis(
+        knowledge_objects, deep_analysis["relationship_edges"], book_id=book_id, run_id=run_id,
+    )
+
     scene_count = sum(len(items) for items in deep_analysis["scenes_by_chapter"].values())
-    object_count = len(fixture["knowledge_objects"])
+    object_count = len(knowledge_objects)
     low_confidence_count = len([
-        item for item in fixture["knowledge_objects"]
+        item for item in knowledge_objects
         if item.get("review_status") == "pending" and item.get("confidence", 1) < 0.8
     ])
     metrics = {
@@ -977,8 +999,10 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
         "graph_package_ref": fixture["run"]["graph_package_ref"],
         "extraction_report_ref": fixture["run"]["extraction_report_ref"],
         "quality_report_ref": fixture["run"]["quality_report_ref"],
-        "graph_summary": fixture["graph_summary"],
-        "knowledge_objects": fixture["knowledge_objects"],
+        "graph_summary": graph["summary"],
+        "knowledge_objects": knowledge_objects,
+        "graph_node_details": graph["node_details"],
+        "graph_neighbors_by_node": graph["neighbors"],
         "evidences": evidences,
         "deep_analysis": deep_analysis,
         "provider_calls": provider_calls,

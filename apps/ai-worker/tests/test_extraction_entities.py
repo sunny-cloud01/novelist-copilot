@@ -1,4 +1,63 @@
-from worker.extraction import _extract_entity_candidates, _aggregate_entities
+from worker.extraction import _extract_entity_candidates, _aggregate_entities, _build_graph_from_analysis
+
+
+def test_build_graph_from_analysis_links_relationships():
+    objects = [
+        {"object_id": "RUN1OBJ001", "canonical_name": "萧宁", "object_type": "character",
+         "confidence": 0.9, "review_status": "pending", "lifecycle_status": "candidate",
+         "evidence_refs": ["evidence://E1"], "payload": {"aliases": ["宁"], "summary": "少年"}},
+        {"object_id": "RUN1OBJ002", "canonical_name": "云岚宗", "object_type": "faction",
+         "confidence": 0.8, "review_status": "pending", "lifecycle_status": "candidate",
+         "evidence_refs": ["evidence://E2"], "payload": {"aliases": [], "summary": "宗门"}},
+    ]
+    edges = {
+        "RUN1RELATION0101": {
+            "edge_id": "RUN1RELATION0101",
+            "source_id": "object://knowledge-objects/RUN1OBJ001",
+            "target_id": "object://knowledge-objects/RUN1OBJ002",
+            "relation_type": "pressured_by", "confidence": 0.7,
+            "evidence_refs": ["evidence://E1"],
+        }
+    }
+    graph = _build_graph_from_analysis(objects, edges, book_id="BOOK1", run_id="RUN1")
+    assert graph["summary"]["node_count"] == 2
+    assert graph["summary"]["edge_count"] == 1
+    node_ids = list(graph["node_details"].keys())
+    first = graph["node_details"][node_ids[0]]
+    assert first["label"] == "萧宁"
+    assert first["canonical_object_id"] == "RUN1OBJ001"
+    # 双向邻居
+    assert any(n["direction"] == "outgoing" for n in graph["neighbors"][node_ids[0]])
+    assert any(n["direction"] == "incoming" for n in graph["neighbors"][node_ids[1]])
+    assert "Xiao Yan" not in {d["label"] for d in graph["node_details"].values()}
+
+
+def test_run_extract_knowledge_produces_book_specific_objects(monkeypatch):
+    import worker.extraction as extraction
+
+    class FakeStore:
+        class STORE:  # noqa: N801
+            pass
+        def get_book_source_content(self, book_id):
+            return {"content": "萧宁进入云岚宗。云岚宗长老审视萧宁。", "object_ref": "object://source-contents/SC1"}
+        def list_book_chapters(self, book_id):
+            return [{"chapter_id": "CH1", "chapter_index": 1, "title": "云岚宗试炼",
+                     "raw_text": "萧宁进入云岚宗。云岚宗长老审视萧宁。萧宁沉默。云岚宗。"}]
+        def apply_task_execution_result(self, task_id, status, output_refs, metrics, **kwargs):
+            self.captured = metrics
+            return {"status": status, "output_refs": output_refs}
+
+    fake = FakeStore()
+    monkeypatch.setattr(extraction, "load_phase_two_store", lambda: fake)
+    monkeypatch.setattr(extraction, "_resolve_extraction_profile", lambda store: (None, [], None))
+    command = extraction.build_extract_knowledge_command(book_id="BOOK1", run_id="RUN1")
+    extraction.run_extract_knowledge(command)
+    objects = fake.captured["knowledge_objects"]
+    labels = {o["canonical_name"] for o in objects}
+    assert labels
+    assert "Xiao Yan" not in labels
+    assert "graph_node_details" in fake.captured
+    assert fake.captured["graph_summary"]["node_count"] == len(objects)
 
 
 def test_extract_entity_candidates_uses_chapter_title_not_hardcoded():
