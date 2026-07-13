@@ -225,7 +225,7 @@ def execute_writing_provider_pipeline(
                 "issue_id": issue["issue_id"],
                 "severity": issue["severity"],
                 "category": issue["category"],
-                "summary": "主角境界描写与已批准设定冲突，需回收并重写冲突升级段。",
+                "summary": issue.get("summary", "一致性问题待复核。"),
                 "affected_text_ref": issue["affected_text_ref"],
             }
             for issue in consistency_issues

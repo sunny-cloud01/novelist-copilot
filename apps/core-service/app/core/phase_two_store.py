@@ -3984,6 +3984,24 @@ def resolve_model_profile(
         profile = STORE.model_profiles.get(candidate_id)
         if not profile or not profile["enabled"]:
             continue
+        if assignment and assignment.get("max_cost") is not None:
+            est_cost = profile.get("est_cost", 0) or 0
+            if est_cost > assignment["max_cost"]:
+                retry_count += 1
+                provider_calls.append(
+                    _build_provider_call(
+                        agent_role,
+                        candidate_id,
+                        profile["provider_name"],
+                        "failed",
+                        retry_count,
+                        "cost_budget_exceeded",
+                        task_type=assignment["task_type"] if assignment else f"{agent_role}_task",
+                        assignment_id=assignment["assignment_id"] if assignment else None,
+                        fallback_from_call_id=provider_calls[-1]["provider_call_id"] if provider_calls else None,
+                    )
+                )
+                continue
         if require_structured_output and not profile["supports_structured_output"]:
             retry_count += 1
             provider_calls.append(

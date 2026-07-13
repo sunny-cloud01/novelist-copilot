@@ -112,3 +112,19 @@ def test_pipeline_writes_real_metrics_to_provider_calls(monkeypatch):
     assert writer_call["completion_tokens"] == 47
     assert writer_call["latency_ms"] == 321
     assert writer_call["cost_estimate_status"] == "measured"
+
+
+def test_critic_issue_summary_not_hardcoded(monkeypatch):
+    import worker.provider_executor as pe
+    from worker.provider_executor import AnthropicWritingAdapter
+    monkeypatch.setattr(AnthropicWritingAdapter, "_chat", lambda self, **k: {"text": "境界前后矛盾需修正", "prompt_tokens": 1, "completion_tokens": 1, "latency_ms": 1})
+    monkeypatch.setenv("NOVELIST_LLM_BASE_URL", "http://x")
+    monkeypatch.setenv("NOVELIST_LLM_API_KEY", "k")
+    # review_sections 有 key 时走真实判定，issue.summary 来自 review 文本，非写死斗破苍穹
+    adapter = AnthropicWritingAdapter()
+    issues = adapter.review_sections(
+        section_runs=[{"draft_object_ref": "object://d1"}, {"draft_object_ref": "object://d2"}],
+        drafts=[{"writer_output": "a"}, {"writer_output": "b"}],
+        consistency_report_id="CR1", model_profile={"provider_model_name": "m"},
+    )
+    assert all("主角境界描写与已批准设定冲突" not in str(i) for i in issues)

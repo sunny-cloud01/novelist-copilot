@@ -372,3 +372,17 @@ def test_build_knowledge_context_empty_refs_safe():
     context = store.build_knowledge_context([])
     assert context["context_text"] == ""
     assert context["objects"] == []
+
+
+def test_resolve_model_profile_skips_over_max_cost():
+    from app.core import phase_two_store as store
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    # 给 default profile 标一个高 est_cost，assignment max_cost 很低 → 跳过走 fallback
+    default_id = store.MODEL_PROFILE_DEFAULT_ID
+    store.STORE.model_profiles[default_id]["est_cost"] = 9.99
+    assignment = store._get_agent_assignment("writer")
+    assignment["max_cost"] = 0.5
+    result = store.resolve_model_profile("writer")
+    # 应跳过超成本的 default，落到 fallback（structured）或返回 None 记 failed call
+    assert result["selected_profile"] is None or result["selected_profile"]["model_profile_id"] != default_id
