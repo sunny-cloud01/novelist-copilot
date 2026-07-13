@@ -3311,6 +3311,67 @@ def list_knowledge_sources(workspace_id: Optional[str] = None, status: str = "co
     return items
 
 
+def build_knowledge_context(
+    allowed_knowledge_source_refs: list[str],
+    max_objects: int = 12,
+    max_evidence: int = 6,
+) -> dict[str, Any]:
+    objects: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    graph_nodes: list[dict[str, Any]] = []
+    source_labels: list[str] = []
+    for ref in allowed_knowledge_source_refs or []:
+        book_id = ref.rsplit("/", 1)[-1]
+        book = STORE.books.get(book_id)
+        if not book:
+            continue
+        source_labels.append(book.get("title", book_id))
+        run = _latest_extraction_run_for_book(book_id)
+        run_id = run.get("run_id") if run else None
+        if run_id:
+            for obj in list_knowledge_objects_for_run(run_id):
+                objects.append({
+                    "canonical_name": obj.get("canonical_name", ""),
+                    "object_type": obj.get("object_type", ""),
+                    "aliases": obj.get("payload", {}).get("aliases", []),
+                    "summary": obj.get("payload", {}).get("summary", ""),
+                })
+        summary = get_graph_summary(book_id)
+        graph_nodes.extend(summary.get("nodes", []))
+        for item in list_evidence_for_book(book_id)[:max_evidence]:
+            evidence.append({
+                "excerpt": item.get("excerpt", ""),
+                "chapter_index": item.get("chapter_index"),
+            })
+    objects = objects[:max_objects]
+    evidence = evidence[:max_evidence]
+
+    lines: list[str] = []
+    if source_labels:
+        lines.append("【可用知识源】" + "、".join(source_labels))
+    if objects:
+        lines.append("【人物与势力】")
+        for obj in objects:
+            alias_part = f"（别名：{'、'.join(obj['aliases'])}）" if obj["aliases"] else ""
+            desc = f"·{obj['summary']}" if obj["summary"] else ""
+            lines.append(f"- {obj['canonical_name']}[{obj['object_type']}]{alias_part}{desc}")
+    if graph_nodes:
+        lines.append("【图谱节点】" + "、".join(str(n.get("label", "")) for n in graph_nodes[:max_objects]))
+    if evidence:
+        lines.append("【原文摘录】")
+        for item in evidence:
+            chapter_hint = f"第{item['chapter_index']}章" if item.get("chapter_index") else ""
+            lines.append(f"- {chapter_hint}「{item['excerpt']}」")
+    context_text = "\n".join(lines)
+    return {
+        "summary": f"已汇总 {len(source_labels)} 个知识源、{len(objects)} 个对象、{len(evidence)} 条证据。" if source_labels else "",
+        "objects": objects,
+        "graph": {"nodes": graph_nodes[:max_objects]},
+        "evidence": evidence,
+        "context_text": context_text,
+    }
+
+
 @_persisting_mutation
 def create_extraction_run(
     book_id: str,
@@ -5077,6 +5138,33 @@ def mark_task_dispatched(
     return deepcopy(task)
 
 
+def _merge_book_scoped_map(
+    target: dict[str, dict[str, Any]],
+    incoming: dict[str, dict[str, Any]],
+    book_id: str,
+) -> None:
+    """Replace only the current book's entries in an id-keyed map, keep other books'."""
+    stale = [key for key, item in target.items() if item.get("book_id") == book_id]
+    for key in stale:
+        target.pop(key, None)
+    target.update(incoming)
+
+
+def _merge_book_scoped_lists(
+    target: dict[str, list[dict[str, Any]]],
+    incoming: dict[str, list[dict[str, Any]]],
+    book_id: str,
+) -> None:
+    """Replace only the current book's buckets in a bucketed map, keep other books'."""
+    stale = [
+        key for key, items in target.items()
+        if any(item.get("book_id") == book_id for item in items)
+    ]
+    for key in stale:
+        target.pop(key, None)
+    target.update(incoming)
+
+
 @_persisting_mutation
 def apply_task_execution_result(
     task_id: str,
@@ -5142,17 +5230,33 @@ def apply_task_execution_result(
                     STORE.evidence_by_run[entity_id].append(evidence_id)
                     STORE.evidence_by_book[run["book_id"]].append(evidence_id)
             deep_analysis = metrics.get("deep_analysis", {})
-            STORE.source_scenes_by_chapter = deepcopy(deep_analysis.get("scenes_by_chapter", STORE.source_scenes_by_chapter))
-            STORE.events_by_scene = deepcopy(deep_analysis.get("events_by_scene", STORE.events_by_scene))
+            book_id = run["book_id"]
+            # Merge per book so extracting another book does not wipe this book's
+            # deep-analysis data (and vice versa). All item payloads carry book_id.
+            if "scenes_by_chapter" in deep_analysis:
+                _merge_book_scoped_lists(
+                    STORE.source_scenes_by_chapter,
+                    deepcopy(deep_analysis["scenes_by_chapter"]),
+                    book_id,
+                )
+            if "events_by_scene" in deep_analysis:
+                _merge_book_scoped_lists(
+                    STORE.events_by_scene,
+                    deepcopy(deep_analysis["events_by_scene"]),
+                    book_id,
+                )
             for field_name in ("conflicts", "hooks", "rewards", "climaxes", "relationship_edges"):
                 if field_name in deep_analysis:
-                    setattr(STORE, field_name, deepcopy(deep_analysis[field_name]))
+                    _merge_book_scoped_map(
+                        getattr(STORE, field_name),
+                        deepcopy(deep_analysis[field_name]),
+                        book_id,
+                    )
             if graph_summary is not None:
                 STORE.graph_summaries[run["book_id"]] = deepcopy(graph_summary)
             node_details = metrics.get("graph_node_details")
             neighbors_map = metrics.get("graph_neighbors_by_node")
             if node_details is not None:
-                book_id = run["book_id"]
                 stale_nodes = [
                     node_id for node_id, node in STORE.graph_node_details.items()
                     if node.get("book_id") == book_id
