@@ -83,7 +83,7 @@ def test_run_create_chapter_plan_keeps_running_on_stale_dispatch_token() -> None
     store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-plan-stale")
     fresh_token = store.mark_task_dispatched(
         created["task"]["task_id"],
-        trace_id="trace-plan-stale",
+        trace_id="trace-plan-stale-2",
     )["current_dispatch_token"]
     command = {
         **build_create_chapter_plan_command(
@@ -179,7 +179,7 @@ def test_run_create_section_plans_keeps_running_on_stale_dispatch_token() -> Non
     store.schedule_task_retry(created_sections["task"]["task_id"], "lease_expired", trace_id="trace-section-stale")
     fresh_token = store.mark_task_dispatched(
         created_sections["task"]["task_id"],
-        trace_id="trace-section-stale",
+        trace_id="trace-section-stale-2",
     )["current_dispatch_token"]
     command = build_create_section_plans_command(
         chapter_plan_id=created_plan["chapter_plan"]["chapter_plan_id"],

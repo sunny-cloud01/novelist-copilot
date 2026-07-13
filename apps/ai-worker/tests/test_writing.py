@@ -217,7 +217,7 @@ def test_run_create_writing_run_keeps_running_on_stale_dispatch_token() -> None:
     store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-writing-stale")
     fresh_token = store.mark_task_dispatched(
         created["task"]["task_id"],
-        trace_id="trace-writing-stale",
+        trace_id="trace-writing-stale-2",
     )["current_dispatch_token"]
     command = build_create_writing_run_command(
         project_id=created["writing_run"]["project_id"],

@@ -13,7 +13,7 @@ import worker.extraction as extraction_module
 
 
 def dispatch_task(store, task_id: str, trace_id: str) -> str:
-    task = store.mark_task_dispatched(task_id, trace_id=trace_id, dispatched_at="2026-07-12T00:00:00+00:00")
+    task = store.mark_task_dispatched(task_id, trace_id=trace_id)
     assert task is not None
     assert task["current_dispatch_token"] is not None
     return task["current_dispatch_token"]
@@ -210,11 +210,10 @@ def test_run_extract_knowledge_keeps_running_on_stale_dispatch_token() -> None:
     )
     created_run = store.create_extraction_run(created_book["book_id"], trace_id="trace-worker-stale")
     first_token = dispatch_task(store, created_run["task"]["task_id"], trace_id="trace-worker-stale")
-    store.schedule_task_retry(created_run["task"]["task_id"], "lease_expired", trace_id="trace-worker-stale", retry_at="2026-07-12T00:01:00+00:00")
+    store.schedule_task_retry(created_run["task"]["task_id"], "lease_expired", trace_id="trace-worker-stale")
     fresh_token = store.mark_task_dispatched(
         created_run["task"]["task_id"],
-        trace_id="trace-worker-stale",
-        dispatched_at="2026-07-12T00:02:00+00:00",
+        trace_id="trace-worker-stale-2",
     )["current_dispatch_token"]
     command = build_extract_knowledge_command(
         book_id=created_book["book_id"],
