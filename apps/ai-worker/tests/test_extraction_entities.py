@@ -32,6 +32,30 @@ def test_build_graph_from_analysis_links_relationships():
     assert "Xiao Yan" not in {d["label"] for d in graph["node_details"].values()}
 
 
+def test_build_graph_from_analysis_resolves_edges_by_entity_name():
+    objects = [
+        {"object_id": "RUN1OBJ001", "canonical_name": "萧宁", "object_type": "character",
+         "confidence": 0.9, "review_status": "pending", "lifecycle_status": "candidate",
+         "evidence_refs": [], "payload": {"aliases": ["宁少"], "summary": "少年"}},
+        {"object_id": "RUN1OBJ002", "canonical_name": "云岚宗", "object_type": "faction",
+         "confidence": 0.8, "review_status": "pending", "lifecycle_status": "candidate",
+         "evidence_refs": [], "payload": {"aliases": [], "summary": "宗门"}},
+    ]
+    # 端点是人名/别名而非 object:// 引用，仍应连上边
+    edges = {
+        "RUN1RELATION0101": {
+            "edge_id": "RUN1RELATION0101",
+            "source_id": "宁少",
+            "target_id": "云岚宗",
+            "relation_type": "pressured_by", "confidence": 0.7, "evidence_refs": [],
+        }
+    }
+    graph = _build_graph_from_analysis(objects, edges, book_id="BOOK1", run_id="RUN1")
+    assert graph["summary"]["edge_count"] == 1
+    node_ids = list(graph["node_details"].keys())
+    assert any(graph["neighbors"][node_id] for node_id in node_ids)
+
+
 def test_run_extract_knowledge_produces_book_specific_objects(monkeypatch):
     import worker.extraction as extraction
 
@@ -58,6 +82,11 @@ def test_run_extract_knowledge_produces_book_specific_objects(monkeypatch):
     assert "Xiao Yan" not in labels
     assert "graph_node_details" in fake.captured
     assert fake.captured["graph_summary"]["node_count"] == len(objects)
+    # 修复回归：真实管线里关系边必须能连上，而不是恒 0。
+    assert len(objects) >= 2
+    assert fake.captured["graph_summary"]["edge_count"] >= 1
+    neighbors_by_node = fake.captured["graph_neighbors_by_node"]
+    assert any(neighbors_by_node[node_id] for node_id in neighbors_by_node)
 
 
 def test_extract_entity_candidates_uses_chapter_title_not_hardcoded():

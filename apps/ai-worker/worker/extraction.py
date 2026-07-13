@@ -294,9 +294,24 @@ def _chapter_excerpt(chapter: dict[str, Any]) -> str:
     return (chapter.get("text_excerpt") or chapter.get("raw_text") or "")[:160]
 
 
-def _build_fallback_chapter_analysis(chapter: dict[str, Any], chapter_index: int, knowledge_objects: list[dict[str, Any]]) -> dict[str, Any]:
-    protagonist = knowledge_objects[0]["canonical_name"] if knowledge_objects else "主角"
-    pressure = knowledge_objects[-1]["canonical_name"] if knowledge_objects else "外部压力"
+def _build_fallback_chapter_analysis(chapter: dict[str, Any], chapter_index: int, knowledge_objects: list[dict[str, Any]], chapter_entities: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    entity_names = [
+        str(entity.get("name", "")).strip()
+        for entity in (chapter_entities or [])
+        if str(entity.get("name", "")).strip()
+    ]
+    if knowledge_objects:
+        protagonist = knowledge_objects[0]["canonical_name"]
+        pressure = knowledge_objects[-1]["canonical_name"]
+    elif len(entity_names) >= 2:
+        protagonist = entity_names[0]
+        pressure = entity_names[1]
+    elif entity_names:
+        protagonist = entity_names[0]
+        pressure = "外部压力"
+    else:
+        protagonist = "主角"
+        pressure = "外部压力"
     excerpt = _chapter_excerpt(chapter) or "章节主场景推进。"
     return {
         "summary": excerpt,
@@ -481,9 +496,26 @@ def _build_graph_from_analysis(
             "evidence_refs": obj.get("evidence_refs", []),
         })
 
-    def _resolve_node(ref: str) -> str | None:
-        object_id = ref.rsplit("/", 1)[-1] if isinstance(ref, str) else ref
-        return node_by_object.get(object_id)
+    name_to_node: dict[str, str] = {}
+    for obj in knowledge_objects:
+        node_id = node_by_object[obj["object_id"]]
+        canonical = obj.get("canonical_name")
+        if isinstance(canonical, str) and canonical.strip():
+            name_to_node.setdefault(canonical.strip().lower(), node_id)
+        for alias in obj.get("payload", {}).get("aliases", []):
+            if isinstance(alias, str) and alias.strip():
+                name_to_node.setdefault(alias.strip().lower(), node_id)
+
+    def _resolve_node(ref: Any) -> str | None:
+        if not isinstance(ref, str):
+            return node_by_object.get(ref)
+        raw = ref.rsplit("/", 1)[-1]
+        # 先按 object id 解析（object://knowledge-objects/{id} 或裸 id）
+        node = node_by_object.get(raw)
+        if node is not None:
+            return node
+        # miss 再按人名/别名解析（去 object:// 前缀后的原值 lower()）
+        return name_to_node.get(raw.strip().lower())
 
     neighbors: dict[str, list[dict[str, Any]]] = {node_id: [] for node_id in node_details}
     edge_count = 0
@@ -628,9 +660,10 @@ def _chapter_provider_analysis(
     assignment: dict[str, Any] | None,
     output_ref: str,
     knowledge_objects: list[dict[str, Any]],
+    chapter_entities: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], bool]:
     chapter_index = chapter.get("chapter_index", 1)
-    fallback = _build_fallback_chapter_analysis(chapter, chapter_index, knowledge_objects)
+    fallback = _build_fallback_chapter_analysis(chapter, chapter_index, knowledge_objects, chapter_entities)
     if not model_profile:
         return fallback, False
     if model_profile.get("provider_name") not in {"deepseek", "openai_compatible"}:
@@ -694,6 +727,7 @@ def _normalize_chapter_analysis(
     knowledge_objects: list[dict[str, Any]],
     evidence_ref: str,
     evidence_id: str,
+    chapter_entities: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     chapter_index = chapter["chapter_index"]
     chapter_id = chapter["chapter_id"]
@@ -866,6 +900,21 @@ def _normalize_chapter_analysis(
             "target": knowledge_objects[-1]["canonical_name"],
             "confidence": 0.7,
         }]
+    # 真实管线里 fixture knowledge_objects 为空，改用本章抽取到的实体名造 fallback 关系，
+    # 使 source/target 的人名能匹配后续聚合出的 canonical_name，从而被图谱按名解析连边。
+    if not raw_relationships and chapter_entities:
+        entity_names = [
+            str(entity.get("name", "")).strip()
+            for entity in chapter_entities
+            if str(entity.get("name", "")).strip()
+        ]
+        if len(entity_names) >= 2:
+            raw_relationships = [{
+                "source": entity_names[0],
+                "relation_type": "pressured_by",
+                "target": entity_names[1],
+                "confidence": 0.7,
+            }]
     for relationship_index, raw_relationship in enumerate(raw_relationships, start=1):
         edge_id = f"{run_id}RELATION{chapter_index:02d}{relationship_index:02d}"
         normalized["relationships"][edge_id] = {
@@ -938,6 +987,7 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
                 "evidence_id": f"{run_id}EVIDENCE{index:02d}",
                 "evidence_ref": f"evidence://{run_id}EVIDENCE{index:02d}",
             }
+            chapter_candidates = _extract_entity_candidates(chapter)
             chapter_analysis, used_provider = _chapter_provider_analysis(
                 store=store,
                 command=command,
@@ -947,11 +997,12 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
                 assignment=assignment,
                 output_ref=fixture["run"]["extraction_report_ref"],
                 knowledge_objects=fixture["knowledge_objects"],
+                chapter_entities=chapter_candidates,
             )
             provider_used = provider_used or used_provider
             raw_entities = chapter_analysis.get("entities") if isinstance(chapter_analysis.get("entities"), list) else []
             if not raw_entities:
-                raw_entities = _extract_entity_candidates(chapter)
+                raw_entities = chapter_candidates
             entity_lists.append(raw_entities)
             normalized = _normalize_chapter_analysis(
                 run_id=run_id,
@@ -962,6 +1013,7 @@ def run_extract_knowledge(command: dict[str, Any]) -> dict[str, Any]:
                 knowledge_objects=fixture["knowledge_objects"],
                 evidence_ref=evidence["evidence_ref"],
                 evidence_id=evidence["evidence_id"],
+                chapter_entities=raw_entities,
             )
             deep_analysis["scenes_by_chapter"][chapter["chapter_id"]] = normalized["scenes"]
             for scene in normalized["scenes"]:
