@@ -414,6 +414,96 @@ def _build_fallback_chapter_analysis(chapter: dict[str, Any], chapter_index: int
     }
 
 
+import re
+
+_ENTITY_TYPE_HINTS = {
+    "宗": "faction", "门": "faction", "派": "faction", "族": "clan", "家": "clan",
+    "城": "location", "山": "location", "谷": "location", "殿": "location",
+}
+
+
+def _guess_entity_type(name: str) -> str:
+    for suffix, entity_type in _ENTITY_TYPE_HINTS.items():
+        if name.endswith(suffix):
+            return entity_type
+    return "character"
+
+
+def _extract_entity_candidates(chapter: dict[str, Any]) -> list[dict[str, Any]]:
+    text = (chapter.get("raw_text") or chapter.get("text_excerpt") or "")
+    title = str(chapter.get("title") or "").strip()
+    # 中文专名候选：2-4 连续汉字，按频次排序
+    tokens = re.findall(r"[一-鿿]{2,4}", text)
+    freq: dict[str, int] = {}
+    for token in tokens:
+        freq[token] = freq.get(token, 0) + 1
+    ranked = sorted(freq.items(), key=lambda kv: (-kv[1], kv[0]))
+    candidates: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    if title and title not in seen:
+        seen.add(title)
+        candidates.append({
+            "name": title, "type": _guess_entity_type(title), "aliases": [],
+            "confidence": 0.55, "summary": f"章节《{title}》核心对象。",
+        })
+    for name, count in ranked:
+        if count < 2 or name in seen:
+            continue
+        seen.add(name)
+        candidates.append({
+            "name": name, "type": _guess_entity_type(name), "aliases": [],
+            "confidence": min(0.75, 0.5 + count * 0.05), "summary": f"章节高频对象 {name}。",
+        })
+        if len(candidates) >= 5:
+            break
+    return candidates
+
+
+def _aggregate_entities(
+    entity_lists: list[list[dict[str, Any]]], run_id: str, workspace_id: str
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for entity_list in entity_lists:
+        for entity in entity_list:
+            name = str(entity.get("name", "")).strip()
+            if not name:
+                continue
+            key = name.lower()
+            confidence = _confidence(entity.get("confidence"), 0.5)
+            aliases = [a.strip() for a in entity.get("aliases", []) if isinstance(a, str) and a.strip()]
+            if key not in merged:
+                merged[key] = {
+                    "canonical_name": name,
+                    "object_type": str(entity.get("type") or "character"),
+                    "aliases": set(aliases),
+                    "confidence": confidence,
+                    "summary": _text(entity.get("summary"), f"{name} 相关对象。"),
+                }
+            else:
+                record = merged[key]
+                record["aliases"].update(aliases)
+                if confidence > record["confidence"]:
+                    record["confidence"] = confidence
+                    record["object_type"] = str(entity.get("type") or record["object_type"])
+    objects: list[dict[str, Any]] = []
+    for index, (_, record) in enumerate(merged.items(), start=1):
+        confidence = record["confidence"]
+        lifecycle = "approved" if confidence >= 0.95 else "candidate"
+        objects.append({
+            "schema_version": 1,
+            "object_id": f"{run_id}OBJ{index:03d}",
+            "workspace_id": workspace_id,
+            "object_type": record["object_type"],
+            "canonical_name": record["canonical_name"],
+            "lifecycle_status": lifecycle,
+            "review_status": "approved" if lifecycle == "approved" else "pending",
+            "confidence": confidence,
+            "evidence_refs": [],
+            "payload": {"schema_version": 1, "aliases": sorted(record["aliases"]), "summary": record["summary"]},
+        })
+    return objects
+
+
 def _build_chapter_prompt(chapter: dict[str, Any]) -> str:
     chapter_index = chapter.get("chapter_index", 1)
     raw_text = (chapter.get("raw_text") or chapter.get("text_excerpt") or "")[:6000]
