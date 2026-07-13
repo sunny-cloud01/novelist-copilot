@@ -3320,11 +3320,18 @@ def build_knowledge_context(
     evidence: list[dict[str, Any]] = []
     graph_nodes: list[dict[str, Any]] = []
     source_labels: list[str] = []
+    seen_books: set[str] = set()
     for ref in allowed_knowledge_source_refs or []:
+        # 只解析书源 ref；同一本书的多个 ref（如 source-books 与 graph-summaries）只处理一次
+        if not ref.startswith("object://source-books/"):
+            continue
         book_id = ref.rsplit("/", 1)[-1]
+        if book_id in seen_books:
+            continue
         book = STORE.books.get(book_id)
         if not book:
             continue
+        seen_books.add(book_id)
         source_labels.append(book.get("title", book_id))
         run = _latest_extraction_run_for_book(book_id)
         run_id = run.get("run_id") if run else None
