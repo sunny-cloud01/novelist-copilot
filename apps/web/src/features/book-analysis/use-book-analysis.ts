@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReviewAction } from "../../components/phase-two-state";
 import { usePhaseTwo } from "../../state/phase-two-provider";
 import { createNovelFactoryApiClient } from "../../lib/api-client";
+import { resolveApiBaseUrl } from "../../lib/api-base";
 
 type BookAnalysisState = {
   loading: boolean;
@@ -12,7 +13,7 @@ type BookAnalysisState = {
 
 export function useBookAnalysis(bookId?: string) {
   const context = usePhaseTwo();
-  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(
     () => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null),
     [apiBaseUrl],

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { DEMO_BOOK_ID } from "../../components/phase-two-state";
 import { createNovelFactoryApiClient } from "../../lib/api-client";
+import { resolveApiBaseUrl } from "../../lib/api-base";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -11,7 +12,7 @@ import { usePhaseTwo } from "../../state/phase-two-provider";
 export function SourceLibraryPage() {
   const navigate = useNavigate();
   const { state, uploadBook } = usePhaseTwo();
-  const apiBaseUrl = import.meta.env.VITE_NOVEL_FACTORY_API_BASE_URL as string | undefined;
+  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
   const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState("第一章 乌坦城风起……");
