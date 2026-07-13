@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from worker.core_store import load_phase_two_store
+from worker.llm_json import generate_json
 
 
 WORKSPACE_ID = "01JZWORKSPACE0000000000001"
@@ -238,6 +239,26 @@ def build_section_plan_fixture(command: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _generate_chapter_plan(story_bible: dict[str, Any] | None, chapter_index: int, knowledge_context: str) -> dict[str, Any]:
+    bible_payload = (story_bible or {}).get("payload", {})
+    premise = bible_payload.get("premise", "")
+    protagonist = bible_payload.get("protagonist", "主角")
+    core_conflict = bible_payload.get("core_conflict", "")
+    knowledge_block = f"\n【可用拆书知识】\n{knowledge_context}\n" if knowledge_context.strip() else ""
+    generated = generate_json(
+        system="你是中文网文章节规划师。基于故事圣经与已确立设定，为指定章节输出规划。只输出 JSON：{\"title\":\"章节标题\",\"summary\":\"本章推进摘要\"}，不要解释。",
+        user=f"故事前提：{premise}\n主角：{protagonist}\n核心冲突：{core_conflict}\n当前章节：第{chapter_index}章{knowledge_block}",
+    )
+    if generated and isinstance(generated.get("title"), str) and generated.get("title").strip():
+        return {"title": generated["title"].strip(), "summary": str(generated.get("summary", "")).strip() or f"{protagonist}在第{chapter_index}章推进{core_conflict or premise}。"}
+    # 确定性 fallback：从 story bible 派生，非乌坦城写死
+    stage = ["铺垫", "冲突", "转折", "推进", "高潮"][min(chapter_index - 1, 4)]
+    return {
+        "title": f"{protagonist}·第{chapter_index}章·{stage}",
+        "summary": f"{protagonist}在第{chapter_index}章围绕「{core_conflict or premise}」展开{stage}，推进主线。",
+    }
+
+
 def run_create_chapter_plan(command: dict[str, Any]) -> dict[str, Any]:
     store = load_phase_two_store()
     chapter_plan_id = command["chapter_plan_id"]
@@ -250,10 +271,15 @@ def run_create_chapter_plan(command: dict[str, Any]) -> dict[str, Any]:
         "generated_at": utc_now(),
     }
     if chapter_plan:
+        project = store.STORE.novel_projects.get(command["project_id"])
+        story_bible = store.STORE.story_bibles.get(project["story_bible_id"]) if project else None
+        allowed_refs = project.get("allowed_knowledge_source_refs", []) if project else []
+        knowledge = store.build_knowledge_context(allowed_refs)
+        generated = _generate_chapter_plan(story_bible, command["chapter_index"], knowledge["context_text"])
         chapter_plan["payload"] = {
             **chapter_plan.get("payload", {}),
-            "title": chapter_plan.get("payload", {}).get("title") or f"第{command['chapter_index']}章规划",
-            "summary": chapter_plan.get("payload", {}).get("summary") or f"第 {command['chapter_index']} 章完成故事推进规划。",
+            "title": generated["title"],
+            "summary": generated["summary"],
             "planning_stages": PLANNING_STAGES,
             "current_stage": "quality_review",
         }
