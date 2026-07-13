@@ -1234,6 +1234,8 @@ def seed_phase_two_demo_data() -> None:
         "enabled": True,
         "supports_structured_output": False,
         "fallback_profile_ids": [MODEL_PROFILE_STRUCTURED_FALLBACK_ID],
+        "base_url_env": "NOVELIST_LLM_BASE_URL",
+        "api_key_env": "NOVELIST_LLM_API_KEY",
     }
     STORE.model_profiles[MODEL_PROFILE_STRUCTURED_FALLBACK_ID] = {
         "schema_version": 1,
@@ -1245,6 +1247,8 @@ def seed_phase_two_demo_data() -> None:
         "enabled": True,
         "supports_structured_output": True,
         "fallback_profile_ids": [],
+        "base_url_env": "NOVELIST_LLM_BASE_URL",
+        "api_key_env": "NOVELIST_LLM_API_KEY",
     }
     STORE.provider_accounts[provider_account_id] = {
         "provider_account_id": provider_account_id,

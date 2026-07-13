@@ -47,12 +47,15 @@ class WritingProviderAdapter(Protocol):
 
 
 class AnthropicWritingAdapter:
-    def _chat(self, *, model_profile: dict[str, Any], system: str, user: str) -> str:
-        base_url = os.getenv("NOVELIST_LLM_BASE_URL")
-        api_key = os.getenv("NOVELIST_LLM_API_KEY")
+    def _chat(self, *, model_profile: dict[str, Any], system: str, user: str) -> dict[str, Any]:
+        import time
+        base_env = model_profile.get("base_url_env", "NOVELIST_LLM_BASE_URL")
+        key_env = model_profile.get("api_key_env", "NOVELIST_LLM_API_KEY")
+        base_url = os.getenv(base_env)
+        api_key = os.getenv(key_env)
         if not base_url or not api_key:
-            # 确定性 fallback：无 LLM 时用 user 前缀构造可读中文，而非裸截断
-            return f"（离线草稿）{user.strip()[:280]}"
+            text = f"（离线草稿）{user.strip()[:280]}"
+            return {"text": text, "prompt_tokens": len(user) // 2, "completion_tokens": len(text) // 2, "latency_ms": 0}
         endpoint = base_url.rstrip("/") + "/chat/completions"
         body = json.dumps(
             {
@@ -71,6 +74,7 @@ class AnthropicWritingAdapter:
             headers={"authorization": f"Bearer {api_key}", "content-type": "application/json"},
             method="POST",
         )
+        started = time.monotonic()
         try:
             with urlopen(request, timeout=60) as response:
                 payload = json.loads(response.read().decode("utf-8"))
@@ -80,10 +84,13 @@ class AnthropicWritingAdapter:
             raise ProviderExecutionError("provider_network_error", "provider request failed") from exc
         except TimeoutError as exc:
             raise ProviderExecutionError("provider_timeout", "provider request timed out") from exc
+        latency_ms = int((time.monotonic() - started) * 1000)
         try:
-            return payload["choices"][0]["message"]["content"].strip()
+            text = payload["choices"][0]["message"]["content"].strip()
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderExecutionError("provider_response_invalid", "provider response missing message content") from exc
+        usage = payload.get("usage") or {}
+        return {"text": text, "prompt_tokens": int(usage.get("prompt_tokens", 0)), "completion_tokens": int(usage.get("completion_tokens", 0)), "latency_ms": latency_ms}
 
     def draft_section(self, *, chapter_plan: dict[str, Any], section_plan: dict[str, Any], section_index: int, model_profile: dict[str, Any], knowledge_context: str = "") -> dict[str, Any]:
         payload = section_plan.get("payload", {})
@@ -95,24 +102,24 @@ class AnthropicWritingAdapter:
             f"章节目标：{chapter_plan.get('payload', {}).get('summary', scene_goal)}\n"
             f"本节目标：{scene_goal}\nbeats：{beat_phrase}\n{knowledge_block}"
         )
-        text = self._chat(
+        chat = self._chat(
             model_profile=model_profile,
             system="你是中文网文章节写手。必须遵循给定世界观与已确立设定，不得引入矛盾。输出一段可直接进入章节草稿的中文正文，不要解释。",
             user=user,
         )
-        return {"writer_output": text, "scene_goal": scene_goal, "beat_phrase": beat_phrase, "provider_model_name": model_profile["provider_model_name"]}
+        return {"writer_output": chat["text"], "scene_goal": scene_goal, "beat_phrase": beat_phrase, "provider_model_name": model_profile["provider_model_name"], "prompt_tokens": chat["prompt_tokens"], "completion_tokens": chat["completion_tokens"], "latency_ms": chat["latency_ms"]}
 
     def review_sections(self, *, section_runs: list[dict[str, Any]], drafts: list[dict[str, Any]], consistency_report_id: str, model_profile: dict[str, Any]) -> list[dict[str, Any]]:
-        base_url = os.getenv("NOVELIST_LLM_BASE_URL")
-        api_key = os.getenv("NOVELIST_LLM_API_KEY")
-        if not base_url or not api_key:
+        base_env = model_profile.get("base_url_env", "NOVELIST_LLM_BASE_URL")
+        key_env = model_profile.get("api_key_env", "NOVELIST_LLM_API_KEY")
+        if not os.getenv(base_env) or not os.getenv(key_env):
             return []
         combined = "\n".join(draft["writer_output"] for draft in drafts)
         review = self._chat(
             model_profile=model_profile,
             system="你是中文小说一致性审稿人。若没有严重阻断，只输出 PASS；若有阻断，用一句中文说明。",
             user=combined,
-        )
+        )["text"]
         if review.upper().startswith("PASS"):
             return []
         section_run = section_runs[min(1, len(section_runs) - 1)]
@@ -133,12 +140,12 @@ class AnthropicWritingAdapter:
 
     def humanize_section(self, *, section_plan: dict[str, Any], section_index: int, draft_text: str, critic_issues: list[dict[str, Any]], model_profile: dict[str, Any], knowledge_context: str = "") -> dict[str, Any]:
         knowledge_block = f"\n【需保持一致的设定】\n{knowledge_context}\n" if knowledge_context.strip() else ""
-        text = self._chat(
+        chat = self._chat(
             model_profile=model_profile,
             system="你是中文小说润色师。保留剧情事实与给定设定，降低机械感，输出润色正文，不要解释。",
             user=f"{draft_text}\n{knowledge_block}",
         )
-        return {"humanized_text": text, "provider_model_name": model_profile["provider_model_name"], "had_critic_issues": bool(critic_issues)}
+        return {"humanized_text": chat["text"], "provider_model_name": model_profile["provider_model_name"], "had_critic_issues": bool(critic_issues), "prompt_tokens": chat["prompt_tokens"], "completion_tokens": chat["completion_tokens"], "latency_ms": chat["latency_ms"]}
 
 
 class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):

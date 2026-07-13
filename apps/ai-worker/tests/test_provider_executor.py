@@ -8,7 +8,7 @@ def test_base_adapter_has_chat_with_fallback(monkeypatch):
     adapter = AnthropicWritingAdapter()
     # 无 key → 确定性 fallback，非 user[:320] 裸截断，含可读中文
     out = adapter._chat(model_profile={"provider_model_name": "m"}, system="s", user="写一段")
-    assert isinstance(out, str) and out
+    assert isinstance(out, dict) and out.get("text")
 
 
 def test_draft_injects_knowledge_context(monkeypatch):
@@ -17,7 +17,7 @@ def test_draft_injects_knowledge_context(monkeypatch):
     def fake_chat(self, *, model_profile, system, user):
         captured["user"] = user
         captured["system"] = system
-        return "草稿正文"
+        return {"text": "草稿正文", "prompt_tokens": 1, "completion_tokens": 1, "latency_ms": 0}
 
     monkeypatch.setattr(AnthropicWritingAdapter, "_chat", fake_chat)
     adapter = AnthropicWritingAdapter()
@@ -44,3 +44,37 @@ def test_review_no_hardcoded_issue_without_model(monkeypatch):
     )
     assert issues == []
     assert all("斗之气" not in str(i) for i in issues)
+
+
+def test_chat_reads_profile_specific_env(monkeypatch):
+    from worker.provider_executor import AnthropicWritingAdapter
+    monkeypatch.delenv("NOVELIST_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("NOVELIST_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("NOVELIST_CRITIC_LLM_BASE_URL", "http://critic")
+    monkeypatch.setenv("NOVELIST_CRITIC_LLM_API_KEY", "ck")
+    captured = {}
+
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self):
+            import json
+            return json.dumps({"choices": [{"message": {"content": "ok"}}], "usage": {"prompt_tokens": 5, "completion_tokens": 3}}).encode("utf-8")
+
+    def fake_urlopen(request, timeout=60):
+        captured["url"] = request.full_url
+        captured["auth"] = request.headers.get("Authorization")
+        return FakeResp()
+
+    import worker.provider_executor as pe
+    monkeypatch.setattr(pe, "urlopen", fake_urlopen)
+    adapter = AnthropicWritingAdapter()
+    result = adapter._chat(
+        model_profile={"provider_model_name": "m", "base_url_env": "NOVELIST_CRITIC_LLM_BASE_URL", "api_key_env": "NOVELIST_CRITIC_LLM_API_KEY"},
+        system="s", user="u",
+    )
+    assert "http://critic" in captured["url"]
+    assert captured["auth"] == "Bearer ck"
+    # _chat 现在返回 dict（Task 2 会用 usage；此步先确认 text 可取）
+    text = result["text"] if isinstance(result, dict) else result
+    assert text == "ok"
