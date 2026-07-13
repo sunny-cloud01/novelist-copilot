@@ -1,6 +1,8 @@
 import { BookOpen, ChevronRight, FileText, Home, Network, PenLine, Settings, ShieldAlert, Sparkles } from "lucide-react";
 import { Link, Outlet } from "react-router-dom";
 
+import { ThemeToggle } from "./theme-toggle";
+
 const navItems = [
   { to: "/workspaces/demo-workspace", label: "Home", description: "工作台", icon: Home },
   { to: "/sources", label: "Sources", description: "来源与拆书", icon: BookOpen },
@@ -48,18 +50,21 @@ export function AppShell() {
             <h2>创作者工作台</h2>
             <p>少输入，自动运行，只在异常和关键确认处打断。</p>
           </div>
-          <span
-            style={{
-              border: "1px solid var(--nf-border)",
-              borderRadius: 999,
-              color: "var(--nf-success)",
-              padding: "6px 10px",
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-          >
-            Demo workspace
-          </span>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+            <ThemeToggle />
+            <span
+              style={{
+                border: "1px solid var(--nf-border)",
+                borderRadius: 999,
+                color: "var(--nf-success)",
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Demo workspace
+            </span>
+          </div>
         </header>
         <div className="nf-content-frame">
           <Outlet />

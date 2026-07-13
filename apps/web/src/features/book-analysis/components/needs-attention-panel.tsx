@@ -14,7 +14,7 @@ function objectIdFromTargetRef(targetRef: string | undefined) {
 
 export function NeedsAttentionPanel({ exceptions, onReview }: NeedsAttentionPanelProps) {
   return (
-    <Card>
+    <Card className={exceptions.length > 0 ? "nf-attn-card" : undefined}>
       <CardHeader>
         <CardTitle>Needs attention</CardTitle>
         <CardDescription>只打断低置信、冲突或缺证据项目；不要求逐项审核全部候选。</CardDescription>
