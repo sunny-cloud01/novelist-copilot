@@ -311,12 +311,14 @@ def _build_memory_package_payload(store: Any, writing_run: dict[str, Any], chapt
         *allowed_refs,
     ]
     knowledge = store.build_knowledge_context(allowed_refs)
+    prior_context = writing_run.get("prior_context", "")
+    combined_context = (prior_context + "\n" + knowledge["context_text"]).strip() if prior_context else knowledge["context_text"]
     chapter_title = chapter_plan.get("payload", {}).get("title") or f"第{chapter_plan['chapter_index']}章"
     summary_suffix = f"，已载入 {len(knowledge['objects'])} 个知识对象" if knowledge["objects"] else ""
     return {
         "summary": f"已汇总 {chapter_title} 的故事圣经、章节目标、分节 beats{summary_suffix}。",
         "source_refs": source_refs,
-        "knowledge_context": knowledge["context_text"],
+        "knowledge_context": combined_context,
     }
 
 

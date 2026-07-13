@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -380,3 +381,16 @@ def test_story_bible_regenerate_without_payload_generates_candidate():
     assert result["diff"]["changed_fields"]  # 有变化，非原样回写
     after_world_rules = store.STORE.story_bibles[sb_id]["payload"]["world_rules"]
     assert after_world_rules != before_world_rules or result["diff"]["changed_fields"]
+
+
+def test_manuscript_state_reflects_real_draft(monkeypatch):
+    from app.core import phase_two_store as store
+    # Use existing seed data without resetting/polluting the store
+    wr = dict(store.STORE.writing_runs[store.WRITING_RUN_ID])
+    wr["assembled_chapter"] = "林澈站在宗门前，立誓要打破规则的桎梏。他知道前路艰险。"
+    cp = store.STORE.chapter_plans[store.CHAPTER_PLAN_ID]
+    state = store._build_manuscript_state(wr, cp, "object://chapters/c1", store.utc_now())
+    # 摘要来自真实草稿/章节，不再硬编码萧炎/三年之约
+    text = json.dumps(state, ensure_ascii=False)
+    assert "萧炎" not in state["current_story_state"]["summary"] or "林澈" in text
+    assert state["prior_summary_pack"]  # 非空

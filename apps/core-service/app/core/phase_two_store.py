@@ -4542,6 +4542,12 @@ def create_writing_run(
     revision_summary_id = str(ulid.new())
     now = utc_now()
 
+    prior_state = STORE.manuscript_states_by_project.get(project_id)
+    prior_context = ""
+    if prior_state:
+        prior_lines = [item["summary"] for item in prior_state.get("prior_summary_pack", [])]
+        prior_context = "【前情提要】\n" + "\n".join(prior_lines) + f"\n当前故事状态：{prior_state.get('current_story_state', {}).get('summary', '')}"
+
     section_plans = STORE.section_plans_by_chapter.get(chapter_plan_id, [])
     if not section_plans:
         return None
@@ -4737,6 +4743,7 @@ def create_writing_run(
         "critic_model_profile_id": critic_resolution["selected_profile"]["model_profile_id"],
         "humanizer_model_profile_id": humanizer_resolution["selected_profile"]["model_profile_id"],
         "assembled_chapter": "",
+        "prior_context": prior_context,
         "model_cost": _build_model_cost(provider_calls, retry_count),
         "provider_calls": deepcopy(provider_calls),
         "accepted_into_manuscript_at": None,
@@ -5459,41 +5466,41 @@ def _build_manuscript_state(writing_run: dict[str, Any], chapter_plan: Optional[
     manuscript_state_id = writing_run.get("manuscript_state_id") or f"manuscript-state:{writing_run['project_id']}"
     chapter_payload = chapter_plan.get("payload", {}) if chapter_plan else {}
     chapter_title = chapter_payload.get("title", "当前章节")
+    chapter_summary = chapter_payload.get("summary") or ""
+    assembled = writing_run.get("assembled_chapter") or ""
+    project = STORE.novel_projects.get(writing_run["project_id"])
+    story_bible = STORE.story_bibles.get(project["story_bible_id"]) if project else None
+    protagonist = (story_bible or {}).get("payload", {}).get("protagonist", "主角")
+    core_conflict = (story_bible or {}).get("payload", {}).get("core_conflict", "")
+    # 前情摘要包：从真实组章文本分句派生
+    sentences = [s.strip() for s in assembled.replace("。", "。\n").split("\n") if s.strip()]
+    prior_pack = [{"summary_index": i + 1, "summary": s} for i, s in enumerate(sentences[:3])] or (
+        [{"summary_index": 1, "summary": chapter_summary or f"{chapter_title}已进入 manuscript。"}]
+    )
+    state_summary = (
+        f"第 {chapter_plan['chapter_index']} 章《{chapter_title}》已进入 manuscript：{chapter_summary or assembled[:60]}"
+        if chapter_plan else f"《{chapter_title}》已进入 manuscript。"
+    )
     return {
         "schema_version": 1,
         "manuscript_state_id": manuscript_state_id,
         "project_id": writing_run["project_id"],
         "writing_run_id": writing_run["writing_run_id"],
         "current_story_state": {
-            "summary": f"第 {chapter_plan['chapter_index']} 章《{chapter_title}》已进入 manuscript，三年之约正式进入主线。" if chapter_plan else f"《{chapter_title}》已进入 manuscript。",
+            "summary": state_summary,
             "accepted_chapter_ref": accepted_chapter_ref,
             "quality_gate_status": "passed",
         },
         "character_dynamic_state": [
-            {
-                "character_name": "萧炎",
-                "state_summary": "从公开羞辱中立下三年之约，主线动机被明确激活。",
-            }
+            {"character_name": protagonist, "state_summary": f"在本章推进「{core_conflict or chapter_summary}」，动机与处境更新。"}
         ],
         "relationship_state": [
-            {
-                "subject": "萧炎",
-                "object": "三年之约",
-                "state_summary": "人物目标从承压转为正面回应，冲突升级为长期承诺。",
-            }
+            {"subject": protagonist, "object": core_conflict or "核心冲突", "state_summary": "人物与核心冲突的关系随本章推进。"}
         ],
         "hook_state": [
-            {
-                "hook_key": "core_conflict",
-                "status": "active",
-                "summary": "天赋跌落后的家族压力与三年之约仍是当前核心挂钩。",
-            }
+            {"hook_key": "core_conflict", "status": "active", "summary": core_conflict or chapter_summary or "核心挂钩持续推进。"}
         ],
-        "prior_summary_pack": [
-            {"summary_index": 1, "summary": "议事堂压抑氛围与家族压力被建立。"},
-            {"summary_index": 2, "summary": "纳兰家退婚消息引爆公开冲突。"},
-            {"summary_index": 3, "summary": "主角在羞辱中立下三年之约。"},
-        ],
+        "prior_summary_pack": prior_pack,
         "updated_at": updated_at,
     }
 
