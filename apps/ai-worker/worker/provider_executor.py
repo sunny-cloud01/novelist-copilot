@@ -45,78 +45,12 @@ class WritingProviderAdapter(Protocol):
 
 
 class AnthropicWritingAdapter:
-    def draft_section(
-        self,
-        *,
-        chapter_plan: dict[str, Any],
-        section_plan: dict[str, Any],
-        section_index: int,
-        model_profile: dict[str, Any],
-    ) -> dict[str, Any]:
-        payload = section_plan.get("payload", {})
-        scene_goal = payload.get("scene_goal") or f"推进第 {section_index} 节剧情"
-        beats = payload.get("beats", [])
-        beat_summaries = [beat.get("summary", f"beat {beat.get('index', beat_index + 1)}") for beat_index, beat in enumerate(beats)]
-        beat_phrase = "，".join(beat_summaries) if beat_summaries else scene_goal
-        return {
-            "writer_output": f"第{section_index}节聚焦{scene_goal}，具体推进{beat_phrase}。",
-            "scene_goal": scene_goal,
-            "beat_phrase": beat_phrase,
-            "provider_model_name": model_profile["provider_model_name"],
-        }
-
-    def review_sections(
-        self,
-        *,
-        section_runs: list[dict[str, Any]],
-        drafts: list[dict[str, Any]],
-        consistency_report_id: str,
-        model_profile: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        issue_section_index = 1 if len(section_runs) > 1 else 0
-        section_run = section_runs[issue_section_index]
-        return [
-            {
-                "issue_id": "01JZCONSISTISSUE000000001",
-                "category": "power_system_constraint",
-                "severity": "critical",
-                "summary": "主角境界被写回斗之气三段，与已批准状态冲突。",
-                "affected_text_ref": f"{section_run['draft_object_ref']}#p2",
-                "rule_id": "rule-01JZPOWER000000000000001",
-                "resolution_status": "open",
-                "input_refs": ["object://rules/rule-01JZPOWER000000000000001"],
-                "output_refs": [f"object://consistency-reports/{consistency_report_id}/issues/1"],
-                "note": model_profile["provider_model_name"],
-            }
-        ]
-
-    def humanize_section(
-        self,
-        *,
-        section_plan: dict[str, Any],
-        section_index: int,
-        draft_text: str,
-        critic_issues: list[dict[str, Any]],
-        model_profile: dict[str, Any],
-    ) -> dict[str, Any]:
-        payload = section_plan.get("payload", {})
-        scene_goal = payload.get("scene_goal") or f"推进第 {section_index} 节剧情"
-        beats = payload.get("beats", [])
-        beat_summaries = [beat.get("summary", f"beat {beat.get('index', beat_index + 1)}") for beat_index, beat in enumerate(beats)]
-        beat_phrase = "，".join(beat_summaries) if beat_summaries else scene_goal
-        return {
-            "humanized_text": f"第{section_index}节里，{scene_goal}被落到具体动作与情绪上：{beat_phrase}。",
-            "provider_model_name": model_profile["provider_model_name"],
-            "had_critic_issues": bool(critic_issues),
-        }
-
-
-class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):
     def _chat(self, *, model_profile: dict[str, Any], system: str, user: str) -> str:
         base_url = os.getenv("NOVELIST_LLM_BASE_URL")
         api_key = os.getenv("NOVELIST_LLM_API_KEY")
         if not base_url or not api_key:
-            return user[:320]
+            # 确定性 fallback：无 LLM 时用 user 前缀构造可读中文，而非裸截断
+            return f"（离线草稿）{user.strip()[:280]}"
         endpoint = base_url.rstrip("/") + "/chat/completions"
         body = json.dumps(
             {
@@ -149,19 +83,28 @@ class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderExecutionError("provider_response_invalid", "provider response missing message content") from exc
 
-    def draft_section(self, *, chapter_plan: dict[str, Any], section_plan: dict[str, Any], section_index: int, model_profile: dict[str, Any]) -> dict[str, Any]:
+    def draft_section(self, *, chapter_plan: dict[str, Any], section_plan: dict[str, Any], section_index: int, model_profile: dict[str, Any], knowledge_context: str = "") -> dict[str, Any]:
         payload = section_plan.get("payload", {})
         scene_goal = payload.get("scene_goal") or f"推进第 {section_index} 节剧情"
         beats = payload.get("beats", [])
         beat_phrase = "，".join(beat.get("summary", f"beat {beat.get('index', i + 1)}") for i, beat in enumerate(beats)) or scene_goal
+        knowledge_block = f"\n【世界观与知识】\n{knowledge_context}\n" if knowledge_context.strip() else ""
+        user = (
+            f"章节目标：{chapter_plan.get('payload', {}).get('summary', scene_goal)}\n"
+            f"本节目标：{scene_goal}\nbeats：{beat_phrase}\n{knowledge_block}"
+        )
         text = self._chat(
             model_profile=model_profile,
-            system="你是中文网文章节写手。输出一段可直接进入章节草稿的中文正文，不要解释。",
-            user=f"章节目标：{chapter_plan.get('payload', {}).get('summary', scene_goal)}\n本节目标：{scene_goal}\nbeats：{beat_phrase}",
+            system="你是中文网文章节写手。必须遵循给定世界观与已确立设定，不得引入矛盾。输出一段可直接进入章节草稿的中文正文，不要解释。",
+            user=user,
         )
         return {"writer_output": text, "scene_goal": scene_goal, "beat_phrase": beat_phrase, "provider_model_name": model_profile["provider_model_name"]}
 
     def review_sections(self, *, section_runs: list[dict[str, Any]], drafts: list[dict[str, Any]], consistency_report_id: str, model_profile: dict[str, Any]) -> list[dict[str, Any]]:
+        base_url = os.getenv("NOVELIST_LLM_BASE_URL")
+        api_key = os.getenv("NOVELIST_LLM_API_KEY")
+        if not base_url or not api_key:
+            return []
         combined = "\n".join(draft["writer_output"] for draft in drafts)
         review = self._chat(
             model_profile=model_profile,
@@ -186,13 +129,18 @@ class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):
             }
         ]
 
-    def humanize_section(self, *, section_plan: dict[str, Any], section_index: int, draft_text: str, critic_issues: list[dict[str, Any]], model_profile: dict[str, Any]) -> dict[str, Any]:
+    def humanize_section(self, *, section_plan: dict[str, Any], section_index: int, draft_text: str, critic_issues: list[dict[str, Any]], model_profile: dict[str, Any], knowledge_context: str = "") -> dict[str, Any]:
+        knowledge_block = f"\n【需保持一致的设定】\n{knowledge_context}\n" if knowledge_context.strip() else ""
         text = self._chat(
             model_profile=model_profile,
-            system="你是中文小说润色师。保留剧情事实，降低机械感，输出润色正文，不要解释。",
-            user=draft_text,
+            system="你是中文小说润色师。保留剧情事实与给定设定，降低机械感，输出润色正文，不要解释。",
+            user=f"{draft_text}\n{knowledge_block}",
         )
         return {"humanized_text": text, "provider_model_name": model_profile["provider_model_name"], "had_critic_issues": bool(critic_issues)}
+
+
+class OpenAICompatibleWritingAdapter(AnthropicWritingAdapter):
+    pass
 
 
 
@@ -226,6 +174,7 @@ def execute_writing_provider_pipeline(
     section_plans: list[dict[str, Any]],
     section_runs: list[dict[str, Any]],
     prompt_package: dict[str, Any],
+    knowledge_context: str = "",
 ) -> dict[str, Any]:
     provider_calls = deepcopy(store.STORE.provider_calls_by_writing.get(writing_run["writing_run_id"], []))
     retry_count = max((item.get("retry_count", 0) for item in provider_calls), default=0)
@@ -247,6 +196,7 @@ def execute_writing_provider_pipeline(
             section_plan=section_plan,
             section_index=index,
             model_profile=writer_profile,
+            knowledge_context=knowledge_context,
         )
         for index, section_plan in enumerate(section_plans, start=1)
     ]
@@ -277,6 +227,7 @@ def execute_writing_provider_pipeline(
             draft_text=draft["writer_output"],
             critic_issues=critic_issues,
             model_profile=humanizer_profile,
+            knowledge_context=knowledge_context,
         )
         beat_status = [
             {
