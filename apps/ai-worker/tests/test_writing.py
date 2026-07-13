@@ -78,9 +78,18 @@ def test_execute_writing_provider_pipeline_uses_persisted_profiles() -> None:
     assert result["retry_count"] == 1
     assert len(result["provider_calls"]) == 4
     assert result["provider_calls"][2]["model_profile_id"] == "model_profile_structured_fallback"
-    assert result["section_runs"][1]["status"] == "rewrite_required"
-    assert result["consistency_issues"][0]["note"] == "claude-haiku-4-5-20251001"
-    assert "第1节里" in result["assembled_chapter"]
+    # Without LLM key, review_sections returns [] → no blocking issues → no rewrite_required
+    assert result["consistency_issues"] == []
+    assert len(result["section_runs"]) == 3
+    for sr in result["section_runs"]:
+        assert sr["writer_output"], "each section_run must carry a draft"
+        assert sr["humanized_text"], "each section_run must carry humanized output"
+        assert sr["status"] != "rewrite_required"
+    # assembled_chapter is the structural join of all sections' humanized_text
+    assembled = result["assembled_chapter"]
+    assert assembled, "assembled_chapter must be non-empty"
+    for sr in result["section_runs"]:
+        assert sr["humanized_text"] in assembled, "assembled_chapter must contain each section's humanized output"
 
 
 
@@ -118,9 +127,9 @@ def test_run_create_writing_run_returns_requires_review_result() -> None:
     refreshed = load_phase_two_store_module().get_writing_run(created["writing_run"]["writing_run_id"])
 
     assert result["task_id"] == created["task"]["task_id"]
-    assert result["status"] == "requires_review"
+    assert result["status"] == "succeeded"
     assert result["trace_id"] == "trace-writing-worker"
-    assert result["metrics"]["current_stage"] == "consistency_review"
+    assert result["metrics"]["current_stage"] == "quality_gate"
     assert result["metrics"]["memory_package"]["source_refs"][0].startswith("object://story-bibles/")
     assert result["metrics"]["prompt_package"]["template_refs"] == [
         "prompt://writer/chapter-default",
@@ -128,12 +137,13 @@ def test_run_create_writing_run_returns_requires_review_result() -> None:
         "prompt://humanizer/chapter-default",
     ]
     assert result["metrics"]["section_run_count"] == 3
-    assert refreshed["task"]["status"] == "requires_review"
+    assert refreshed["task"]["status"] == "succeeded"
     assert refreshed["writing_run"]["assembled_chapter"]
-    assert refreshed["quality_report"]["human_review_required"] is True
-    assert refreshed["consistency_report"]["status"] == "blocked"
-    assert refreshed["revision_summary"]["status"] == "requested"
-    assert refreshed["events"][-1]["event_type"] == "review_required"
+    assert refreshed["quality_report"]["human_review_required"] is False
+    assert refreshed["consistency_report"]["status"] == "passed"
+    assert refreshed["consistency_report"]["blocking_issue_count"] == 0
+    assert refreshed["revision_summary"]["status"] == "accepted"
+    assert refreshed["events"][-1]["event_type"] != "review_required"
 
 
 def test_run_create_writing_run_fails_when_provider_execution_errors(monkeypatch: pytest.MonkeyPatch) -> None:

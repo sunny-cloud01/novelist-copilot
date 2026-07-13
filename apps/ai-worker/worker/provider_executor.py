@@ -22,6 +22,7 @@ class WritingProviderAdapter(Protocol):
         section_plan: dict[str, Any],
         section_index: int,
         model_profile: dict[str, Any],
+        knowledge_context: str = "",
     ) -> dict[str, Any]: ...
 
     def review_sections(
@@ -41,6 +42,7 @@ class WritingProviderAdapter(Protocol):
         draft_text: str,
         critic_issues: list[dict[str, Any]],
         model_profile: dict[str, Any],
+        knowledge_context: str = "",
     ) -> dict[str, Any]: ...
 
 
