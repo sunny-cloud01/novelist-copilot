@@ -20,7 +20,7 @@ def load_phase_two_store_module():
 
 
 def dispatch_task(store, task_id: str, trace_id: str) -> str:
-    task = store.mark_task_dispatched(task_id, trace_id=trace_id, dispatched_at="2026-07-12T00:00:00+00:00")
+    task = store.mark_task_dispatched(task_id, trace_id=trace_id)
     assert task is not None
     assert task["current_dispatch_token"] is not None
     return task["current_dispatch_token"]
@@ -214,11 +214,10 @@ def test_run_create_writing_run_keeps_running_on_stale_dispatch_token() -> None:
         trace_id="trace-writing-stale",
     )
     first_token = dispatch_task(store, created["task"]["task_id"], trace_id="trace-writing-stale")
-    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-writing-stale", retry_at="2026-07-12T00:01:00+00:00")
+    store.schedule_task_retry(created["task"]["task_id"], "lease_expired", trace_id="trace-writing-stale")
     fresh_token = store.mark_task_dispatched(
         created["task"]["task_id"],
         trace_id="trace-writing-stale",
-        dispatched_at="2026-07-12T00:02:00+00:00",
     )["current_dispatch_token"]
     command = build_create_writing_run_command(
         project_id=created["writing_run"]["project_id"],
