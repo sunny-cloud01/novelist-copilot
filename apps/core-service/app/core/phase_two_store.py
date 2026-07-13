@@ -154,6 +154,7 @@ class CoreStore:
     task_events_by_task: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
     migration_events: list[dict[str, Any]] = field(default_factory=list)
+    knowledge_packages: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 STORE = CoreStore()
@@ -1148,6 +1149,7 @@ def reset_store() -> None:
     STORE.task_events_by_task.clear()
     STORE.audit_events.clear()
     STORE.migration_events.clear()
+    STORE.knowledge_packages.clear()
     _persist_store()
 
 
@@ -3549,10 +3551,42 @@ def commit_knowledge_package(run_id: str) -> Optional[dict[str, Any]]:
     run["finished_at"] = finished_at
     run["task"]["finished_at"] = finished_at
     run["task"]["heartbeat_at"] = finished_at
+    object_ids = STORE.knowledge_by_run.get(run_id, [])
+    objects = [
+        deepcopy(STORE.knowledge_objects[oid]) for oid in object_ids
+        if oid in STORE.knowledge_objects
+        and STORE.knowledge_objects[oid].get("lifecycle_status") in {"approved", "merged"}
+    ]
+    book_id = run["book_id"]
+    scenes = [
+        scene for chapter in list_book_chapters(book_id)
+        for scene in STORE.source_scenes_by_chapter.get(chapter["chapter_id"], [])
+    ]
+    relationships = [
+        deepcopy(edge) for edge in STORE.relationship_edges.values()
+        if edge.get("book_id") == book_id
+    ]
+    package_ref = f"object://knowledge-packages/{run_id}"
+    STORE.knowledge_packages[run_id] = {
+        "schema_version": 1,
+        "package_ref": package_ref,
+        "metadata": {
+            "run_id": run_id, "book_id": book_id,
+            "object_count": len(objects), "scene_count": len(scenes),
+            "relationship_count": len(relationships), "committed_at": finished_at,
+        },
+        "source_book": deepcopy(get_book(book_id) or {}),
+        "chapters": deepcopy(list_book_chapters(book_id)),
+        "scenes": scenes,
+        "objects": objects,
+        "relationships": relationships,
+    }
+    run["knowledge_package_ref"] = package_ref
     return {
         "run_id": run_id,
         "status": run["status"],
-        "committed_object_count": len(STORE.knowledge_by_run.get(run_id, [])),
+        "committed_object_count": len(object_ids),
+        "package_ref": package_ref,
     }
 
 

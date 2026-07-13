@@ -329,3 +329,19 @@ def test_graph_search_and_evidence_ref_lookup() -> None:
         "/v1/knowledge-objects/missing/review-actions",
         json={"action": "approve"},
     ).status_code == 404
+
+
+def test_commit_knowledge_package_assembles_real_package():
+    from app.core import phase_two_store as store
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    run_id = store.RUN_ID
+    result = store.commit_knowledge_package(run_id)
+    assert result["status"] == "succeeded"
+    assert "package_ref" in result
+    package = store.STORE.knowledge_packages[run_id]
+    assert "metadata" in package
+    assert "objects" in package
+    assert "relationships" in package
+    assert "scenes" in package
+    assert package["metadata"]["run_id"] == run_id
