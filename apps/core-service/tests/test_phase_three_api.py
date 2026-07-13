@@ -354,3 +354,16 @@ def test_project_and_planning_missing_resources_return_not_found() -> None:
     assert client.get("/v1/chapter-plans/missing").status_code == 404
     assert client.get("/v1/chapter-plans/missing/section-plans").status_code == 404
     assert client.post("/v1/chapter-plans/missing/section-plans", json={"section_count": 2}).status_code == 404
+
+
+def test_story_bible_regenerate_without_payload_generates_candidate():
+    from app.core import phase_two_store as store
+    store.reset_store()
+    store.seed_phase_two_demo_data()
+    sb_id = store.STORY_BIBLE_ID
+    before = store.STORE.story_bibles[sb_id]["payload"]["world_rules"][:]
+    result = store.apply_story_bible_action(sb_id, "regenerate", payload={"summary": "补强世界规则"})
+    assert result["status"] == "pending_review"
+    assert result["diff"]["changed_fields"]  # 有变化，非原样回写
+    after = store.STORE.story_bibles[sb_id]["payload"]["world_rules"]
+    assert after != before or result["diff"]["changed_fields"]

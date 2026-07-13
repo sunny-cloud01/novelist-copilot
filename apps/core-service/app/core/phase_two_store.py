@@ -4143,6 +4143,55 @@ def get_story_bible(story_bible_id: str) -> Optional[dict[str, Any]]:
     return deepcopy(_hydrate_story_bible(story_bible))
 
 
+def _llm_json(system: str, user: str) -> Optional[dict[str, Any]]:
+    base_url = os.getenv("NOVELIST_LLM_BASE_URL")
+    api_key = os.getenv("NOVELIST_LLM_API_KEY")
+    if not base_url or not api_key:
+        return None
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError, URLError
+    endpoint = base_url.rstrip("/") + "/chat/completions"
+    body = json.dumps({
+        "model": "deepseek-chat",
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "temperature": 0.5,
+        "max_tokens": 1200,
+        "response_format": {"type": "json_object"},
+    }).encode("utf-8")
+    request = Request(endpoint, data=body, headers={"authorization": f"Bearer {api_key}", "content-type": "application/json"}, method="POST")
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        parsed = json.loads(payload["choices"][0]["message"]["content"])
+        return parsed if isinstance(parsed, dict) else None
+    except (HTTPError, URLError, TimeoutError, KeyError, IndexError, TypeError, ValueError):
+        return None
+
+
+def _deterministic_enhance_story_bible(current_payload: dict[str, Any]) -> dict[str, Any]:
+    enhanced = deepcopy(current_payload) if isinstance(current_payload, dict) else {}
+    protagonist = enhanced.get("protagonist", "主角")
+    world_rules = list(enhanced.get("world_rules", []))
+    new_rule = f"{protagonist}每次突破都需付出真实代价，力量提升与风险同步。"
+    if new_rule not in world_rules:
+        world_rules.append(new_rule)
+    enhanced["world_rules"] = world_rules
+    promises = list(enhanced.get("narrative_promises", []))
+    new_promise = f"前三章内确立{protagonist}的核心动机与首个转折。"
+    if new_promise not in promises:
+        promises.append(new_promise)
+    enhanced["narrative_promises"] = promises
+    return enhanced
+
+
+def _generate_story_bible_candidate(current_payload: dict[str, Any], note: Optional[str]) -> Optional[dict[str, Any]]:
+    generated = _llm_json(
+        system="你是中文小说故事圣经编辑。基于当前故事圣经补强世界规则与叙事承诺，保持前提与主角一致。只输出 JSON，键：premise, protagonist, core_conflict, style_target, forbidden_similarities, world_rules(数组), narrative_promises(数组)。",
+        user=f"当前故事圣经：{json.dumps(current_payload, ensure_ascii=False)}\n补强方向：{note or '强化世界观与叙事承诺'}",
+    )
+    return generated
+
+
 @_persisting_mutation
 def apply_story_bible_action(
     story_bible_id: str,
@@ -4179,7 +4228,12 @@ def apply_story_bible_action(
         changed_fields = []
         final_summary = summary or "驳回当前故事圣经版本。"
     elif action == "regenerate":
-        next_payload = _normalize_story_bible_payload((payload or {}).get("story_bible_payload"), project.get("title") if project else None)
+        explicit = (payload or {}).get("story_bible_payload")
+        if explicit:
+            next_payload = _normalize_story_bible_payload(explicit, project.get("title") if project else None)
+        else:
+            candidate = _generate_story_bible_candidate(normalized_current, note) or _deterministic_enhance_story_bible(normalized_current)
+            next_payload = _normalize_story_bible_payload(candidate, project.get("title") if project else None)
         previous_version = story_bible.get("version", 1)
         previous_payload = deepcopy(story_bible.get("payload"))
         story_bible["version"] = previous_version + 1
