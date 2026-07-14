@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ReviewAction } from "../../components/phase-two-state";
-import { usePhaseTwo } from "../../state/phase-two-provider";
-import { createNovelFactoryApiClient } from "../../lib/api-client";
-import { resolveApiBaseUrl } from "../../lib/api-base";
+import { createNovelFactoryApiClient } from "@/lib/api-client";
+import { resolveApiBaseUrl } from "@/lib/api-base";
 
 type BookAnalysisState = {
   loading: boolean;
@@ -12,59 +11,37 @@ type BookAnalysisState = {
 };
 
 export function useBookAnalysis(bookId?: string) {
-  const context = usePhaseTwo();
-  const apiBaseUrl = resolveApiBaseUrl();
   const apiClient = useMemo(
-    () => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null),
-    [apiBaseUrl],
+    () => createNovelFactoryApiClient({ baseUrl: resolveApiBaseUrl()! }),
+    // resolveApiBaseUrl always returns the same value at runtime — stable ref
+    []
   );
-  const activeBookId = bookId ?? context.state.book.bookId;
-  const [apiState, setApiState] = useState<BookAnalysisState>({ loading: Boolean(apiClient), error: null, apiAnalysis: null });
+  const activeBookId = bookId ?? "";
+  const [apiState, setApiState] = useState<BookAnalysisState>({
+    loading: true,
+    error: null,
+    apiAnalysis: null,
+  });
 
   const refresh = useCallback(async () => {
-    if (!apiClient) return;
+    if (!apiClient || !activeBookId) return;
     setApiState((current) => ({ ...current, loading: true, error: null }));
     try {
       const apiAnalysis = await apiClient.getBookAnalysis(activeBookId);
       setApiState({ loading: false, error: null, apiAnalysis });
     } catch (error) {
-      setApiState({ loading: false, error: error instanceof Error ? error.message : "Book analysis load failed", apiAnalysis: null });
+      setApiState({
+        loading: false,
+        error:
+          error instanceof Error ? error.message : "Book analysis load failed",
+        apiAnalysis: null,
+      });
     }
-  }, [activeBookId, apiClient]);
+  }, [activeBookId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  if (!apiClient) {
-    return {
-      mode: "demo-fallback" as const,
-      loading: false,
-      error: null,
-      book: context.state.book,
-      chapters: context.state.chapters,
-      run: context.state.run,
-      summary: context.state.bookAnalysisSummary,
-      exceptions: context.state.analysisExceptions,
-      evidenceSamples: context.state.evidences.slice(0, 3),
-      knowledgeObjects: context.state.knowledgeObjects,
-      scenes: [],
-      events: [],
-      conflicts: [],
-      hooks: [],
-      rewards: [],
-      climaxes: [],
-      relationships: [],
-      patterns: context.state.patterns,
-      rhythmProfiles: context.state.rhythmProfiles,
-      assets: context.state.assets,
-      rules: context.state.rules,
-      commitRun: context.commitRun,
-      applyReviewAction: context.applyReviewAction,
-      refresh: () => undefined,
-      apiClient: null,
-    };
-  }
 
   const analysis = apiState.apiAnalysis;
   return {
@@ -90,13 +67,21 @@ export function useBookAnalysis(bookId?: string) {
     assets: analysis?.assets ?? [],
     rules: analysis?.rules ?? [],
     commitRun: async () => {
-      if (analysis?.summary?.run_id) {
+      if (analysis?.summary?.run_id && apiClient) {
         await apiClient.commitKnowledgePackage(analysis.summary.run_id);
         await refresh();
       }
     },
-    applyReviewAction: async (objectId: string, action: ReviewAction, targetObjectId?: string) => {
-      await apiClient.reviewKnowledgeObject(objectId, { action, target_object_id: targetObjectId });
+    applyReviewAction: async (
+      objectId: string,
+      action: ReviewAction,
+      targetObjectId?: string
+    ) => {
+      if (!apiClient) return;
+      await apiClient.reviewKnowledgeObject(objectId, {
+        action,
+        target_object_id: targetObjectId,
+      });
       await refresh();
     },
     refresh,

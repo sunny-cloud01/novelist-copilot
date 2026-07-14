@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.agent_tasks import router as agent_tasks_router
 from app.api.v1.audit import router as audit_router
@@ -16,6 +17,13 @@ from app.api.v1.writing import router as writing_router
 from app.core.request_context import RequestContextMiddleware
 
 app = FastAPI(title="Novel Factory API Gateway", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(RequestContextMiddleware)
 app.include_router(health_router, prefix="/v1")
 app.include_router(audit_router, prefix="/v1")

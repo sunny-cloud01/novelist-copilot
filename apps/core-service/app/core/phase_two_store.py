@@ -1385,6 +1385,86 @@ def seed_phase_two_demo_data() -> None:
         STORE.evidence_by_run[RUN_ID].append(evidence_id)
         STORE.evidence_by_book[BOOK_ID].append(evidence_id)
 
+    # ---- 拆书提取数据：场景、事件、冲突、钩子、爽点、高潮、关系链 ----
+    chapter_1_id = "01JZCHAPTER00000000000001"
+    chapter_2_id = "01JZCHAPTER00000000000002"
+
+    # 场景 (6 scenes: 3 per chapter)
+    scene_1 = {"scene_id": "01JZSCENE00000000000001", "chapter_id": chapter_1_id, "book_id": BOOK_ID, "scene_index": 1, "title": "家族议事堂试压", "summary": "萧炎在天赋归零后首次面对全族审问，三年之约被当众提出。"}
+    scene_2 = {"scene_id": "01JZSCENE00000000000002", "chapter_id": chapter_1_id, "book_id": BOOK_ID, "scene_index": 2, "title": "退婚前夜独白", "summary": "少年独自在院中练拳，回忆三年来的跌落与不甘。"}
+    scene_3 = {"scene_id": "01JZSCENE00000000000003", "chapter_id": chapter_1_id, "book_id": BOOK_ID, "scene_index": 3, "title": "纳兰嫣然退婚", "summary": "云岚宗纳兰嫣然当众退婚，萧炎立下三年之约。"}
+    scene_4 = {"scene_id": "01JZSCENE00000000000004", "chapter_id": chapter_2_id, "book_id": BOOK_ID, "scene_index": 1, "title": "戒指异变初现", "summary": "修炼中体内斗气被戒指吸收，萧炎发现异常。"}
+    scene_5 = {"scene_id": "01JZSCENE00000000000005", "chapter_id": chapter_2_id, "book_id": BOOK_ID, "scene_index": 2, "title": "药老首现", "summary": "戒指中苍老声音点破少年困境，揭示吸收斗气的真相。"}
+    scene_6 = {"scene_id": "01JZSCENE00000000000006", "chapter_id": chapter_2_id, "book_id": BOOK_ID, "scene_index": 3, "title": "拜师抉择", "summary": "药老提出拜师条件，萧炎在绝望与希望中做出决定。"}
+    STORE.source_scenes_by_chapter[chapter_1_id] = [scene_1, scene_2, scene_3]
+    STORE.source_scenes_by_chapter[chapter_2_id] = [scene_4, scene_5, scene_6]
+
+    # 事件 (按场景组织)
+    scene_1_events = [
+        {"event_id": "01JZEVENT00000000000001", "scene_id": scene_1["scene_id"], "book_id": BOOK_ID, "event_type": "confrontation", "cause": "家族长老质疑萧炎修炼进度", "action": "萧炎沉默承受，萧战维护儿子", "result": "三年之约被提出"},
+        {"event_id": "01JZEVENT00000000000002", "scene_id": scene_1["scene_id"], "book_id": BOOK_ID, "event_type": "internal_conflict", "cause": "族人嘲讽与怜悯交织", "action": "萧炎回忆天赋巅峰时的荣耀", "result": "内心种下复仇与证明的种子"},
+    ]
+    scene_2_events = [
+        {"event_id": "01JZEVENT00000000000003", "scene_id": scene_2["scene_id"], "book_id": BOOK_ID, "event_type": "reflection", "cause": "三年跌落无人理解", "action": "萧炎独自练拳至双手流血", "result": "坚定了不服输的意志"},
+    ]
+    scene_3_events = [
+        {"event_id": "01JZEVENT00000000000004", "scene_id": scene_3["scene_id"], "book_id": BOOK_ID, "event_type": "humiliation", "cause": "纳兰嫣然携云岚宗之势退婚", "action": "萧炎当众撕毁婚书立三年之约", "result": "萧家与云岚宗结下仇怨"},
+    ]
+    scene_4_events = [
+        {"event_id": "01JZEVENT00000000000005", "scene_id": scene_4["scene_id"], "book_id": BOOK_ID, "event_type": "discovery", "cause": "斗气修炼始终无法突破", "action": "萧炎发现戒指暗中吸收斗气", "result": "愤怒中怀疑有人暗中害他"},
+    ]
+    scene_5_events = [
+        {"event_id": "01JZEVENT00000000000006", "scene_id": scene_5["scene_id"], "book_id": BOOK_ID, "event_type": "revelation", "cause": "戒指吸满斗气后触发机关", "action": "药老以灵魂体现身揭秘三年真相", "result": "萧炎得知天赋消失的真正原因"},
+    ]
+    scene_6_events = [
+        {"event_id": "01JZEVENT00000000000007", "scene_id": scene_6["scene_id"], "book_id": BOOK_ID, "event_type": "decision", "cause": "药老提出炼药术传承的交换条件", "action": "萧炎权衡后选择拜师", "result": "获得焚决与炼药传承的承诺"},
+    ]
+    STORE.events_by_scene = {
+        scene_1["scene_id"]: scene_1_events,
+        scene_2["scene_id"]: scene_2_events,
+        scene_3["scene_id"]: scene_3_events,
+        scene_4["scene_id"]: scene_4_events,
+        scene_5["scene_id"]: scene_5_events,
+        scene_6["scene_id"]: scene_6_events,
+    }
+
+    # 冲突 (2个主要冲突)
+    STORE.conflicts = {
+        "01JZCNFLICT0000000000001": {"conflict_id": "01JZCNFLICT0000000000001", "book_id": BOOK_ID, "objective": "三年之约：萧炎 vs 纳兰嫣然", "pressure": "云岚宗以势压人，萧家面临灭族压力，少年必须在三年内重登巅峰。"},
+        "01JZCNFLICT0000000000002": {"conflict_id": "01JZCNFLICT0000000000002", "book_id": BOOK_ID, "objective": "天赋之谜：戒指吸收斗气的真相", "pressure": "三年跌落之谜揭晓——药老魂魄藏于戒指中，少年在怨恨与希望间挣扎。"},
+    }
+
+    # 钩子/悬念 (2个)
+    STORE.hooks = {
+        "01JZHOOK0000000000000001": {"hook_id": "01JZHOOK0000000000000001", "book_id": BOOK_ID, "hook_type": "cliffhanger", "description": "三年之约——萧炎能否在三年内超越云岚宗？"},
+        "01JZHOOK0000000000000002": {"hook_id": "01JZHOOK0000000000000002", "book_id": BOOK_ID, "hook_type": "mystery", "description": "戒指中的药老——他的真实身份与实力？"},
+    }
+
+    # 爽点 (2个)
+    STORE.rewards = {
+        "01JZRWRD0000000000000001": {"reward_id": "01JZRWRD0000000000000001", "book_id": BOOK_ID, "reward_type": "comeback", "description": "退婚当众撕书——弱者逆袭的经典爽点，读者情绪爆发点。"},
+        "01JZRWRD0000000000000002": {"reward_id": "01JZRWRD0000000000000002", "book_id": BOOK_ID, "reward_type": "power_reveal", "description": "药老现身揭秘——三年屈辱终得解释，读者获得真相满足感。"},
+    }
+
+    # 高潮 (1个)
+    STORE.climaxes = {
+        "01JZCLIMAX0000000000001": {"climax_id": "01JZCLIMAX0000000000001", "book_id": BOOK_ID, "climax_type": "emotional_peak", "description": "药老现身：戒指中的灵魂第一次完全显现，少年三年的所有痛苦找到答案。"},
+    }
+
+    # 关系链 (2条)
+    STORE.relationship_edges = {
+        "01JZRLEDGE0000000000001": {"edge_id": "01JZRLEDGE0000000000001", "book_id": BOOK_ID, "from_object_id": "01JZOBJ0000000000000000001", "to_object_id": "01JZOBJ0000000000000000002", "relation_type": "master_disciple", "description": "药老收萧炎为徒"},
+        "01JZRLEDGE0000000000002": {"edge_id": "01JZRLEDGE0000000000002", "book_id": BOOK_ID, "from_object_id": "01JZOBJ0000000000000000001", "to_object_id": "01JZOBJ0000000000000000003", "relation_type": "bloodline", "description": "萧炎为萧家嫡子"},
+    }
+
+    # 丰富章节数据（让章节节奏面板显示非零值）
+    STORE.chapters_by_book[BOOK_ID][0].update({
+        "sceneCount": 3, "eventCount": 4, "conflictIndex": 2, "suspenseIndex": 1, "rewardCount": 1, "evidenceCoverage": 0.85,
+    })
+    STORE.chapters_by_book[BOOK_ID][1].update({
+        "sceneCount": 3, "eventCount": 3, "conflictIndex": 1, "suspenseIndex": 1, "rewardCount": 1, "evidenceCoverage": 0.92,
+    })
+
     STORE.extraction_runs[RUN_ID] = {
         "schema_version": 1,
         "run_id": RUN_ID,
@@ -3413,15 +3493,15 @@ def create_extraction_run(
             f"object://extraction-reports/{run_id}",
             f"object://quality-reports/{run_id}",
         ],
-        status="queued",
-        progress=0,
+        status="running",
+        progress=10,
         idempotency_key=f"extract-{book_id}",
         request_id=request_id,
         trace_id=trace_id,
         actor_id=context["actor_id"],
         retry_count=0,
         created_at=now,
-        started_at=None,
+        started_at=now,
         finished_at=None,
         latency_ms=None,
     )
@@ -3454,7 +3534,7 @@ def create_extraction_run(
     _append_task_event(
         task,
         "created",
-        "Extraction run queued.",
+        "Extraction running – analyzing chapters...",
         task["status"],
         request_id,
         trace_id,
@@ -3462,6 +3542,30 @@ def create_extraction_run(
         payload_json={"book_id": book_id, "run_id": run_id},
         created_at=now,
     )
+
+    # --- trigger synchronous extraction pipeline ---
+    try:
+        import importlib.util
+
+        _extraction_path = Path(__file__).resolve().parent / "extraction_pipeline.py"
+        _spec = importlib.util.spec_from_file_location("extraction_pipeline", _extraction_path)
+        _extraction = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_extraction)
+        _extraction.run_sync_extraction(
+            store=STORE,
+            book_id=book_id,
+            run_id=run_id,
+            task_id=task_id,
+            workspace_id=context["workspace_id"],
+            trace_id=trace_id,
+        )
+    except Exception:
+        import traceback
+
+        run["status"] = "failed"
+        run["errors"] = [traceback.format_exc()]
+        task["status"] = "failed"
+
     return run
 
 
@@ -4140,6 +4244,24 @@ def create_novel_project(
         "story_bible": story_bible,
         "chapter_plans": [],
     }
+
+
+def list_novel_projects() -> list[dict[str, Any]]:
+    """Return all novel projects with minimal story bible preview."""
+    return [
+        {
+            "project_id": project_id,
+            "title": project["title"],
+            "genre_scope": project.get("genre_scope", ""),
+            "status": project.get("status", "draft"),
+            "story_bible_id": project.get("story_bible_id", ""),
+            "quality_gate_profile_id": project.get("quality_gate_profile_id", ""),
+            "created_at": project.get("created_at", ""),
+            "updated_at": project.get("updated_at", ""),
+            "story_bible_status": (STORE.story_bibles.get(project.get("story_bible_id", ""), {}) or {}).get("status") or None,
+        }
+        for project_id, project in STORE.novel_projects.items()
+    ]
 
 
 def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:

@@ -1,75 +1,117 @@
-import { BookOpen, ChevronRight, FileText, Home, Network, PenLine, Settings, ShieldAlert, Sparkles } from "lucide-react";
-import { Link, Outlet } from "react-router-dom";
+import { BookOpen, PenLine, Settings } from "lucide-react";
+import { useState } from "react";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
-import { ThemeToggle } from "./theme-toggle";
+import { Separator } from "@/components/ui/separator";
 
-const navItems = [
-  { to: "/workspaces/demo-workspace", label: "Home", description: "工作台", icon: Home },
-  { to: "/sources", label: "Sources", description: "来源与拆书", icon: BookOpen },
-  { to: "/knowledge", label: "Knowledge", description: "知识包", icon: Network },
-  { to: "/projects", label: "Projects", description: "小说项目", icon: FileText },
-  { to: "/projects/01JZPROJECT000000000000001/writing/01JZWRITING00000000000001", label: "Writing", description: "章节生成", icon: PenLine },
-  { to: "/review", label: "Review", description: "异常处理", icon: ShieldAlert },
-  { to: "/reports", label: "Reports", description: "质量反馈", icon: Sparkles },
-  { to: "/settings", label: "Settings", description: "模型配置", icon: Settings },
-];
+type Lane = "deconstruct" | "write";
+
+const lanes = [
+  {
+    id: "deconstruct" as Lane,
+    icon: BookOpen,
+    label: "拆书",
+    hint: "上传参考作品，自动拆解为知识",
+    color: "amber",
+    path: "/sources",
+  },
+  {
+    id: "write" as Lane,
+    icon: PenLine,
+    label: "写书",
+    hint: "基于知识包生成原创章节",
+    color: "indigo",
+    path: "/projects",
+  },
+] as const;
 
 export function AppShell() {
+  const location = useLocation();
+  const currentLane: Lane = location.pathname.startsWith("/projects")
+    ? "write"
+    : "deconstruct";
+  const [activeLane, setActiveLane] = useState<Lane>(currentLane);
+
   return (
-    <div className="nf-shell">
-      <aside className="nf-sidebar">
-        <div className="nf-brand">
-          <h1>Novel Factory</h1>
-          <p>上传参考作品，自动拆书，沉淀可复用知识，再生成原创章节。</p>
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* ===== Left Rail: 56px icon-only sidebar ===== */}
+      <aside className="flex w-14 shrink-0 flex-col items-center gap-3 border-r border-border bg-sidebar py-4">
+        {/* Brand mark */}
+        <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15">
+          <span className="font-['Playfair_Display',Georgia,serif] text-xs font-bold text-primary">
+            NF
+          </span>
         </div>
-        <nav aria-label="主导航">
-          <ul className="nf-nav-list">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <li key={`${item.label}-${item.to}`}>
-                  <Link className="nf-nav-link" to={item.to}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-                      <Icon aria-hidden="true" size={18} />
-                      <span>
-                        <strong>{item.label}</strong>
-                        <span style={{ display: "block", color: "var(--nf-muted)", fontSize: 12 }}>{item.description}</span>
-                      </span>
-                    </span>
-                    <ChevronRight aria-hidden="true" size={16} />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </aside>
-      <main className="nf-main">
-        <header className="nf-topbar">
-          <div>
-            <h2>创作者工作台</h2>
-            <p>少输入，自动运行，只在异常和关键确认处打断。</p>
-          </div>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
-            <ThemeToggle />
-            <span
-              style={{
-                border: "1px solid var(--nf-border)",
-                borderRadius: 999,
-                color: "var(--nf-success)",
-                padding: "6px 10px",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
+
+        <Separator className="w-8" />
+
+        {/* Two main lanes: Deconstruct (amber) and Write (indigo) */}
+        {lanes.map((lane) => {
+          const Icon = lane.icon;
+          const isActive = activeLane === lane.id;
+          return (
+            <Link
+              key={lane.id}
+              to={lane.path}
+              onClick={() => setActiveLane(lane.id)}
+              title={lane.hint}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 hover:bg-accent ${
+                isActive
+                  ? lane.color === "amber"
+                    ? "bg-secondary/15 text-secondary shadow-sm shadow-secondary/10"
+                    : "bg-primary/15 text-primary shadow-sm shadow-primary/10"
+                  : "text-muted-foreground"
+              }`}
             >
-              Demo workspace
+              <Icon size={18} />
+            </Link>
+          );
+        })}
+
+        {/* Spacer pushes settings to bottom */}
+        <div className="flex-1" />
+
+        <Separator className="w-8" />
+
+        <Link
+          to="/settings"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
+          title="设置"
+        >
+          <Settings size={18} />
+        </Link>
+      </aside>
+
+      {/* ===== Right: Workspace ===== */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top bar: context-aware header */}
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-6">
+          <div className="flex items-center gap-3">
+            <h1 className="font-['Playfair_Display',Georgia,serif] text-sm font-semibold tracking-wide text-foreground">
+              {activeLane === "deconstruct" ? "拆书工作台" : "写书工作台"}
+            </h1>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {activeLane === "deconstruct"
+                ? "上传 → 自动拆解 → 知识沉淀"
+                : "选择知识包 → 生成章节 → 审核发布"}
             </span>
           </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+            Demo workspace
+          </div>
         </header>
-        <div className="nf-content-frame">
-          <Outlet />
+
+        {/* Divider with breathing animation — signature element */}
+        <div className="relative h-px shrink-0 bg-gradient-to-r from-secondary/40 via-primary/20 to-transparent">
+          <div className="absolute inset-0 animate-breathe bg-gradient-to-r from-secondary/20 via-primary/30 to-transparent" />
         </div>
-      </main>
+
+        {/* Scrollable content area */}
+        <main className="flex-1 overflow-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

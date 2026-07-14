@@ -1,3 +1,5 @@
+import axios, { type AxiosInstance } from "axios";
+
 export type ApiEnvelope<T> = {
   data: T;
   request_id: string;
@@ -7,25 +9,45 @@ export type ApiEnvelope<T> = {
   actor_role: string;
 };
 
-export type ApiClientOptions = {
-  baseUrl?: string;
-  fetcher?: typeof fetch;
-};
-
 export class ApiClientError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly status?: number
+  ) {
     super(message);
     this.name = "ApiClientError";
   }
 }
 
+export type ApiClientOptions = {
+  baseUrl?: string;
+};
+
 export class NovelFactoryApiClient {
-  private readonly baseUrl: string;
-  private readonly fetcher: typeof fetch;
+  private readonly http: AxiosInstance;
 
   constructor(options: ApiClientOptions = {}) {
-    this.baseUrl = options.baseUrl ?? "";
-    this.fetcher = options.fetcher ?? fetch;
+    this.http = axios.create({
+      baseURL: options.baseUrl ?? "",
+      headers: { "content-type": "application/json" },
+      timeout: 30000,
+    });
+
+    this.http.interceptors.response.use(
+      (response) => {
+        const envelope = response.data as ApiEnvelope<unknown>;
+        return { ...response, data: envelope.data };
+      },
+      (error) => {
+        if (axios.isAxiosError(error) && error.response) {
+          throw new ApiClientError(
+            `API request failed with status ${error.response.status}`,
+            error.response.status
+          );
+        }
+        throw error;
+      }
+    );
   }
 
   async createBook(payload: {
@@ -83,19 +105,33 @@ export class NovelFactoryApiClient {
   }
 
   async listKnowledgeObjects(runId: string) {
-    return this.get(`/v1/knowledge-objects?run_id=${encodeURIComponent(runId)}`);
+    return this.get(
+      `/v1/knowledge-objects?run_id=${encodeURIComponent(runId)}`
+    );
   }
 
-  async reviewKnowledgeObject(objectId: string, payload: { action: string; target_object_id?: string; note?: string }) {
-    return this.post(`/v1/knowledge-objects/${objectId}/review-actions`, payload);
+  async reviewKnowledgeObject(
+    objectId: string,
+    payload: { action: string; target_object_id?: string; note?: string }
+  ) {
+    return this.post(
+      `/v1/knowledge-objects/${objectId}/review-actions`,
+      payload
+    );
   }
 
-  async listKnowledgeSources(params: { workspace_id?: string; status?: string } = {}) {
+  async listKnowledgeSources(
+    params: { workspace_id?: string; status?: string } = {}
+  ) {
     const search = new URLSearchParams();
     if (params.workspace_id) search.set("workspace_id", params.workspace_id);
     if (params.status) search.set("status", params.status);
     const suffix = search.toString() ? `?${search.toString()}` : "";
     return this.get(`/v1/knowledge-sources${suffix}`);
+  }
+
+  async listNovelProjects() {
+    return this.get("/v1/novel-projects");
   }
 
   async createNovelProject(payload: {
@@ -113,15 +149,49 @@ export class NovelFactoryApiClient {
     return this.get(`/v1/novel-projects/${projectId}`);
   }
 
+  async getWritingRun(writingRunId: string) {
+    return this.get(`/v1/writing-runs/${writingRunId}`);
+  }
+
+  async postWritingReviewAction(
+    writingRunId: string,
+    payload: {
+      schema_version?: number;
+      action: string;
+      requested_by: string;
+      trace_id: string;
+      issue_id?: string;
+      note?: string;
+      output_ref?: string;
+    }
+  ) {
+    return this.post(
+      `/v1/writing-runs/${writingRunId}/review-actions`,
+      payload
+    );
+  }
+
+  async acceptChapter(writingRunId: string) {
+    return this.post(`/v1/writing-runs/${writingRunId}/accept-chapter`, {});
+  }
+
   async getStoryBible(storyBibleId: string) {
     return this.get(`/v1/story-bibles/${storyBibleId}`);
   }
 
   async reviewStoryBible(
     storyBibleId: string,
-    payload: { action: string; summary?: string; note?: string; story_bible_payload?: Record<string, unknown> },
+    payload: {
+      action: string;
+      summary?: string;
+      note?: string;
+      story_bible_payload?: Record<string, unknown>;
+    }
   ) {
-    return this.post(`/v1/story-bibles/${storyBibleId}/review-actions`, payload);
+    return this.post(
+      `/v1/story-bibles/${storyBibleId}/review-actions`,
+      payload
+    );
   }
 
   async getGraphSummary(bookId?: string) {
@@ -129,7 +199,9 @@ export class NovelFactoryApiClient {
     return this.get(`/v1/graph/summary${suffix}`);
   }
 
-  async searchGraphNodes(params: { bookId?: string; query?: string; nodeType?: string } = {}) {
+  async searchGraphNodes(
+    params: { bookId?: string; query?: string; nodeType?: string } = {}
+  ) {
     const search = new URLSearchParams();
     if (params.bookId) search.set("book_id", params.bookId);
     if (params.query) search.set("query", params.query);
@@ -146,6 +218,10 @@ export class NovelFactoryApiClient {
     return this.get(`/v1/graph/nodes/${nodeId}/neighbors`);
   }
 
+  async getConfiguration() {
+    return this.get("/v1/configuration");
+  }
+
   async setModelProfileEnabled(modelProfileId: string, enabled: boolean) {
     const action = enabled ? "enable" : "disable";
     return this.post(`/v1/model-profiles/${modelProfileId}/${action}`, {});
@@ -153,7 +229,17 @@ export class NovelFactoryApiClient {
 
   async updateAgentAssignment(
     assignmentId: string,
-    { modelProfileId, maxRetry, maxCost, enabled }: { modelProfileId: string; maxRetry: number; maxCost: number; enabled: boolean },
+    {
+      modelProfileId,
+      maxRetry,
+      maxCost,
+      enabled,
+    }: {
+      modelProfileId: string;
+      maxRetry: number;
+      maxCost: number;
+      enabled: boolean;
+    }
   ) {
     return this.post(`/v1/agent-model-assignments/${assignmentId}`, {
       model_profile_id: modelProfileId,
@@ -163,7 +249,11 @@ export class NovelFactoryApiClient {
     });
   }
 
-  async updateQualityGateProfile(profileId: string, aiFlavorThreshold: number, originalitySafetyThreshold: number) {
+  async updateQualityGateProfile(
+    profileId: string,
+    aiFlavorThreshold: number,
+    originalitySafetyThreshold: number
+  ) {
     return this.post(`/v1/quality-gate-profiles/${profileId}`, {
       ai_flavor_threshold: aiFlavorThreshold,
       originality_safety_threshold: originalitySafetyThreshold,
@@ -171,25 +261,13 @@ export class NovelFactoryApiClient {
   }
 
   private async get<T = unknown>(path: string): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`);
-    return this.parseResponse<T>(response);
+    const { data } = await this.http.get<T>(path);
+    return data;
   }
 
   private async post<T = unknown>(path: string, body: unknown): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return this.parseResponse<T>(response);
-  }
-
-  private async parseResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      throw new ApiClientError(`API request failed with status ${response.status}`, response.status);
-    }
-    const envelope = (await response.json()) as ApiEnvelope<T>;
-    return envelope.data;
+    const { data } = await this.http.post<T>(path, body);
+    return data;
   }
 }
 

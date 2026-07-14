@@ -1,22 +1,40 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { DEMO_BOOK_ID } from "../../components/phase-two-state";
-import { createNovelFactoryApiClient } from "../../lib/api-client";
-import { resolveApiBaseUrl } from "../../lib/api-base";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { usePhaseTwo } from "../../state/phase-two-provider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { resolveApiBaseUrl } from "@/lib/api-base";
+import { createNovelFactoryApiClient } from "@/lib/api-client";
+
+type RecentBook = {
+  bookId: string;
+  title: string;
+  authorName: string;
+  sourceType: string;
+};
 
 export function SourceLibraryPage() {
   const navigate = useNavigate();
-  const { state, uploadBook } = usePhaseTwo();
   const apiBaseUrl = resolveApiBaseUrl();
-  const apiClient = useMemo(() => (apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null), [apiBaseUrl]);
+  const apiClient = useMemo(
+    () =>
+      apiBaseUrl ? createNovelFactoryApiClient({ baseUrl: apiBaseUrl }) : null,
+    [apiBaseUrl]
+  );
   const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState("第一章 乌坦城风起……");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [lastApiBook, setLastApiBook] = useState<RecentBook | null>(null);
+
+  const recentBook: RecentBook | null = lastApiBook;
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setError(null);
@@ -25,7 +43,8 @@ export function SourceLibraryPage() {
       setSelectedFileName(null);
       return;
     }
-    const isTxt = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
+    const isTxt =
+      file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
     if (!isTxt) {
       setSelectedFileName(null);
       setError("仅支持 .txt 文本文件。");
@@ -52,129 +71,190 @@ export function SourceLibraryPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSubmitting(true);
     const form = new FormData(event.currentTarget);
     const title = String(form.get("title") ?? "");
     const authorName = String(form.get("authorName") ?? "");
     const sourceType = String(form.get("sourceType") ?? "reference_novel");
-    if (apiClient) {
-      try {
-        const book = await apiClient.createBook({
-          title,
-          author_name: authorName,
-          source_type: sourceType,
-          platform: String(form.get("platform") ?? ""),
-          genre: String(form.get("genre") ?? ""),
-          usage_boundary: String(form.get("usageBoundary") ?? ""),
-          source_text: String(form.get("sourceText") ?? ""),
-        }) as { book_id: string };
-        await apiClient.createExtractionRun(book.book_id);
-        navigate(`/sources/${book.book_id}/analysis`);
-        return;
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Upload failed");
-        return;
-      }
+    if (!apiClient) {
+      setError("请配置 VITE_NOVEL_FACTORY_API_BASE_URL 后再上传。");
+      setSubmitting(false);
+      return;
     }
-    uploadBook({ title, authorName, sourceType });
-    navigate(`/sources/${DEMO_BOOK_ID}/analysis`);
+    try {
+      const book: any = await apiClient.createBook({
+        title,
+        author_name: authorName,
+        source_type: sourceType,
+        platform: String(form.get("platform") ?? ""),
+        genre: String(form.get("genre") ?? ""),
+        usage_boundary: String(form.get("usageBoundary") ?? ""),
+        source_text: String(form.get("sourceText") ?? ""),
+      });
+      await apiClient.createExtractionRun(book.book_id);
+      setLastApiBook({ bookId: book.book_id, title, authorName, sourceType });
+      setSubmitting(false);
+      navigate(`/sources/${book.book_id}/analysis`);
+      return;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Upload failed");
+      setSubmitting(false);
+      return;
+    }
   }
 
   return (
-    <section className="nf-source-page">
-      <div className="nf-analysis-hero">
+    <div className="space-y-6">
+      {/* Hero banner */}
+      <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-6">
         <div>
-          <Badge variant="success">Sources</Badge>
-          <h2>上传参考作品，自动拆书学习</h2>
-          <p>确认来源边界后，系统自动完成章节切分、对象抽取、证据绑定、套路节奏分析和知识包准备。</p>
+          <Badge variant="success" className="mb-2">
+            Sources
+          </Badge>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">
+            上传参考作品，自动拆书学习
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            确认来源边界后，系统自动完成章节切分、对象抽取、证据绑定、套路节奏分析和知识包准备。
+          </p>
         </div>
-        <div className="nf-analysis-actions">
+        {lastApiBook ? (
           <Button asChild variant="secondary">
-            <Link to={`/sources/${state.book.bookId}/analysis`}>继续分析中心</Link>
+            <Link to={`/sources/${lastApiBook.bookId}/analysis`}>
+              继续分析中心
+            </Link>
           </Button>
-        </div>
+        ) : null}
       </div>
 
-      <div className="nf-source-grid">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.2fr]">
+        {/* Upload form */}
         <Card>
           <CardHeader>
             <CardTitle>Upload Source</CardTitle>
-            <CardDescription>少填字段，上传后直接进入自动分析。</CardDescription>
+            <CardDescription>
+              少填字段，上传后直接进入自动分析。
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form aria-label="上传来源书籍" className="nf-form-grid" onSubmit={handleSubmit}>
-              <label className="nf-field">
-                书名
-                <input name="title" defaultValue="Battle Through the Heavens" />
-              </label>
-              <label className="nf-field">
-                作者
-                <input name="authorName" defaultValue="Tian Can Tu Dou" />
-              </label>
-              <label className="nf-field">
-                平台
-                <input name="platform" defaultValue="起点中文网" />
-              </label>
-              <label className="nf-field">
-                题材
-                <input name="genre" defaultValue="玄幻升级流" />
-              </label>
-              <label className="nf-field">
-                来源类型
-                <select name="sourceType" defaultValue="reference_novel">
+            <form
+              aria-label="上传来源书籍"
+              className="space-y-4"
+              onSubmit={handleSubmit}
+            >
+              <div className="space-y-2">
+                <label className="text-sm font-medium">书名</label>
+                <input
+                  name="title"
+                  defaultValue="Battle Through the Heavens"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">作者</label>
+                <input
+                  name="authorName"
+                  defaultValue="Tian Can Tu Dou"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">平台</label>
+                <input
+                  name="platform"
+                  defaultValue="起点中文网"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">题材</label>
+                <input
+                  name="genre"
+                  defaultValue="玄幻升级流"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">来源类型</label>
+                <select
+                  name="sourceType"
+                  defaultValue="reference_novel"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
                   <option value="reference_novel">参考小说</option>
                   <option value="outline">大纲</option>
                 </select>
-              </label>
-              <label className="nf-field">
-                文本粘贴 / TXT 文件
-                <input aria-label="选择 TXT 文件" accept=".txt,text/plain" name="sourceFile" onChange={handleFileChange} type="file" />
-                <textarea aria-label="文本粘贴 / TXT 文件内容" name="sourceText" rows={4} value={sourceText} onChange={(event) => setSourceText(event.target.value)} />
-                <span>{selectedFileName ? `已读取 ${selectedFileName}，可继续编辑文本。` : "可粘贴文本，或选择 .txt 文件自动填入。"}</span>
-              </label>
-              <label className="nf-field">
-                用途边界
-                <input name="usageBoundary" defaultValue="仅供结构学习，不直接复写原文。" />
-              </label>
-              {error ? <p role="alert">{error}</p> : null}
-              <Button type="submit">Upload and Analyze</Button>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  文本粘贴 / TXT 文件
+                </label>
+                <input
+                  aria-label="选择 TXT 文件"
+                  accept=".txt,text/plain"
+                  name="sourceFile"
+                  onChange={handleFileChange}
+                  type="file"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <textarea
+                  aria-label="文本粘贴 / TXT 文件内容"
+                  name="sourceText"
+                  rows={4}
+                  value={sourceText}
+                  onChange={(event) => setSourceText(event.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                {selectedFileName && (
+                  <span className="text-xs text-muted-foreground">
+                    {selectedFileName}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">使用边界</label>
+                <select
+                  name="usageBoundary"
+                  defaultValue="analysis_only"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="analysis_only">仅分析</option>
+                  <option value="fragment_reuse">片段复用</option>
+                </select>
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? "上传中..." : "上传并开始拆书"}
+              </Button>
             </form>
           </CardContent>
         </Card>
 
-        <div className="nf-analysis-stack">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent analysis</CardTitle>
-              <CardDescription>最近来源与自动拆书状态。</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="nf-source-list">
-                <li className="nf-source-item">
-                  <div className="nf-row-between">
-                    <h3>{state.book.title}</h3>
-                    <Badge variant="warning">{state.run.status}</Badge>
-                  </div>
-                  <p>{state.book.authorName} · {state.book.sourceType} · 章节 {state.run.chapterCount} · 证据 {state.run.evidenceCount}</p>
-                  <p>下一步：处理 {state.bookAnalysisSummary.needsAttentionCount} 个异常后提交知识包。</p>
-                  <Button asChild size="sm" variant="secondary">
-                    <Link to={`/sources/${state.book.bookId}/analysis`}>打开拆书分析中心</Link>
-                  </Button>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage boundary</CardTitle>
-              <CardDescription>平台只学习结构、节奏、证据和套路，不直接复写原文。</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>上传来源用于抽取可追踪知识资产：人物、势力、事件、冲突、悬念、爽点、Pattern、Rhythm、Asset 与 Rule。</p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Recent uploads + activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Sources</CardTitle>
+            <CardDescription>最近上传的参考作品</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentBook ? (
+              <div className="rounded-lg border border-border p-4">
+                <h3 className="font-medium">{recentBook.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {recentBook.authorName} · {recentBook.sourceType}
+                </p>
+                <Button asChild variant="outline" size="sm" className="mt-3">
+                  <Link to={`/sources/${recentBook.bookId}`}>查看详情</Link>
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                暂无上传记录。上传第一本参考作品开始拆书。
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </section>
+    </div>
   );
 }

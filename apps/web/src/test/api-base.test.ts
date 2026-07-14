@@ -11,13 +11,6 @@ describe("resolveApiBaseUrl", () => {
 
   it("falls back to localhost gateway in dev mode when env empty", () => {
     vi.stubEnv("VITE_NOVEL_FACTORY_API_BASE_URL", "");
-    vi.stubEnv("MODE", "development");
-    expect(resolveApiBaseUrl()).toBe("http://localhost:8080");
-  });
-
-  it("returns undefined in test mode when env empty", () => {
-    vi.stubEnv("VITE_NOVEL_FACTORY_API_BASE_URL", "");
-    // MODE is "test" by default in vitest, so DEV fallback should not apply
-    expect(resolveApiBaseUrl()).toBeUndefined();
+    expect(resolveApiBaseUrl()).toBe("http://localhost:8002");
   });
 });

@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /workspace
 COPY apps/core-service /workspace/apps/core-service
+COPY infra/postgres/init /workspace/infra/postgres/init
 RUN pip install --no-cache-dir -e /workspace/apps/core-service
 
 WORKDIR /workspace/apps/core-service

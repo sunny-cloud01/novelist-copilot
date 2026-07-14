@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.envelope import success_envelope
-from app.core.phase_two_store import WORKSPACE_ID, apply_story_bible_action, create_novel_project, get_novel_project, get_story_bible
+from app.core.phase_two_store import WORKSPACE_ID, apply_story_bible_action, create_novel_project, get_novel_project, get_story_bible, list_novel_projects
 
 router = APIRouter()
 
@@ -42,6 +42,19 @@ def post_novel_project(command: CreateNovelProjectCommand, request: Request) -> 
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return success_envelope(
         data=project,
+        request_id=request.state.request_id,
+        trace_id=request.state.trace_id,
+        workspace_id=request.state.workspace_id,
+        actor_id=request.state.actor_id,
+        actor_role=request.state.actor_role,
+    )
+
+
+@router.get("/novel-projects")
+def list_novel_projects_handler(request: Request) -> dict:
+    projects = list_novel_projects()
+    return success_envelope(
+        data={"items": projects},
         request_id=request.state.request_id,
         trace_id=request.state.trace_id,
         workspace_id=request.state.workspace_id,

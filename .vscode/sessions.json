@@ -1,0 +1,43 @@
+{
+  "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v10/terminal-keeper.json",
+  "theme": "tribe",
+  "active": "reset",
+  "activateOnStartup": true,
+  "keepExistingTerminals": false,
+  "sessions": {
+    "default": [
+      {
+        "name": "前端启动 (Vite :5174)",
+        "autoExecuteCommands": true,
+        "icon": "browser",
+        "color": "terminal.ansiGreen",
+        "commands": ["cd apps/web && pnpm dev"]
+      },
+      {
+        "name": "后端-基础设施 (PG/Redis/MinIO)",
+        "autoExecuteCommands": true,
+        "icon": "database",
+        "color": "terminal.ansiBlue",
+        "commands": [
+          "docker compose -f infra/docker-compose.yml up -d postgres redis minio minio-bootstrap && echo '✅ 基础设施已启动 (postgres:5436, redis:6379, minio:9000)'"
+        ]
+      },
+      {
+        "name": "后端-业务服务 (Core/API/Worker/Scheduler)",
+        "autoExecuteCommands": true,
+        "icon": "server-process",
+        "color": "terminal.ansiCyan",
+        "commands": [
+          "docker compose -f infra/docker-compose.yml stop core-service api-gateway ai-worker scheduler 2>/dev/null; docker compose -f infra/docker-compose.yml rm -f core-service api-gateway ai-worker scheduler 2>/dev/null; docker compose -f infra/docker-compose.yml up -d --build core-service api-gateway ai-worker scheduler && echo '✅ 业务服务已启动 (api-gateway:8002, core:8100)'"
+        ]
+      }
+    ],
+    "reset": [
+      {
+        "name": "重置",
+        "icon": "terminal",
+        "commands": []
+      }
+    ]
+  }
+}

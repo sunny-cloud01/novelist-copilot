@@ -141,6 +141,10 @@ def get_workspace_home(workspace_id: str) -> Optional[dict[str, Any]]:
     return _STORE.get_workspace_home(workspace_id)
 
 
+def list_novel_projects() -> list[dict[str, Any]]:
+    return _STORE.list_novel_projects()
+
+
 def get_novel_project(project_id: str) -> Optional[dict[str, Any]]:
     return _STORE.get_novel_project(project_id)
 

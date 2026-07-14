@@ -253,18 +253,22 @@ def save_business_state(snapshot: dict[str, Any]) -> None:
     connection = _connect()
     if connection is None:
         return
-    with connection:
-        with connection.cursor() as cursor:
-            _delete_all(cursor)
-            _save_identity(cursor, snapshot)
-            _save_config(cursor, snapshot)
-            _save_source(cursor, snapshot)
-            _save_story_structure(cursor, snapshot)
-            _save_extraction_knowledge_graph(cursor, snapshot)
-            _save_project_planning(cursor, snapshot)
-            _save_writing_quality_feedback(cursor, snapshot)
-            _save_nks_support(cursor, snapshot)
-            _save_audit(cursor, {**snapshot, "migration_events": migration_events})
+    try:
+        with connection:
+            with connection.cursor() as cursor:
+                _delete_all(cursor)
+                _save_identity(cursor, snapshot)
+                _save_config(cursor, snapshot)
+                _save_source(cursor, snapshot)
+                _save_story_structure(cursor, snapshot)
+                _save_extraction_knowledge_graph(cursor, snapshot)
+                _save_project_planning(cursor, snapshot)
+                _save_writing_quality_feedback(cursor, snapshot)
+                _save_nks_support(cursor, snapshot)
+                _save_audit(cursor, {**snapshot, "migration_events": migration_events})
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to persist business state — server will continue without persistence")
 
 
 def backfill_business_state_from_snapshot(snapshot: dict[str, Any]) -> None:
@@ -450,19 +454,19 @@ def _load_source(cursor: Any, state: dict[str, Any]) -> None:
 
 def _save_story_structure(cursor: Any, snapshot: dict[str, Any]) -> None:
     scenes = [scene for scenes in (snapshot.get("source_scenes_by_chapter") or {}).values() for scene in scenes]
-    _execute_many(cursor, "INSERT INTO core.source_scenes (scene_id, book_id, chapter_id, workspace_id, scene_index, title, text_range, segmentation_status, segmentation_confidence, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", ((i["scene_id"], i["book_id"], i["chapter_id"], i["workspace_id"], i["scene_index"], i["title"], i["text_range"], i.get("segmentation_status", "segmented"), i.get("segmentation_confidence", 0), _json(i.get("evidence_refs", [])), _json(i), i.get("created_at"), i.get("updated_at")) for i in scenes))
+    _execute_many(cursor, "INSERT INTO core.source_scenes (scene_id, book_id, chapter_id, workspace_id, scene_index, title, text_range, segmentation_status, segmentation_confidence, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", ((i.get("scene_id", ""), i.get("book_id", ""), i.get("chapter_id", ""), i.get("workspace_id", ""), i.get("scene_index", 0), i.get("title", ""), i.get("text_range", ""), i.get("segmentation_status", "segmented"), i.get("segmentation_confidence", 0), _json(i.get("evidence_refs", [])), _json(i), i.get("created_at"), i.get("updated_at")) for i in scenes))
     events = [event for events in (snapshot.get("events_by_scene") or {}).values() for event in events]
-    _execute_many(cursor, "INSERT INTO core.story_events (event_id, book_id, chapter_id, scene_id, workspace_id, event_index, event_type, cause, action, result, consequence, participants, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s)", ((i["event_id"], i["book_id"], i["chapter_id"], i.get("scene_id"), i["workspace_id"], i["event_index"], i["event_type"], i["cause"], i["action"], i["result"], i["consequence"], _json(i.get("participants", [])), _json(i.get("evidence_refs", [])), _json(i), i.get("created_at"), i.get("updated_at")) for i in events))
+    _execute_many(cursor, "INSERT INTO core.story_events (event_id, book_id, chapter_id, scene_id, workspace_id, event_index, event_type, cause, action, result, consequence, participants, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s)", ((i.get("event_id", ""), i.get("book_id", ""), i.get("chapter_id", ""), i.get("scene_id"), i.get("workspace_id", ""), i.get("event_index", 0), i.get("event_type", ""), i.get("cause", ""), i.get("action", ""), i.get("result", ""), i.get("consequence", ""), _json(i.get("participants", [])), _json(i.get("evidence_refs", [])), _json(i), i.get("created_at"), i.get("updated_at")) for i in events))
     for item in _rows(snapshot.get("conflicts")):
-        cursor.execute("INSERT INTO core.story_conflicts (conflict_id, book_id, chapter_id, scene_id, workspace_id, parties, objective, pressure, escalation_level, resolution_state, trigger_event_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item["conflict_id"], item["book_id"], item["chapter_id"], item.get("scene_id"), item["workspace_id"], _json(item.get("parties", [])), item["objective"], item["pressure"], item.get("escalation_level", 0), item["resolution_state"], item.get("trigger_event_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
+        cursor.execute("INSERT INTO core.story_conflicts (conflict_id, book_id, chapter_id, scene_id, workspace_id, parties, objective, pressure, escalation_level, resolution_state, trigger_event_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item.get("conflict_id", ""), item.get("book_id", ""), item.get("chapter_id", ""), item.get("scene_id"), item.get("workspace_id", ""), _json(item.get("parties", [])), item.get("objective", ""), item.get("pressure", ""), item.get("escalation_level", 0), item.get("resolution_state", ""), item.get("trigger_event_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
     for item in _rows(snapshot.get("hooks")):
-        cursor.execute("INSERT INTO core.story_hooks (hook_id, book_id, chapter_id, scene_id, workspace_id, hook_type, open_question, introduced_at, expected_resolution_range, linked_conflict_id, linked_event_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item["hook_id"], item["book_id"], item["chapter_id"], item.get("scene_id"), item["workspace_id"], item["hook_type"], item["open_question"], item["introduced_at"], item["expected_resolution_range"], item.get("linked_conflict_id"), item.get("linked_event_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
+        cursor.execute("INSERT INTO core.story_hooks (hook_id, book_id, chapter_id, scene_id, workspace_id, hook_type, open_question, introduced_at, expected_resolution_range, linked_conflict_id, linked_event_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item.get("hook_id", ""), item.get("book_id", ""), item.get("chapter_id", ""), item.get("scene_id"), item.get("workspace_id", ""), item.get("hook_type", ""), item.get("open_question", ""), item.get("introduced_at", ""), item.get("expected_resolution_range", ""), item.get("linked_conflict_id"), item.get("linked_event_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
     for item in _rows(snapshot.get("rewards")):
-        cursor.execute("INSERT INTO core.story_rewards (reward_id, book_id, chapter_id, scene_id, workspace_id, reward_type, trigger_event_id, beneficiary_character_id, reader_effect, intensity, payoff_target, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item["reward_id"], item["book_id"], item["chapter_id"], item.get("scene_id"), item["workspace_id"], item["reward_type"], item.get("trigger_event_id"), item.get("beneficiary_character_id"), item["reader_effect"], item.get("intensity", 0), item.get("payoff_target"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
+        cursor.execute("INSERT INTO core.story_rewards (reward_id, book_id, chapter_id, scene_id, workspace_id, reward_type, trigger_event_id, beneficiary_character_id, reader_effect, intensity, payoff_target, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item.get("reward_id", ""), item.get("book_id", ""), item.get("chapter_id", ""), item.get("scene_id"), item.get("workspace_id", ""), item.get("reward_type", ""), item.get("trigger_event_id"), item.get("beneficiary_character_id"), item.get("reader_effect", ""), item.get("intensity", 0), item.get("payoff_target"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
     for item in _rows(snapshot.get("climaxes")):
-        cursor.execute("INSERT INTO core.story_climaxes (climax_id, book_id, chapter_id, scene_id, workspace_id, scope_type, scope_id, event_id, conflict_id, reward_refs, hook_refs, intensity, aftermath, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item["climax_id"], item["book_id"], item.get("chapter_id"), item.get("scene_id"), item["workspace_id"], item["scope_type"], item["scope_id"], item.get("event_id"), item.get("conflict_id"), _json(item.get("reward_refs", [])), _json(item.get("hook_refs", [])), item.get("intensity", 0), item["aftermath"], _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
+        cursor.execute("INSERT INTO core.story_climaxes (climax_id, book_id, chapter_id, scene_id, workspace_id, scope_type, scope_id, event_id, conflict_id, reward_refs, hook_refs, intensity, aftermath, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item.get("climax_id", ""), item.get("book_id", ""), item.get("chapter_id"), item.get("scene_id"), item.get("workspace_id", ""), item.get("scope_type", ""), item.get("scope_id", ""), item.get("event_id"), item.get("conflict_id"), _json(item.get("reward_refs", [])), _json(item.get("hook_refs", [])), item.get("intensity", 0), item.get("aftermath", ""), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
     for item in _rows(snapshot.get("relationship_edges")):
-        cursor.execute("INSERT INTO core.relationship_edges (edge_id, book_id, workspace_id, source_id, relation_type, target_id, confidence, evidence_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item["edge_id"], item["book_id"], item["workspace_id"], item["source_id"], item["relation_type"], item["target_id"], item.get("confidence", 0), item.get("evidence_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
+        cursor.execute("INSERT INTO core.relationship_edges (edge_id, book_id, workspace_id, source_id, relation_type, target_id, confidence, evidence_id, evidence_refs, payload, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s)", (item.get("edge_id", ""), item.get("book_id", ""), item.get("workspace_id", ""), item.get("source_id", ""), item.get("relation_type", ""), item.get("target_id", ""), item.get("confidence", 0), item.get("evidence_id"), _json(item.get("evidence_refs", [])), _json(item), item.get("created_at"), item.get("updated_at")))
 
 
 def _load_story_structure(cursor: Any, state: dict[str, Any]) -> None:
